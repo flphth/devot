@@ -51,6 +51,10 @@ export interface ZgMindOptions {
   /** Provisional A0GI→USD rate for pricing. G2 recalibrates against a real run. */
   a0giUsd?: number;
   gate?: InferenceGate;
+  /** Inject a broker (tests / a pre-built broker); skips SDK+key bootstrap. */
+  broker?: ZgBroker;
+  /** Inject a fetch implementation (tests); defaults to the global fetch. */
+  fetchImpl?: typeof fetch;
 }
 
 /** 1 A0GI = 1e18 neurons (on-chain price unit), like wei. */
@@ -87,6 +91,10 @@ export class ZgMind implements MindProvider {
 
   private async getBroker(): Promise<ZgBroker> {
     if (this.broker) return this.broker;
+    if (this.opts.broker) {
+      this.broker = this.opts.broker;
+      return this.broker;
+    }
     const privateKey = this.opts.privateKey ?? process.env.ZG_PRIVATE_KEY ?? "";
     const rpcUrl = this.opts.rpcUrl ?? process.env.ZG_RPC_URL ?? "https://evmrpc-testnet.0g.ai";
     if (!privateKey) throw new Error("ZG_PRIVATE_KEY is required for MIND=0g (use a throwaway testnet key)");
@@ -154,7 +162,8 @@ export class ZgMind implements MindProvider {
         };
         if (jsonMode) body.response_format = { type: "json_object" };
 
-        const res = await fetch(`${endpoint}/chat/completions`, {
+        const doFetch = this.opts.fetchImpl ?? fetch;
+        const res = await doFetch(`${endpoint}/chat/completions`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...headers },
           body: JSON.stringify(body),
