@@ -114,6 +114,24 @@ export class VoxelWorld {
   readonly moveMats: Uint8Array;
 
   tick = 0;
+
+  /**
+   * REGISTRE ÉNERGÉTIQUE : total de l'énergie jamais entrée dans ce monde depuis
+   * l'extérieur du bilan — la photosynthèse, les dotations des fondateurs, les
+   * dons divins. Ni la nourriture mangée, ni les cadavres, ni l'héritage d'un
+   * enfant n'en font partie : ce sont des transferts internes.
+   *
+   * Sert à une seule chose, mais elle est vitale : affirmer par un test que
+   * `Σ énergie vivante + Σ nutriments du monde ≤ energyInjected`. C'est la seule
+   * formulation qui détecte un amplificateur d'énergie. L'ancien test comptait
+   * le mangé comme un revenu légitime, et laissait donc passer un cadavre qui
+   * rendait huit fois son coût de construction.
+   *
+   * Diagnostic uniquement : aucune règle de simulation ne le lit, ce qui permet
+   * au chemin GPU de ne pas le tenir sans changer l'état du monde.
+   */
+  energyInjected = 0;
+
   readonly seed: number;
   private nextOrgId = 1;
 
@@ -215,7 +233,15 @@ export class VoxelWorld {
   }
 
   /** Écrit un voxel de terrain en tenant la borne active à jour. */
+  /**
+   * Pose un matériau à la main : ensemencement, pouvoir divin, test. Tout
+   * nutriment ainsi ajouté vient de l'extérieur du monde et entre au registre —
+   * c'est ce qui permet au test de conservation de rester vrai même quand un
+   * dieu (ou un test) dépose de la nourriture.
+   */
   setMaterial(i: number, mat: number, nutrient = 0): void {
+    const gained = nutrient - this.nutrient[i]!;
+    if (gained > 0) this.energyInjected += gained;
     this.material[i] = mat;
     this.nutrient[i] = nutrient;
     this.touch(i);
@@ -385,6 +411,7 @@ export class VoxelWorld {
           if (rng.chance(8, 100)) {
             this.material[i] = BIOMASS;
             this.nutrient[i] = NUTRIENT_FRESH;
+            this.energyInjected += NUTRIENT_FRESH;
           }
           break;
         }

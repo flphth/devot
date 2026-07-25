@@ -164,6 +164,11 @@ export function passReproduce(w: VoxelWorld): void {
     if (childId === 0) continue;
 
     w.energy[id] = w.energy[id]! - REPRO_COST - share;
+    // L'héritage n'est pas une entrée d'énergie : il sort du parent pour entrer
+    // dans l'enfant. `spawnFromGenome` l'a compté comme une dotation, on défait
+    // cette ligne — sinon le registre autoriserait le monde à grossir d'une
+    // génération à l'autre, et le test de conservation ne prouverait plus rien.
+    w.energyInjected -= share;
   }
 }
 

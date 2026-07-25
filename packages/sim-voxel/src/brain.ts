@@ -128,14 +128,22 @@ export function think(
   const h = hidden > g.hiddenMax ? g.hiddenMax : hidden;
 
   if (h === 0) {
-    // Aucun neurone : réflexe direct entrées → sorties.
-    let o = 0;
-    for (let j = 0; j < NUM_OUTPUTS; j++) {
-      let sum = 0;
-      for (let i = 0; i < NUM_INPUTS; i++) sum += w[o++]! * inputs[i]!;
-      sum = (sum / FP_ONE) | 0;
-      outputs[j] = clampFp(sum + w[NUM_INPUTS * NUM_OUTPUTS + j]!);
-    }
+    // AUCUN NEURONE : aucune action. Pas de déplacement, pas de reproduction,
+    // pas d'attaque. Un corps sans système nerveux vit encore — il pousse selon
+    // son plan et sa bouche mange ce qui la touche, deux mécaniques du terrain —
+    // mais il n'agit pas, et surtout il ne se reproduit pas.
+    //
+    // Il y avait ici un « réflexe direct entrées → sorties », gratuit. C'était
+    // la vraie raison de l'extinction systématique des neurones : un réflexe
+    // linéaire résout parfaitement « aller vers le signal de nourriture le plus
+    // fort », donc la couche cachée n'achetait rien et coûtait 8 d'entretien
+    // plus 12 de pensée par neurone et par tick. Mesuré sur trois graines et
+    // 3 000 ticks : zéro cerveau survivant, corps réduits à deux voxels.
+    //
+    // Rendre l'action conditionnelle au système nerveux aligne la simulation sur
+    // sa propre prémisse : penser coûte la vie, mais ne pas penser interdit de
+    // vivre longtemps.
+    for (let j = 0; j < NUM_OUTPUTS; j++) outputs[j] = 0;
     return;
   }
 

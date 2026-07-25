@@ -71,6 +71,10 @@ export function spawnFromGenome(
   w.muscleCount[id] = 0;
   w.mouthCount[id] = 0;
   w.energy[id] = energy;
+  // Dotation comptée comme une entrée d'énergie. La reproduction, elle, annule
+  // cette ligne pour la part héritée : un enfant ne reçoit rien du monde, tout
+  // vient de son parent (voir `reproduce`).
+  w.energyInjected += energy;
   w.bornTick[id] = w.tick;
   w.eaten[id] = 0;
   w.distance[id] = 0;

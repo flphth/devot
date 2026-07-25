@@ -237,6 +237,35 @@ describe("cerveau — borné par les voxels neurone", () => {
 });
 
 describe("déplacement", () => {
+  it("un corps sans neurone n'agit pas du tout, même saturé d'énergie", () => {
+    // La règle qui donne son sens à « le cerveau est borné par les voxels
+    // neurone » : sans système nerveux, pas d'action. Il y avait auparavant un
+    // réflexe direct gratuit, et c'était la vraie cause de l'extinction
+    // systématique des cerveaux — un réflexe linéaire suffisait à ce monde, donc
+    // la couche cachée ne servait à rien et coûtait son entretien.
+    const w = flatWorld();
+    const plan = makePlan([
+      [0, 0, 0, MOUTH],
+      [1, 0, 0, MUSCLE],
+    ]);
+    const g = fixedBrain(plan, () => 3000); // toutes les sorties saturées
+    const p = registerGenome(w, g);
+    const id = spawnOrganism(w, p, 20, 1, 20, 500_000);
+    stepN(w, 3);
+    expect(w.muscleCount[id]).toBe(1); // il a bien de quoi bouger
+    expect(w.neuronCount[id]).toBe(0); // mais rien pour le vouloir
+
+    const seedBefore = w.seedIdx[id]!;
+    stepN(w, 10);
+    expect(w.seedIdx[id]).toBe(seedBefore);
+    expect(w.distance[id]).toBe(0);
+    expect(w.intentRepro[id]).toBe(0);
+    expect(w.intentAttack[id]).toBe(0);
+    // Il vit pourtant : la croissance et l'alimentation ne passent pas par le
+    // cerveau. Un corps sans nerfs est une plante, pas un cadavre.
+    expect(w.orgState[id]).toBe(1);
+  });
+
   it("un corps sans muscle ne bouge pas, quoi qu'en dise son cerveau", () => {
     const w = flatWorld();
     const plan = makePlan([[0, 0, 0, MOUTH]]);
@@ -249,18 +278,22 @@ describe("déplacement", () => {
     expect(w.distance[id]).toBe(0);
   });
 
-  it("un corps musclé se translate et paie la contraction", () => {
+  it("un corps musclé et pourvu d'un neurone se translate et paie la contraction", () => {
     const w = flatWorld();
+    // Le neurone n'est pas décoratif : sans système nerveux, aucune action n'est
+    // émise, quel que soit le cerveau (voir `think`).
     const plan = makePlan([
       [0, 0, 0, MOUTH],
       [1, 0, 0, MUSCLE],
+      [2, 0, 0, NEURON],
     ]);
     // Poids qui saturent la sortie « +x » : direction prévisible.
     const g = fixedBrain(plan, () => 2000);
     const p = registerGenome(w, g);
     const id = spawnOrganism(w, p, 20, 1, 20, 400_000);
-    stepN(w, 2); // le muscle pousse
+    stepN(w, 3); // le muscle et le neurone poussent
     expect(w.muscleCount[id]).toBe(1);
+    expect(w.neuronCount[id]).toBe(1);
 
     const before = { x: w.xOf(w.seedIdx[id]!), e: w.energy[id]! };
     step(w);
@@ -332,6 +365,7 @@ describe("reproduction", () => {
     const plan = makePlan([
       [0, 0, 0, MOUTH],
       [1, 0, 0, BONE],
+      [2, 0, 0, NEURON], // sans neurone, aucune intention n'est émise
     ]);
     const g = fixedBrain(plan, () => 2000); // veut tout, y compris se reproduire
     const p = registerGenome(w, g);
@@ -339,7 +373,7 @@ describe("reproduction", () => {
     const before = w.energy[parent]!;
 
     let child = 0;
-    for (let k = 0; k < 5 && child === 0; k++) {
+    for (let k = 0; k < 8 && child === 0; k++) {
       step(w);
       for (let id = 1; id < 100; id++) {
         if (id !== parent && w.orgState[id] === 1) child = id;

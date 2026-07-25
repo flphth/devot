@@ -10,6 +10,7 @@ import {
   MOUTH_EFFICIENCY_NUM,
   MOUTH_INTAKE_PER_TICK,
   NUTRIENT_DECAY,
+  SENESCENCE_PERIOD,
   STORAGE,
   UPKEEP,
   makePlan,
@@ -32,6 +33,29 @@ describe("l'énergie est la vie", () => {
     expect(w.energy[id]!).toBe(30_000 - UPKEEP[BONE]!);
     stepN(w, 9);
     expect(w.energy[id]!).toBe(30_000 - UPKEEP[BONE]! * 10);
+  });
+
+  it("vieillir coûte de plus en plus cher", () => {
+    // La sénescence : sans elle, un corps sans neurone — donc stérile, puisque
+    // le système nerveux commande toute action — vivrait éternellement sur une
+    // rive fertile et bloquerait la sélection.
+    const w = flatWorld();
+    const p = registerPlan(w, PLAN_SEED_BONE);
+    const id = spawnOrganism(w, p, 20, 1, 20, 5_000_000);
+
+    const costOverTenTicks = (): number => {
+      const before = w.energy[id]!;
+      stepN(w, 10);
+      return before - w.energy[id]!;
+    };
+    const young = costOverTenTicks();
+    stepN(w, SENESCENCE_PERIOD * 6);
+    const old = costOverTenTicks();
+
+    expect(young).toBe(UPKEEP[BONE]! * 10); // le tout jeune ne paie que son corps
+    expect(old).toBeGreaterThan(young); // le vieux paie son corps ET son âge
+    // La surcharge suit l'âge : +1 par tick tous les SENESCENCE_PERIOD ticks.
+    expect(old - young).toBeGreaterThanOrEqual(60);
   });
 
   it("aucune énergie n'apparaît de nulle part sans nourriture", () => {

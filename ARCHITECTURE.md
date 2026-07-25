@@ -141,7 +141,8 @@ déterministe ni portable sur GPU.
 | `passTerrain` | cellulaire (fusionnée) | eau, pousse et décomposition de la biomasse, alimentation des bouches — **une seule traversée** de la grille |
 | `passMetabolism` | réduction par organisme | somme l'entretien voxel par voxel |
 | `passBrain` | par organisme | perception, décision, et prélèvement du coût de la pensée |
-| `passDeath` | par organisme | énergie ≤ 0 → tout le corps devient biomasse riche |
+| `passMetabolism` (suite) | par organisme | l'entretien inclut une **surcharge d'âge** : vieillir coûte |
+| `passDeath` | par organisme | énergie ≤ 0 → le corps devient biomasse : la réserve du mort **plus** une part du coût de construction, jamais plus (§4.7) |
 | `passConnectivity` | parcours depuis le germe | ampute ce qui est déconnecté → biomasse morte |
 | `passGrowth` | par organisme | croissance ou cicatrisation d'un voxel, si l'énergie suit |
 | `passMove` | par organisme | translation du corps entier, payée par les muscles |
@@ -184,7 +185,64 @@ déplacement, reproduction, attaque. Tout est en **virgule fixe entière** — m
 raison que l'énergie (§4.1). Perdre ses neurones rend bête, les faire repousser
 rend à nouveau intelligent : la capacité est relue à chaque tick depuis le corps.
 
-### 4.6 Chunks
+**Sans neurone, aucune action.** Un corps sans système nerveux vit encore : il
+pousse selon son plan et sa bouche mange ce qui la touche, deux mécaniques du
+terrain. Mais il ne se déplace pas, n'attaque pas et ne se reproduit pas. Il y
+avait auparavant un « réflexe direct » gratuit qui reliait les entrées aux
+sorties sans neurone, et c'était la cause mesurée de l'extinction systématique
+des cerveaux : un réflexe linéaire résout parfaitement « aller vers le signal de
+nourriture le plus fort », donc la couche cachée n'achetait rien et coûtait son
+entretien. Sur trois graines et 3 000 ticks, il ne restait aucun cerveau.
+
+### 4.7 Thermodynamique : l'énergie ne se crée pas
+
+Une seule entrée d'énergie dans le monde : la **photosynthèse**. Les cadavres,
+la prédation, l'héritage d'un enfant sont des transferts internes. Le monde tient
+un registre, `energyInjected`, qui totalise ce qui est entré depuis l'extérieur
+du bilan, et un test exige en permanence :
+
+    Σ énergie des vivants + Σ nutriments du monde  ≤  energyInjected
+
+Cet invariant a une histoire. La formulation précédente — « l'énergie d'un
+organisme ne dépasse pas sa dotation plus ce qu'il a mangé » — était vraie et
+sans valeur : elle comptait le mangé comme un revenu légitime sans jamais
+demander d'où il venait. Or une dépouille rendait **12 000 par voxel** pour un
+coût de construction de **1 200** : un amplificateur ×8. Conséquence, invisible
+mais totale : l'écosystème vivait de ses propres cadavres. Un monde où **rien ne
+poussait** gardait 120 vivants au tick 800. La nourriture était décorative, donc
+la chercher ne rapportait rien, donc muscles, yeux et neurones étaient du pur
+surcoût — et la sélection les éliminait tous.
+
+Deux règles en découlent, et elles sont liées :
+
+- une dépouille vaut la réserve du mort plus une part du coût de construction de
+  son corps, avec `CORPSE_RETURN_PER_VOXEL < GROWTH_COST` ;
+- la végétation **colonise** : une plante ne pousse qu'au contact d'une autre
+  plante (vite au bord de l'eau, lentement au sec), la génération spontanée
+  restant très rare. Brouter détruit donc le stock de graines local : le
+  garde-manger s'épuise et il faut suivre le front de végétation.
+
+C'est cette seconde règle qui crée la pression sélective. L'ancien gradient
+rive/intérieur n'y suffisait pas : une bouche immobile posée sur une rive était
+nourrie à vie.
+
+Une troisième règle en découle, moins évidente : la **sénescence**. Puisqu'un
+corps sans neurone est stérile mais vivant, il devenait, bien nourri, un blob
+immortel occupant sa place pour toujours — environ 70 % des vivants, et la
+génération maximale d'un monde stagnait à 1 après 5 850 ticks. L'entretien
+augmente donc de 1 tous les `SENESCENCE_PERIOD` ticks vécus. Un couperet d'âge
+fixe a d'abord été essayé : il éteignait les mondes marginaux d'un coup, toute
+une cohorte disparaissant au même tick.
+
+Après correction, mesuré sur six mondes de 6 000 ticks : population soutenue de
+38 à 309, génération 10 à 26, et **des cerveaux dans chacun** (10 à 120
+porteurs). Le banc agrégé donne 5 mondes sur 6 en amélioration de fitness,
+médiane +47 %.
+
+Le registre est un **diagnostic** : aucune règle de simulation ne le lit, ce qui
+permet au chemin GPU de ne pas le tenir sans changer l'état du monde.
+
+### 4.8 Chunks
 
 Le noyau travaille sur la grille à plat ; le découpage en **chunks 16³**
 (8×2×8 = 128 chunks) sert deux usages en aval : la version par chunk pour

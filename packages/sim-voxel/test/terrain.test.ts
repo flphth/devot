@@ -133,22 +133,51 @@ describe("biomasse", () => {
     expect(countMaterial(w, BIOMASS)).toBeGreaterThan(0);
   });
 
-  it("pousse beaucoup plus vite près de l'eau que sur sol sec", () => {
-    // Le gradient de fertilité est ce qui crée la pression sélective : sans
-    // lui, la nourriture est partout et l'évolution choisit l'immobilité.
-    const dry = flatWorld();
-    stepN(dry, 200);
-    const dryCount = countMaterial(dry, BIOMASS);
+  it("colonise depuis une plante existante, et beaucoup plus vite au bord de l'eau", () => {
+    // La végétation ne surgit pas de nulle part : elle avance depuis ses
+    // colonies. C'est cette dépendance au voisinage qui rend le broutage
+    // épuisant pour la plante — donc payant pour l'animal qui suit le front.
+    // On compare deux colonies identiques, l'une posée au bord d'une flaque,
+    // l'autre en terrain sec, en comptant leur seule expansion locale.
+    const spread = (wet: boolean): number => {
+      const w = flatWorld(3);
+      if (wet) {
+        for (let z = 60; z <= 68; z++) {
+          for (let x = 60; x <= 68; x++) w.setMaterial(w.idx(x, 1, z), WATER);
+        }
+      }
+      // Une colonie de départ, juste à côté de la zone observée.
+      for (let z = 62; z <= 66; z++) w.setMaterial(w.idx(59, 1, z), BIOMASS, NUTRIENT_FRESH);
+      stepN(w, 120);
+      let grown = 0;
+      for (let z = 55; z <= 73; z++) {
+        for (let x = 60; x <= 73; x++) {
+          if (w.material[w.idx(x, 1, z)] === BIOMASS) grown++;
+        }
+      }
+      return grown;
+    };
 
-    const wet = flatWorld();
-    for (let x = 0; x < 128; x += 4) {
-      for (let z = 0; z < 128; z += 4) wet.setMaterial(wet.idx(x, 1, z), WATER);
-    }
-    stepN(wet, 200);
-    const wetCount = countMaterial(wet, BIOMASS) - countMaterial(wet, WATER) * 0;
+    const nearWater = spread(true);
+    const onDryGround = spread(false);
+    expect(onDryGround).toBeGreaterThan(0); // le sec n'est pas stérile
+    expect(nearWater, `${nearWater} au bord de l'eau contre ${onDryGround} au sec`).toBeGreaterThan(
+      onDryGround * 2,
+    );
+  });
 
-    expect(dryCount).toBeGreaterThan(0); // le sol sec n'est pas stérile
-    expect(wetCount).toBeGreaterThan(dryCount * 2); // mais les rives sont riches
+  it("une plante isolée n'apparaît qu'exceptionnellement", () => {
+    // Le pendant du test précédent : la génération spontanée existe — sinon un
+    // monde sans plante resterait stérile pour toujours — mais elle est si rare
+    // qu'elle ne peut pas renourrir un individu immobile.
+    const w = flatWorld(4); // aucune plante, aucune eau
+    stepN(w, 40);
+    const isolated = countMaterial(w, BIOMASS);
+    // 16 384 surfaces × 40 ticks × 1/65536 ≈ 10 pousses spontanées attendues,
+    // qui colonisent ensuite. Ce qu'on exige, c'est l'ordre de grandeur : très
+    // loin de la couverture qu'obtiendrait une pousse spontanée systématique.
+    expect(isolated).toBeGreaterThan(0);
+    expect(isolated).toBeLessThan(300);
   });
 
   it("se décompose seule et finit par disparaître", () => {

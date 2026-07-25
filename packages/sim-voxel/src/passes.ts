@@ -2,7 +2,7 @@ import {
   ALIVE,
   BIOMASS,
   BONE,
-  CORPSE_NUTRIENT_PER_VOXEL,
+  CORPSE_RETURN_PER_VOXEL,
   CX,
   CZ,
   DEAD,
@@ -17,6 +17,7 @@ import {
   NUTRIENT_FRESH,
   NUTRIENT_MAX,
   ROCK,
+  SENESCENCE_PERIOD,
   SX,
   SY,
   SZ,
@@ -26,6 +27,7 @@ import {
   WATER,
   WATER_EVAPORATION_CHANCE,
   BIOMASS_SPAWN_CHANCE_DRY,
+  BIOMASS_SPAWN_CHANCE_SEED,
   BIOMASS_SPAWN_CHANCE_WET,
 } from "./constants.js";
 import { hash32 } from "./rng.js";
@@ -59,6 +61,9 @@ export function passTerrain(w: VoxelWorld): void {
   const seed = w.seed;
   const energyDelta = w.energyDelta;
   const eatenTotal = w.eaten;
+  // Accumulé en local (la boucle chaude ne touche pas un champ d'objet), reversé
+  // au monde à la fin de la passe.
+  let injected = 0;
 
   // Au-dessus de la borne active il n'y a que du vide : un memset suffit,
   // au lieu de visiter des centaines de milliers de voxels d'air.
@@ -146,11 +151,20 @@ export function passTerrain(w: VoxelWorld): void {
 
         const next = nextForSupportedVoid(w, i, x, y, z, below, tick, seed);
         matN[i] = next;
-        nutN[i] = next === BIOMASS ? NUTRIENT_FRESH : 0;
+        if (next === BIOMASS) {
+          nutN[i] = NUTRIENT_FRESH;
+          // La photosynthèse est la SEULE entrée d'énergie du monde. On la
+          // compte, ce qui permet ensuite d'affirmer que rien d'autre n'en
+          // crée : voir `energyInjected`.
+          injected += NUTRIENT_FRESH;
+        } else {
+          nutN[i] = 0;
+        }
         if (next !== VOID) chunkVersion[chunkRowBase + ((x / 16) | 0)]!++;
       }
     }
   }
+  w.energyInjected += injected;
 }
 
 function matAt(w: VoxelWorld, x: number, y: number, z: number): number {
@@ -239,18 +253,34 @@ function nextForSupportedVoid(
     if (give >= 0 && LAT_OPPOSITE[give]! === pick) return WATER;
   }
 
-  // 2. La biomasse pousse sur roche ou biomasse. L'eau à proximité accélère
-  //    fortement la pousse, mais le sol sec reste fertile — sans quoi le monde
-  //    serait stérile partout sauf sur les rives.
+  // 2. La biomasse COLONISE : elle ne pousse qu'au contact d'une autre plante,
+  //    vite près de l'eau, lentement au sec. Une graine peut aussi apparaître
+  //    seule, mais rarement.
+  //
+  //    C'est cette dépendance au voisinage qui rend le broutage épuisant pour
+  //    la plante et payant pour l'animal : tant que la pousse était spontanée,
+  //    une bouche posée sur une rive était nourrie à vie sans bouger, et
+  //    l'évolution éliminait tout ce qui sert à chercher — muscles, yeux,
+  //    neurones. Maintenant, brouter détruit le stock de graines local : le
+  //    front de végétation recule, et il faut le suivre.
   if (below !== ROCK && below !== BIOMASS) return VOID;
   const roll = hash32(i, tick, seed ^ 0x2) & 0xffff;
-  if (roll >= BIOMASS_SPAWN_CHANCE_WET) return VOID; // écarte le cas fréquent d'abord
+  // Écarte d'abord le cas de très loin le plus fréquent, avant tout voisinage.
+  if (roll >= BIOMASS_SPAWN_CHANCE_WET) return VOID;
+
+  let nearPlant = below === BIOMASS;
+  let nearWater = false;
   for (let d = 0; d < 6; d++) {
-    if (matAt(w, x + NEIGHBOR_DX[d]!, y + NEIGHBOR_DY[d]!, z + NEIGHBOR_DZ[d]!) === WATER) {
-      return BIOMASS;
-    }
+    const m = matAt(w, x + NEIGHBOR_DX[d]!, y + NEIGHBOR_DY[d]!, z + NEIGHBOR_DZ[d]!);
+    if (m === WATER) nearWater = true;
+    else if (m === BIOMASS) nearPlant = true;
   }
-  return roll < BIOMASS_SPAWN_CHANCE_DRY ? BIOMASS : VOID;
+  if (nearPlant) {
+    return roll < (nearWater ? BIOMASS_SPAWN_CHANCE_WET : BIOMASS_SPAWN_CHANCE_DRY) ? BIOMASS : VOID;
+  }
+  // Génération spontanée : le seul rempart contre un monde définitivement
+  // stérile, puisque sans plante aucune plante ne peut plus naître.
+  return roll < BIOMASS_SPAWN_CHANCE_SEED ? BIOMASS : VOID;
 }
 
 /** Première bouche adjacente, dans l'ordre de voisinage fixe (déterminisme). */
@@ -281,6 +311,9 @@ export function passMetabolism(w: VoxelWorld): void {
     for (let k = 0; k < len; k++) {
       cost += UPKEEP[w.material[w.bodyList[base + k]!]!]!;
     }
+    // Sénescence : vieillir coûte. Sans cela, un corps sans neurone — donc
+    // stérile — mais bien nourri occuperait sa place éternellement.
+    cost += ((w.tick - w.bornTick[id]!) / SENESCENCE_PERIOD) | 0;
     delta[id] = delta[id]! - cost;
   }
 }
@@ -387,7 +420,9 @@ export function passConnectivity(w: VoxelWorld): void {
       // La chair amputée nourrit le monde.
       w.removeBodyVoxel(id, i);
       w.material[i] = BIOMASS;
-      w.nutrient[i] = CORPSE_NUTRIENT_PER_VOXEL;
+      // Un membre amputé ne rend que sa construction : l'énergie de l'organisme
+      // reste dans l'organisme, qui est toujours vivant.
+      w.nutrient[i] = CORPSE_RETURN_PER_VOXEL;
       w.owner[i] = NO_OWNER;
       w.touch(i);
     });
@@ -398,7 +433,7 @@ export function passConnectivity(w: VoxelWorld): void {
   }
 }
 
-/** Mort : énergie épuisée → le corps entier se décompose en biomasse. */
+/** Mort : énergie épuisée ou corps disparu. */
 export function passDeath(w: VoxelWorld): void {
   for (let a = 0; a < w.aliveCount; a++) {
     const id = w.aliveIds[a]!;
@@ -407,17 +442,31 @@ export function passDeath(w: VoxelWorld): void {
   }
 }
 
-/** Décompose un organisme : tous ses voxels deviennent de la biomasse riche. */
+/**
+ * Décompose un organisme : son corps devient de la biomasse.
+ *
+ * La dépouille vaut exactement ce que l'organisme possédait encore, plus une
+ * part du coût de construction de son corps — jamais plus. C'est cette borne
+ * qui interdit à la mort d'être rentable ; sans elle, le monde tournait à la
+ * charogne et la production primaire devenait décorative.
+ */
 export function decompose(w: VoxelWorld, id: number): void {
   const base = w.bodySlot(id);
   const len = w.bodyLen[id]!;
-  for (let k = 0; k < len; k++) {
-    const i = w.bodyList[base + k]!;
-    w.material[i] = BIOMASS;
-    const n = CORPSE_NUTRIENT_PER_VOXEL;
-    w.nutrient[i] = n > NUTRIENT_MAX ? NUTRIENT_MAX : n;
-    w.owner[i] = NO_OWNER;
-    w.touch(i);
+  if (len > 0) {
+    const pool = w.energy[id]! + len * CORPSE_RETURN_PER_VOXEL;
+    const per = (pool / len) | 0;
+    const remainder = pool - per * len; // au premier voxel : rien ne se perd ici
+    for (let k = 0; k < len; k++) {
+      const i = w.bodyList[base + k]!;
+      w.material[i] = BIOMASS;
+      // Ce qui dépasse la richesse maximale d'un voxel est perdu : un gros
+      // corps qui meurt riche ne peut pas tout léguer.
+      const n = per + (k === 0 ? remainder : 0);
+      w.nutrient[i] = n > NUTRIENT_MAX ? NUTRIENT_MAX : n;
+      w.owner[i] = NO_OWNER;
+      w.touch(i);
+    }
   }
   w.bodyLen[id] = 0;
   w.voxelCount[id] = 0;
@@ -438,7 +487,7 @@ export function damageVoxel(w: VoxelWorld, i: number): boolean {
   if (id === NO_OWNER || !w.isTissue(i)) return false;
   w.removeBodyVoxel(id, i);
   w.material[i] = BIOMASS;
-  w.nutrient[i] = CORPSE_NUTRIENT_PER_VOXEL;
+  w.nutrient[i] = CORPSE_RETURN_PER_VOXEL;
   w.owner[i] = NO_OWNER;
   w.damaged[id] = 1;
   w.touch(i);

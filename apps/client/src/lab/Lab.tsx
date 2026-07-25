@@ -25,6 +25,12 @@ export default function Lab() {
       voxelCount: lab.frame?.voxels.length ?? 0,
       organismCount: lab.frame ? lab.frame.organisms.length / 5 : 0,
       firstOrganismId: lab.frame && lab.frame.organisms.length > 0 ? lab.frame.organisms[0] : 0,
+      // Tous les identifiants de l'image courante : un pilote de test a besoin
+      // de pouvoir en essayer un autre, le premier de la liste étant souvent un
+      // fondateur mourant.
+      organismIds: lab.frame
+        ? Array.from({ length: lab.frame.organisms.length / 5 }, (_, k) => lab.frame!.organisms[k * 5])
+        : [],
       actions: lab.actions,
     };
   });
