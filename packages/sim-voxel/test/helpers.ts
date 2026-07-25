@@ -1,4 +1,4 @@
-import { BONE, MOUTH, ROCK, SX, SZ, VOID, VoxelWorld, makePlan } from "../src/index.js";
+import { BONE, MOUTH, ROCK, SX, SZ, VOID, VoxelWorld, makePlan, stepN } from "../src/index.js";
 
 /** Monde plat et nu : socle de roche à y=0, tout le reste vide. */
 export function flatWorld(seed = 1): VoxelWorld {
@@ -29,6 +29,23 @@ export const PLAN_LINE3 = makePlan([
   [1, 0, 0, BONE],
   [2, 0, 0, BONE],
 ]);
+
+/**
+ * Avance un monde en cédant la main entre les tranches.
+ *
+ * `stepN` est purement synchrone : sur plusieurs centaines de ticks il bloque
+ * le worker Vitest assez longtemps pour que celui-ci ne réponde plus au
+ * rapporteur, qui abandonne alors avec « Timeout calling onTaskUpdate » — une
+ * erreur non rattrapée qui salit un run par ailleurs vert. Rendre la main tous
+ * les 100 ticks suffit à laisser passer ces messages, sans rien changer à la
+ * simulation : le déterminisme ne dépend que de l'ordre des ticks.
+ */
+export async function stepNYielding(w: VoxelWorld, ticks: number, chunk = 100): Promise<void> {
+  for (let done = 0; done < ticks; done += chunk) {
+    stepN(w, Math.min(chunk, ticks - done));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+}
 
 /** Compte les voxels d'un matériau donné. */
 export function countMaterial(w: VoxelWorld, mat: number): number {

@@ -15,7 +15,8 @@
     "colyseus.js": "^0.16.22",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "three": "^0.180.0"
+    "three": "^0.180.0",
+    "@devot/sim-voxel": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

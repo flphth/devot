@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "pnpm -r --parallel exec tsc --noEmit",
-    "test": "vitest run --testTimeout=90000",
+    "test": "vitest run",
     "p0": "pnpm --filter @devot/server p0",
     "sim:bench": "pnpm --filter @devot/sim-voxel bench",
     "sim:demo": "pnpm --filter @devot/sim-voxel demo",

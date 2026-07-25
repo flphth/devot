@@ -128,7 +128,10 @@ export class VoxelWorld {
   activeTop = SY - 1;
 
   constructor(seed = 1) {
-    this.seed = seed | 0;
+    // `hash32` n'a aucun terme constant : hash32(0,0,0) === 0. Une graine nulle
+    // donnerait donc un tirage nul au premier tick du premier voxel, et un
+    // biais mesurable ensuite. Toute graine est ramenée à une valeur non nulle.
+    this.seed = (seed | 0) === 0 ? 1 : seed | 0;
 
     this.material = new Uint8Array(VOXEL_COUNT);
     this.materialNext = new Uint8Array(VOXEL_COUNT);

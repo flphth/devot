@@ -23,6 +23,9 @@ importers:
       '@devot/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@devot/sim-voxel':
+        specifier: workspace:*
+        version: link:../../packages/sim-voxel
       '@react-three/drei':
         specifier: ^10.0.0
         version: 10.7.7(@react-three/fiber@9.6.1(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(three@0.180.0))(@types/react@19.2.17)(@types/three@0.180.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(three@0.180.0)

@@ -13,7 +13,7 @@ import {
   step,
   stepN,
 } from "../src/index.js";
-import { countMaterial } from "./helpers.js";
+import { countMaterial, stepNYielding } from "./helpers.js";
 
 function populatedWorld(population = 60): VoxelWorld {
   const w = new VoxelWorld(31337);
@@ -29,16 +29,18 @@ function populatedWorld(population = 60): VoxelWorld {
 }
 
 describe("boucle chaude", () => {
-  it("ne fait (quasiment) aucune allocation par tick", () => {
+  it("ne fait (quasiment) aucune allocation par tick", async () => {
     const w = populatedWorld();
-    stepN(w, 150); // chauffe : JIT stabilisé, tampons touchés
+    await stepNYielding(w, 150); // chauffe : JIT stabilisé, tampons touchés
 
     const gc = (globalThis as { gc?: () => void }).gc;
     gc?.();
     const before = process.memoryUsage().heapUsed;
 
     const TICKS = 600;
-    stepN(w, TICKS);
+    // Céder la main tous les 100 ticks n'alloue que six timers : négligeable
+    // devant le seuil, et cela évite de bloquer le rapporteur de Vitest.
+    await stepNYielding(w, TICKS);
 
     gc?.();
     const after = process.memoryUsage().heapUsed;
