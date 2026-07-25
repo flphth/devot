@@ -23,6 +23,7 @@ export class DevotState extends Schema {
   declare thinking: boolean;
   declare utterance: string;
   declare emotion: string;
+  declare thought: string;
   declare age: number;
 
   constructor() {
@@ -41,6 +42,7 @@ export class DevotState extends Schema {
     this.thinking = false;
     this.utterance = "";
     this.emotion = "";
+    this.thought = "";
     this.age = 0;
   }
 }
@@ -59,6 +61,7 @@ defineTypes(DevotState, {
   thinking: "boolean",
   utterance: "string",
   emotion: "string",
+  thought: "string",
   age: "number",
 });
 
@@ -136,6 +139,44 @@ defineTypes(WorldState, {
 
 export interface CreateFounderMsg {
   name?: string;
+  /** 2 à 3 traits choisis dans TRAIT_POOL (validés côté serveur). */
+  traits?: string[];
+}
+
+export interface SmiteMsg {
+  devotId: string;
+}
+
+/** Journal d'un devot (panneau « Esprit »). */
+export interface JournalRequestMsg {
+  devotId: string;
+}
+
+export interface JournalEntry {
+  kind: "event" | "decision";
+  text: string;
+  action?: string;
+  emotion?: string;
+  thought?: string;
+  at: number;
+}
+
+export interface JournalMsg {
+  devotId: string;
+  entries: JournalEntry[];
+}
+
+// ── Mode god (debug/créatif, hors règles du jeu) ────────────────────────────
+
+export interface DebugSpawnDevotMsg {
+  x: number;
+  z: number;
+}
+
+export interface DebugMoveFoodMsg {
+  foodId: string;
+  x: number;
+  z: number;
 }
 
 export interface SpeakMsg {
@@ -151,7 +192,7 @@ export interface FeedMsg {
 
 /** Réponse serveur aux intentions rejetées. */
 export interface ActionRejectedMsg {
-  action: "createFounder" | "speak" | "feed";
+  action: "createFounder" | "speak" | "feed" | "smite";
   reason: string;
 }
 

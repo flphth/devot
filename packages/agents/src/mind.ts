@@ -114,10 +114,19 @@ export class MockMind implements MindProvider {
     const quotedId = /id "([^"]+)"/.exec(eventText)?.[1];
 
     const decision: Decision = scripted
-      ? { action: "idle", targetId: quotedId, ...scripted }
+      ? {
+          action: "idle",
+          targetId: quotedId,
+          thought: "Je fais ce qui est écrit en moi.",
+          ...scripted,
+        }
       : eventText.includes("nourriture")
-        ? { action: "move", direction: { x: 1, z: 0 } }
-        : { action: "idle", emotion: "prudence" };
+        ? {
+            action: "move",
+            direction: { x: 1, z: 0 },
+            thought: "Manger, c'est gagner du temps de pensée.",
+          }
+        : { action: "idle", emotion: "prudence", thought: "Le silence me garde en vie." };
 
     const usage: InferenceUsage = {
       inputTokens: this.mockUsage.inputTokens ?? 1200,

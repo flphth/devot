@@ -33,7 +33,7 @@ async function main(): Promise<void> {
   const room = await client.joinOrCreate(ROOM_NAME, { godName: "Progeniteur" });
   const state = () => room.state as any;
 
-  room.send("createFounder", { name: "Lilith" });
+  room.send("createFounder", { name: "Lilith", traits: ["curieux", "généreux"] });
   await sleep(800);
   check("fondatrice née", state().devots.size >= 1);
 

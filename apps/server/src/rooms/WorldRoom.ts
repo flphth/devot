@@ -12,12 +12,19 @@ import {
   PATCH_RATE_MS,
   PERCEPTION_RADIUS,
   TICK_MS,
+  TRAIT_POOL,
   WorldState,
   type ActionRejectedMsg,
   type CreateFounderMsg,
+  type DebugMoveFoodMsg,
+  type DebugSpawnDevotMsg,
   type DevotEntity,
   type FeedMsg,
   type FoodEntity,
+  type JournalEntry,
+  type JournalMsg,
+  type JournalRequestMsg,
+  type SmiteMsg,
   type SpeakMsg,
 } from "@devot/shared";
 import { applyDecision, dist2, perceptionSystem, tick, World } from "@devot/sim";
@@ -71,9 +78,10 @@ export class WorldRoom extends Room<WorldState> {
         const devot = this.world.devots.get(devotId);
         if (!devot) return;
         applyDecision(devot, decision, this.world);
-        if (decision.emotion) {
-          const s = this.state.devots.get(devotId);
-          if (s) s.emotion = decision.emotion;
+        const s = this.state.devots.get(devotId);
+        if (s) {
+          if (decision.emotion) s.emotion = decision.emotion;
+          if (decision.thought) s.thought = decision.thought;
         }
         if (decision.action === "speak" && decision.utterance) {
           this.onDevotSpoke(devot, decision.utterance);
@@ -88,9 +96,21 @@ export class WorldRoom extends Room<WorldState> {
     );
     this.onMessage("speak", (client, msg: SpeakMsg) => this.handleSpeak(client, msg));
     this.onMessage("feed", (client, msg: FeedMsg) => void this.handleFeed(client, msg ?? {}));
+    this.onMessage("smite", (client, msg: SmiteMsg) => this.handleSmite(client, msg));
+    this.onMessage("getJournal", (client, msg: JournalRequestMsg) =>
+      this.handleGetJournal(client, msg),
+    );
     this.onMessage("select", () => {
       /* lecture seule : la sélection vit côté client */
     });
+
+    // Mode god (debug/créatif) : hors règles du jeu, mais toujours validé ici.
+    this.onMessage("debugSpawnDevot", (client, msg: DebugSpawnDevotMsg) =>
+      this.handleDebugSpawnDevot(client, msg),
+    );
+    this.onMessage("debugMoveFood", (_client, msg: DebugMoveFoodMsg) =>
+      this.handleDebugMoveFood(msg),
+    );
 
     this.setSimulationInterval(() => this.simulate(), TICK_MS);
   }
@@ -140,34 +160,26 @@ export class WorldRoom extends Room<WorldState> {
       return this.reject(client, "createFounder", "Ta lignée vit encore.");
     }
 
+    // Traits choisis par le joueur : 2 à 3, tous issus de la banque.
+    const traits = msg.traits ?? [];
+    const pool = TRAIT_POOL as readonly string[];
+    if (traits.length < 2 || traits.length > 3) {
+      return this.reject(client, "createFounder", "Choisis 2 ou 3 traits.");
+    }
+    if (traits.some((t) => !pool.includes(t)) || new Set(traits).size !== traits.length) {
+      return this.reject(client, "createFounder", "Traits invalides.");
+    }
+
     const receipt = await this.payments.chargeDevotCreation(godId);
     if (!receipt.ok) {
       return this.reject(client, "createFounder", "Paiement refusé.");
     }
 
-    const name = (msg.name ?? `Devot-${++this.devotSeq}`).slice(0, 24);
-    const devot: DevotEntity = {
-      id: `devot-${godId}-${Date.now()}`,
-      godId,
+    const devot = this.spawnDevot(godId, {
+      name: msg.name,
+      traits: ["premier de sa lignée", ...traits],
       isFounder: true,
-      name,
-      pos: {
-        x: (Math.random() - 0.5) * this.world.size,
-        y: 0,
-        z: (Math.random() - 0.5) * this.world.size,
-      },
-      hp: HP_MAX_DEFAULT,
-      hpMax: HP_MAX_DEFAULT,
-      state: "vivant",
-      profile: "frugal",
-      traits: ["premier de sa lignée"],
-      age: 0,
-      thinking: false,
-      utterance: "",
-      currentGoal: { kind: "wander" },
-    };
-    this.world.devots.set(devot.id, devot);
-    this.repos.devots.insertFromEntity(devot);
+    });
     this.repos.events.record("birth", [devot.id], { founder: true, godId });
 
     this.orchestrator.enqueue({
@@ -177,6 +189,116 @@ export class WorldRoom extends Room<WorldState> {
         "Tu viens de naître. Tu ouvres les yeux sur le monde pour la première fois. Tu sais déjà que penser te coûte la vie.",
       createdAt: Date.now(),
     });
+  }
+
+  private spawnDevot(
+    godId: string,
+    opts: { name?: string; traits: string[]; isFounder: boolean; x?: number; z?: number },
+  ): DevotEntity {
+    const devot: DevotEntity = {
+      id: `devot-${godId}-${Date.now()}-${++this.devotSeq}`,
+      godId,
+      isFounder: opts.isFounder,
+      name: (opts.name ?? `Devot-${this.devotSeq}`).slice(0, 24),
+      pos: {
+        x: opts.x ?? (Math.random() - 0.5) * this.world.size,
+        y: 0,
+        z: opts.z ?? (Math.random() - 0.5) * this.world.size,
+      },
+      hp: HP_MAX_DEFAULT,
+      hpMax: HP_MAX_DEFAULT,
+      state: "vivant",
+      profile: "frugal",
+      traits: opts.traits,
+      age: 0,
+      thinking: false,
+      utterance: "",
+      currentGoal: { kind: "wander" },
+    };
+    this.world.devots.set(devot.id, devot);
+    this.repos.devots.insertFromEntity(devot);
+    return devot;
+  }
+
+  /** Foudre divine : le dieu peut tuer son propre devot. Irréversible. */
+  private handleSmite(client: Client, msg: SmiteMsg): void {
+    const godId = this.godOf(client);
+    if (!godId || !msg) return;
+    const devot = this.world.devots.get(msg.devotId ?? "");
+    if (!devot) return this.reject(client, "smite", "Devot introuvable.");
+    if (devot.godId !== godId) {
+      return this.reject(client, "smite", "Ce devot ne t'appartient pas.");
+    }
+    if (devot.state === "mort") {
+      return this.reject(client, "smite", "Il est déjà mort.");
+    }
+
+    devot.hp = 0;
+    devot.state = "mort";
+    this.repos.devots.kill(devot.id, "foudre divine");
+    this.repos.events.record("smite", [devot.id], { godId });
+    console.log(`[world] ⚡ ${devot.name} foudroyé par son dieu — contexte détruit.`);
+    this.broadcast("smite", { devotId: devot.id, x: devot.pos.x, z: devot.pos.z });
+    const s = this.state.devots.get(devot.id);
+    if (s) s.utterance = "";
+  }
+
+  /** Journal du panneau « Esprit » : la vie du devot, datée, côté serveur. */
+  private handleGetJournal(client: Client, msg: JournalRequestMsg): void {
+    if (!msg?.devotId) return;
+    const rows = this.repos.messages.journal(msg.devotId);
+    const entries: JournalEntry[] = rows.map((m) => {
+      if (m.role === "user") {
+        return { kind: "event", text: String(m.content), at: m.createdAt };
+      }
+      // Tour assistant : contenu = décision JSON (ou blocs de texte).
+      let decision: Record<string, unknown> = {};
+      try {
+        const raw = m.content as unknown;
+        const text = Array.isArray(raw)
+          ? ((raw[0] as { text?: string })?.text ?? "")
+          : String(raw);
+        decision = JSON.parse(text) as Record<string, unknown>;
+      } catch {
+        /* contenu non structuré : ignoré */
+      }
+      return {
+        kind: "decision",
+        text: typeof decision.utterance === "string" ? decision.utterance : "",
+        action: typeof decision.action === "string" ? decision.action : undefined,
+        emotion: typeof decision.emotion === "string" ? decision.emotion : undefined,
+        thought: typeof decision.thought === "string" ? decision.thought : undefined,
+        at: m.createdAt,
+      };
+    });
+    client.send("journal", { devotId: msg.devotId, entries } satisfies JournalMsg);
+  }
+
+  private handleDebugSpawnDevot(client: Client, msg: DebugSpawnDevotMsg): void {
+    const godId = this.godOf(client);
+    if (!godId || typeof msg?.x !== "number" || typeof msg?.z !== "number") return;
+    const pool = TRAIT_POOL as readonly string[];
+    const traits = [...pool].sort(() => Math.random() - 0.5).slice(0, 2);
+    const devot = this.spawnDevot(godId, {
+      traits,
+      isFounder: false,
+      x: msg.x,
+      z: msg.z,
+    });
+    this.repos.events.record("debug_spawn", [devot.id], { godId });
+  }
+
+  private handleDebugMoveFood(msg: DebugMoveFoodMsg): void {
+    if (!msg?.foodId || typeof msg.x !== "number" || typeof msg.z !== "number") return;
+    const food = this.world.food.get(msg.foodId);
+    if (!food) return;
+    food.pos.x = Math.max(-this.world.size, Math.min(this.world.size, msg.x));
+    food.pos.z = Math.max(-this.world.size, Math.min(this.world.size, msg.z));
+    const s = this.state.food.get(msg.foodId);
+    if (s) {
+      s.x = food.pos.x;
+      s.z = food.pos.z;
+    }
   }
 
   private handleSpeak(client: Client, msg: SpeakMsg): void {

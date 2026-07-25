@@ -1,6 +1,6 @@
 import { Client, Room } from "colyseus.js";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ROOM_NAME, SERVER_PORT } from "@devot/shared";
+import { ROOM_NAME, SERVER_PORT, type JournalEntry, type JournalMsg } from "@devot/shared";
 
 /** Vue plate (côté client) de l'état synchronisé. */
 export interface DevotView {
@@ -18,6 +18,7 @@ export interface DevotView {
   thinking: boolean;
   utterance: string;
   emotion: string;
+  thought: string;
   age: number;
 }
 
@@ -43,10 +44,21 @@ export interface WorldSnapshot {
   gods: GodView[];
 }
 
+export interface SmiteFx {
+  devotId: string;
+  x: number;
+  z: number;
+  at: number;
+}
+
 export interface WorldActions {
-  createFounder: (name?: string) => void;
+  createFounder: (name: string | undefined, traits: string[]) => void;
   speak: (devotId: string, text: string) => void;
   feed: (devotId: string) => void;
+  smite: (devotId: string) => void;
+  getJournal: (devotId: string) => void;
+  debugSpawnDevot: (x: number, z: number) => void;
+  debugMoveFood: (foodId: string, x: number, z: number) => void;
 }
 
 export interface WorldConnection {
@@ -54,6 +66,8 @@ export interface WorldConnection {
   godId: string | null;
   status: "connecting" | "connected" | "error";
   lastRejection: string | null;
+  lastSmite: SmiteFx | null;
+  journals: Record<string, JournalEntry[]>;
   actions: WorldActions;
 }
 
@@ -64,6 +78,8 @@ export function useWorld(godName: string): WorldConnection {
   const [godId, setGodId] = useState<string | null>(null);
   const [status, setStatus] = useState<WorldConnection["status"]>("connecting");
   const [lastRejection, setLastRejection] = useState<string | null>(null);
+  const [lastSmite, setLastSmite] = useState<SmiteFx | null>(null);
+  const [journals, setJournals] = useState<Record<string, JournalEntry[]>>({});
   const roomRef = useRef<Room | null>(null);
 
   useEffect(() => {
@@ -84,6 +100,12 @@ export function useWorld(godName: string): WorldConnection {
           setLastRejection(msg.reason);
           setTimeout(() => setLastRejection(null), 4000);
         });
+        room.onMessage("smite", (msg: { devotId: string; x: number; z: number }) => {
+          setLastSmite({ ...msg, at: Date.now() });
+        });
+        room.onMessage("journal", (msg: JournalMsg) => {
+          setJournals((prev) => ({ ...prev, [msg.devotId]: msg.entries }));
+        });
 
         room.onStateChange((state: any) => {
           const devots: DevotView[] = [];
@@ -103,6 +125,7 @@ export function useWorld(godName: string): WorldConnection {
               thinking: d.thinking,
               utterance: d.utterance,
               emotion: d.emotion,
+              thought: d.thought,
               age: d.age,
             });
           });
@@ -135,8 +158,8 @@ export function useWorld(godName: string): WorldConnection {
     };
   }, [godName]);
 
-  const createFounder = useCallback((name?: string) => {
-    roomRef.current?.send("createFounder", { name });
+  const createFounder = useCallback((name: string | undefined, traits: string[]) => {
+    roomRef.current?.send("createFounder", { name, traits });
   }, []);
   const speak = useCallback((devotId: string, text: string) => {
     roomRef.current?.send("speak", { devotId, text });
@@ -144,12 +167,34 @@ export function useWorld(godName: string): WorldConnection {
   const feed = useCallback((devotId: string) => {
     roomRef.current?.send("feed", { devotId });
   }, []);
+  const smite = useCallback((devotId: string) => {
+    roomRef.current?.send("smite", { devotId });
+  }, []);
+  const getJournal = useCallback((devotId: string) => {
+    roomRef.current?.send("getJournal", { devotId });
+  }, []);
+  const debugSpawnDevot = useCallback((x: number, z: number) => {
+    roomRef.current?.send("debugSpawnDevot", { x, z });
+  }, []);
+  const debugMoveFood = useCallback((foodId: string, x: number, z: number) => {
+    roomRef.current?.send("debugMoveFood", { foodId, x, z });
+  }, []);
 
   return {
     snapshot,
     godId,
     status,
     lastRejection,
-    actions: { createFounder, speak, feed },
+    lastSmite,
+    journals,
+    actions: {
+      createFounder,
+      speak,
+      feed,
+      smite,
+      getJournal,
+      debugSpawnDevot,
+      debugMoveFood,
+    },
   };
 }

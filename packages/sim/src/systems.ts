@@ -50,8 +50,9 @@ function movementSystem(devot: DevotEntity, world: World, dt: number): void {
     case "idle":
       return;
     case "wander": {
-      // Errance : petit pas pseudo-aléatoire, dépendant de l'âge (déterministe).
-      const angle = (devot.age * 0.37) % (Math.PI * 2);
+      // Errance lissée : le cap dérive lentement (déterministe par âge) au lieu
+      // de zigzaguer — le corps garde sa direction plusieurs ticks.
+      const angle = devot.id.length * 1.7 + devot.age * 0.045;
       devot.pos.x += Math.cos(angle) * step * 0.5;
       devot.pos.z += Math.sin(angle) * step * 0.5;
       break;
@@ -260,8 +261,15 @@ export function applyDecision(devot: DevotEntity, decision: Decision, world: Wor
       if (foodId && world.food.has(foodId)) {
         devot.currentGoal = { kind: "seek_food", foodId };
       } else {
+        // Repli borné à la perception : le corps ne « connaît » pas la
+        // nourriture que le devot ne peut pas voir.
         const nearest = world.nearestFood(devot.pos);
-        if (nearest) devot.currentGoal = { kind: "seek_food", foodId: nearest.id };
+        if (
+          nearest &&
+          dist2(devot.pos, nearest.pos) <= PERCEPTION_RADIUS * PERCEPTION_RADIUS
+        ) {
+          devot.currentGoal = { kind: "seek_food", foodId: nearest.id };
+        }
       }
       break;
     }

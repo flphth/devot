@@ -119,6 +119,23 @@ export class MessageRepo {
       }));
   }
 
+  /** Historique daté, pour le journal du panneau « Esprit ». */
+  journal(
+    devotId: string,
+    limit = 40,
+  ): Array<StoredMessage & { createdAt: number }> {
+    const rows = this.db
+      .select()
+      .from(messages)
+      .where(eq(messages.devotId, devotId))
+      .all();
+    return rows.slice(-limit).map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: JSON.parse(m.contentJson) as unknown,
+      createdAt: m.createdAt,
+    }));
+  }
+
   /** Remplace tout l'historique par un souvenir condensé (chroniqueur, P2). */
   replaceWithSummary(devotId: string, summary: string): void {
     this.db.delete(messages).where(eq(messages.devotId, devotId)).run();

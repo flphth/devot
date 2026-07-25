@@ -41,10 +41,18 @@ async function main(): Promise<void> {
   await sleep(300);
   check("welcome reçu avec godId", godId.startsWith("god-"));
 
-  // 1. Création du fondateur
-  room.send("createFounder", { name: "Ève" });
-  await sleep(600);
   const state = () => room.state as any;
+
+  // 1. Création du fondateur — traits obligatoires (2 à 3, issus du pool)
+  room.send("createFounder", { name: "Sans-Traits" });
+  await sleep(400);
+  check("création sans traits rejetée", state().devots.size === 0);
+  room.send("createFounder", { name: "Ève", traits: ["curieux", "pieux", "inexistant"] });
+  await sleep(400);
+  check("création avec trait hors pool rejetée", state().devots.size === 0);
+
+  room.send("createFounder", { name: "Ève", traits: ["curieux", "pieux"] });
+  await sleep(600);
   check("le fondateur apparaît dans l'état", state().devots.size === 1);
 
   const devotId: string = [...state().devots.keys()][0] as string;
@@ -53,7 +61,7 @@ async function main(): Promise<void> {
   check("le fondateur est vivant avec des HP", devot.hp > 0 && devot.state !== "mort");
 
   // 2. Un second fondateur est refusé tant que le premier vit
-  room.send("createFounder", {});
+  room.send("createFounder", { traits: ["prudent", "pieux"] });
   await sleep(400);
   check("recréation refusée (fondateur vivant)", state().devots.size === 1);
 
@@ -83,6 +91,46 @@ async function main(): Promise<void> {
   // 5. Le devot pense (MockMind) : thinking repasse à false et l'état vit
   await sleep(2000);
   check("le devot n'est pas bloqué en 'thinking'", state().devots.get(devotId).thinking === false);
+  check(
+    "le monologue intérieur est synchronisé",
+    typeof state().devots.get(devotId).thought === "string" &&
+      state().devots.get(devotId).thought.length > 0,
+  );
+
+  // 6. Journal du panneau « Esprit »
+  const journal: any = await new Promise((resolve) => {
+    room.onMessage("journal", (m: any) => resolve(m));
+    room.send("getJournal", { devotId });
+  });
+  check(
+    "journal reçu avec événements et décisions datés",
+    journal.devotId === devotId &&
+      journal.entries.length >= 2 &&
+      journal.entries.every((e: any) => typeof e.at === "number") &&
+      journal.entries.some((e: any) => e.kind === "decision" && e.thought),
+  );
+
+  // 7. Foudre divine : ownership + mort standard
+  let smiteFx = false;
+  room.onMessage("smite", () => (smiteFx = true));
+  room.send("smite", { devotId });
+  await sleep(500);
+  check("le devot foudroyé est mort", state().devots.get(devotId).state === "mort");
+  check("l'effet d'éclair est diffusé", smiteFx);
+
+  // 8. Mode god : spawn debug + déplacement de nourriture
+  room.send("debugSpawnDevot", { x: 5, z: 5 });
+  await sleep(500);
+  check("debugSpawnDevot fait naître un devot", state().devots.size === 2);
+  const foodId = [...state().food.keys()][0] as string | undefined;
+  if (foodId) {
+    room.send("debugMoveFood", { foodId, x: -9, z: -9 });
+    await sleep(400);
+    const f = state().food.get(foodId);
+    check("debugMoveFood déplace la nourriture", f.x === -9 && f.z === -9);
+  } else {
+    check("debugMoveFood déplace la nourriture (pas de nourriture à tester)", true);
+  }
 
   await room.leave();
   await gameServer.gracefullyShutdown(false);

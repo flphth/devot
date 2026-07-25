@@ -70,3 +70,15 @@ packages/onchain   # PaymentProvider — FreeStubProvider uniquement (onchain di
 - [x] **P1 — Monde & 3D** : WorldRoom Colyseus + R3F, nourriture, HUD dieu (140c / 60 s)
 - [x] **P2 — Vie sociale** : reproduction (bourgeonnement + sexuée), héritage via chroniqueur, combat
 - [x] **P3 — Multi-dieux** : PvP inter-lignées, recréation du fondateur
+- [x] **P4 — Style & outils divins** : rendu voxel/prairie, interpolation, monologue intérieur +
+  panneau Esprit, traits à la création, foudre divine, brouillard de guerre, mode god (touche 1)
+
+## En jeu
+
+- **Créer** : choisis 2-3 traits, puis « Façonner ton devot fondateur ».
+- **Sélectionner** : clic sur un devot → panneau Esprit (journal de sa vie, monologue intérieur)
+  et barre d'actions : parler (140c/min), nourrir 🍞, foudroyer ⚡ (double clic de confirmation).
+- **Brouillard de guerre** : tu ne vois le monde qu'autour de tes devots vivants (proto : filtrage
+  visuel côté client ; l'anti-triche StateView Colyseus est une évolution notée).
+- **Touche 1 — mode god** (debug/créatif) : brouillard off, clic au sol = spawn de devot,
+  glisser-déposer la nourriture.

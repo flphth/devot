@@ -24,6 +24,19 @@ describe("parseDecision", () => {
     expect(d.utterance).toHaveLength(UTTERANCE_MAX_CHARS);
   });
 
+  it("porte le monologue intérieur (thought), tronqué à 140c", () => {
+    const d = parseDecision({ action: "idle", thought: "Je crains la nuit. " + "x".repeat(200) });
+    expect(d.thought).toBeDefined();
+    expect(d.thought!.length).toBeLessThanOrEqual(UTTERANCE_MAX_CHARS);
+    expect(d.thought).toContain("Je crains la nuit.");
+  });
+
+  it("le schéma exige action ET thought", async () => {
+    const { DECISION_SCHEMA } = await import("../src/index.js");
+    expect(DECISION_SCHEMA.required).toContain("action");
+    expect(DECISION_SCHEMA.required).toContain("thought");
+  });
+
   it("rejette une action inconnue", () => {
     expect(() => parseDecision({ action: "fly" })).toThrow();
   });

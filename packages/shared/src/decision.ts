@@ -5,12 +5,17 @@ import type { Decision, DecisionAction } from "./types.js";
 export const DECISION_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["action"],
+  required: ["action", "thought"],
   properties: {
     action: {
       type: "string",
       enum: ["idle", "move", "eat", "attack", "reproduce", "speak", "flee"],
       description: "L'action choisie pour cette pensée.",
+    },
+    thought: {
+      type: "string",
+      description:
+        "Ton monologue intérieur : une pensée intime à la première personne, une phrase, 140 caractères maximum. Elle aussi te coûte de la vie.",
     },
     targetId: {
       type: "string",
@@ -68,5 +73,8 @@ export function parseDecision(raw: unknown): Decision {
     decision.utterance = d.utterance.slice(0, UTTERANCE_MAX_CHARS);
   }
   if (typeof d.emotion === "string") decision.emotion = d.emotion;
+  if (typeof d.thought === "string") {
+    decision.thought = d.thought.slice(0, UTTERANCE_MAX_CHARS);
+  }
   return decision;
 }

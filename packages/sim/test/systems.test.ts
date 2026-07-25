@@ -111,3 +111,52 @@ describe("applyDecision — l'esprit pilote le corps", () => {
     expect(devot.utterance).toBe("Je pense donc je meurs.");
   });
 });
+
+describe("perception étanche — rien hors du rayon ne fuit", () => {
+  it("pas de déclencheur pour une nourriture hors de portée", async () => {
+    const { perceptionSystem } = await import("../src/index.js");
+    const world = new World();
+    const devot = makeDevot();
+    world.devots.set(devot.id, devot);
+    world.food.set("far", makeFood("far", 25, 25));
+    expect(perceptionSystem(world)).toHaveLength(0);
+  });
+
+  it("le repli eat n'atteint pas une nourriture invisible", () => {
+    const world = new World();
+    const devot = makeDevot();
+    world.devots.set(devot.id, devot);
+    world.food.set("far", makeFood("far", 25, 25));
+    applyDecision(devot, { action: "eat", targetId: "inexistante" }, world);
+    expect(devot.currentGoal.kind).not.toBe("seek_food");
+  });
+
+  it("pas de rencontre pour un devot hors de portée", async () => {
+    const { perceptionSystem } = await import("../src/index.js");
+    const world = new World();
+    const a = makeDevot({ id: "a" });
+    const b = makeDevot({ id: "b", pos: { x: 25, y: 0, z: 25 } });
+    world.devots.set(a.id, a);
+    world.devots.set(b.id, b);
+    expect(perceptionSystem(world)).toHaveLength(0);
+  });
+
+  it("l'errance garde un cap lissé (pas de zigzag)", () => {
+    const world = new World();
+    const devot = makeDevot({ currentGoal: { kind: "wander" } });
+    world.devots.set(devot.id, devot);
+
+    // Directions de deux ticks consécutifs : presque colinéaires.
+    const p0 = { ...devot.pos };
+    tick(world);
+    const p1 = { ...devot.pos };
+    tick(world);
+    const p2 = { ...devot.pos };
+    const v1 = { x: p1.x - p0.x, z: p1.z - p0.z };
+    const v2 = { x: p2.x - p1.x, z: p2.z - p1.z };
+    const dot =
+      (v1.x * v2.x + v1.z * v2.z) /
+      (Math.hypot(v1.x, v1.z) * Math.hypot(v2.x, v2.z));
+    expect(dot).toBeGreaterThan(0.95);
+  });
+});

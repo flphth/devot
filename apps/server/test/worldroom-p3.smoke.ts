@@ -41,8 +41,8 @@ async function main(): Promise<void> {
   await sleep(300);
   check("deux dieux dans l'état", state().gods.size === 2);
 
-  roomA.send("createFounder", { name: "Kain" });
-  roomB.send("createFounder", { name: "Abel" });
+  roomA.send("createFounder", { name: "Kain", traits: ["féroce", "envieux"] });
+  roomB.send("createFounder", { name: "Abel", traits: ["pacifique", "pieux"] });
   await sleep(800);
   check("deux fondateurs de lignées différentes", state().devots.size === 2);
 
@@ -74,7 +74,7 @@ async function main(): Promise<void> {
   );
 
   // La lignée d'Abel est éteinte : son dieu peut refaçonner un fondateur.
-  roomB.send("createFounder", { name: "Abel-le-Second" });
+  roomB.send("createFounder", { name: "Abel-le-Second", traits: ["prudent", "pieux"] });
   await sleep(800);
   const abelGodDevots = [...state().devots.values()].filter(
     (d: any) => d.godId === "god-abel" && d.state !== "mort",

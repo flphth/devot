@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { DIVINE_MSG_COOLDOWN_MS, DIVINE_MSG_MAX_CHARS } from "@devot/shared";
+import {
+  DIVINE_MSG_COOLDOWN_MS,
+  DIVINE_MSG_MAX_CHARS,
+  TRAIT_POOL,
+  type JournalEntry,
+} from "@devot/shared";
 import type { DevotView, WorldActions, WorldSnapshot } from "./useWorld.js";
 
 const panel: React.CSSProperties = {
@@ -13,26 +18,126 @@ const panel: React.CSSProperties = {
   backdropFilter: "blur(6px)",
 };
 
+const ACTION_ICONS: Record<string, string> = {
+  idle: "🧘",
+  move: "🚶",
+  eat: "🍽",
+  attack: "⚔",
+  reproduce: "🐣",
+  speak: "🗣",
+  flee: "🏃",
+};
+
+function TraitPicker({
+  selected,
+  onToggle,
+}: {
+  selected: string[];
+  onToggle: (t: string) => void;
+}) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+      {TRAIT_POOL.map((t) => {
+        const on = selected.includes(t);
+        return (
+          <button
+            key={t}
+            onClick={() => onToggle(t)}
+            style={{
+              padding: "4px 10px",
+              borderRadius: 999,
+              border: `1px solid ${on ? "#e0b34c" : "#2a3245"}`,
+              background: on ? "#e0b34c" : "#10141d",
+              color: on ? "#10131a" : "#aeb8c9",
+              fontWeight: on ? 700 : 400,
+              cursor: "pointer",
+              fontSize: 12,
+            }}
+          >
+            {t}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Journal({ entries }: { entries: JournalEntry[] }) {
+  const items = [...entries].reverse(); // du plus récent au plus ancien
+  return (
+    <div
+      style={{
+        maxHeight: 260,
+        overflowY: "auto",
+        marginTop: 8,
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+        paddingRight: 4,
+      }}
+    >
+      {items.length === 0 && (
+        <div style={{ opacity: 0.5 }}>Aucun souvenir encore. Il n'a pas vécu.</div>
+      )}
+      {items.map((e, i) => (
+        <div
+          key={i}
+          style={{
+            borderLeft: `3px solid ${e.kind === "event" ? "#4ca6e0" : "#e0b34c"}`,
+            paddingLeft: 8,
+          }}
+        >
+          <div style={{ opacity: 0.45, fontSize: 10 }}>
+            {new Date(e.at).toLocaleTimeString()}
+          </div>
+          {e.kind === "event" ? (
+            <div style={{ fontSize: 12 }}>🌍 {e.text}</div>
+          ) : (
+            <div style={{ fontSize: 12 }}>
+              <div>
+                {ACTION_ICONS[e.action ?? ""] ?? "⚡"} <b>{e.action}</b>
+                {e.emotion ? <span style={{ opacity: 0.65 }}> — {e.emotion}</span> : null}
+              </div>
+              {e.thought && (
+                <div style={{ fontStyle: "italic", color: "#aeb8c9" }}>« {e.thought} »</div>
+              )}
+              {e.text && <div>🗣 « {e.text} »</div>}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Hud({
   snapshot,
   godId,
   selected,
   actions,
   rejection,
+  godMode,
+  journal,
 }: {
   snapshot: WorldSnapshot;
   godId: string | null;
   selected: DevotView | null;
   actions: WorldActions;
   rejection: string | null;
+  godMode: boolean;
+  journal: JournalEntry[];
 }) {
   const [text, setText] = useState("");
   const [now, setNow] = useState(Date.now());
+  const [traits, setTraits] = useState<string[]>([]);
+  const [confirmSmite, setConfirmSmite] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => setConfirmSmite(false), [selected?.id]);
 
   const god = snapshot.gods.find((g) => g.id === godId);
   const myDevots = snapshot.devots.filter((d) => d.godId === godId);
@@ -40,7 +145,13 @@ export function Hud({
   const cooldownLeft = god
     ? Math.max(0, DIVINE_MSG_COOLDOWN_MS - (now - god.lastSpeakAt))
     : 0;
-  const canSpeak = cooldownLeft === 0 && selected && selected.godId === godId && selected.state !== "mort";
+  const canSpeak =
+    cooldownLeft === 0 && selected && selected.godId === godId && selected.state !== "mort";
+
+  const toggleTrait = (t: string) =>
+    setTraits((prev) =>
+      prev.includes(t) ? prev.filter((x) => x !== t) : prev.length < 3 ? [...prev, t] : prev,
+    );
 
   const send = () => {
     if (!selected || !text.trim()) return;
@@ -50,27 +161,52 @@ export function Hud({
 
   return (
     <>
+      {godMode && (
+        <div
+          style={{
+            ...panel,
+            top: 14,
+            right: 14,
+            borderColor: "#e0b34c",
+            color: "#e0b34c",
+            fontWeight: 800,
+            letterSpacing: 1,
+          }}
+        >
+          ⚡ MODE GOD — clic : spawn devot · glisser la nourriture · brouillard off ·
+          touche 1 pour sortir
+        </div>
+      )}
+
       {/* Panthéon / création */}
-      <div style={{ ...panel, top: 14, left: 14, minWidth: 220 }}>
+      <div style={{ ...panel, top: 14, left: 14, width: 250 }}>
         <div style={{ fontWeight: 700, marginBottom: 6 }}>
           {god ? `⚡ ${god.name}` : "Connexion…"}
         </div>
         {!hasLiving && (
-          <button
-            onClick={() => actions.createFounder()}
-            style={{
-              width: "100%",
-              padding: "8px 10px",
-              borderRadius: 8,
-              border: "none",
-              background: god?.color ?? "#4ca6e0",
-              color: "#10131a",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            Façonner ton devot fondateur
-          </button>
+          <>
+            <div style={{ opacity: 0.75, fontSize: 12 }}>
+              Façonne ton fondateur : choisis 2 à 3 traits qui forgeront son âme.
+            </div>
+            <TraitPicker selected={traits} onToggle={toggleTrait} />
+            <button
+              onClick={() => actions.createFounder(undefined, traits)}
+              disabled={traits.length < 2}
+              style={{
+                width: "100%",
+                marginTop: 10,
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: "none",
+                background: traits.length >= 2 ? (god?.color ?? "#4ca6e0") : "#2a3245",
+                color: traits.length >= 2 ? "#10131a" : "#5a6478",
+                fontWeight: 700,
+                cursor: traits.length >= 2 ? "pointer" : "default",
+              }}
+            >
+              Façonner ton devot fondateur
+            </button>
+          </>
         )}
         {myDevots.map((d) => (
           <div key={d.id} style={{ marginTop: 8 }}>
@@ -111,13 +247,31 @@ export function Hud({
         ))}
       </div>
 
-      {/* Devot sélectionné : verbe divin + nourrir */}
+      {/* Panneau Esprit : la vie intérieure du devot sélectionné */}
       {selected && (
-        <div style={{ ...panel, bottom: 14, left: "50%", transform: "translateX(-50%)", width: 420 }}>
+        <div style={{ ...panel, top: 14, left: 280, width: 320 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <b>Esprit de {selected.name}</b>
+            <span style={{ opacity: 0.6, fontSize: 11 }}>
+              {selected.state}, {selected.age} cycles
+            </span>
+          </div>
+          {selected.thought && (
+            <div style={{ fontStyle: "italic", color: "#aeb8c9", marginTop: 4 }}>
+              « {selected.thought} »
+            </div>
+          )}
+          <Journal entries={journal} />
+        </div>
+      )}
+
+      {/* Devot sélectionné : verbe divin + nourrir + foudroyer */}
+      {selected && (
+        <div style={{ ...panel, bottom: 14, left: "50%", transform: "translateX(-50%)", width: 470 }}>
           <div style={{ marginBottom: 6 }}>
             <b>{selected.name}</b>{" "}
             <span style={{ opacity: 0.65 }}>
-              ({selected.state}, {selected.age} cycles
+              ({selected.state}
               {selected.emotion ? `, ${selected.emotion}` : ""})
             </span>
           </div>
@@ -148,7 +302,7 @@ export function Hud({
                   onClick={send}
                   disabled={!canSpeak || !text.trim()}
                   style={{
-                    padding: "8px 14px",
+                    padding: "8px 12px",
                     borderRadius: 8,
                     border: "none",
                     background: canSpeak ? "#e0b34c" : "#2a3245",
@@ -163,7 +317,7 @@ export function Hud({
                   onClick={() => actions.feed(selected.id)}
                   title="Déposer de la nourriture près de lui"
                   style={{
-                    padding: "8px 14px",
+                    padding: "8px 12px",
                     borderRadius: 8,
                     border: "none",
                     background: "#5ee07a",
@@ -174,10 +328,32 @@ export function Hud({
                 >
                   🍞
                 </button>
+                {selected.state !== "mort" && (
+                  <button
+                    onClick={() => {
+                      if (!confirmSmite) return setConfirmSmite(true);
+                      actions.smite(selected.id);
+                      setConfirmSmite(false);
+                    }}
+                    title="Foudroyer ton devot — sa mémoire sera détruite à jamais"
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      border: confirmSmite ? "1px solid #ff8c7a" : "none",
+                      background: confirmSmite ? "#e0634c" : "#3a2430",
+                      color: confirmSmite ? "#fff" : "#ff9a8a",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {confirmSmite ? "Confirmer ⚡" : "⚡"}
+                  </button>
+                )}
               </div>
               <div style={{ opacity: 0.55, fontSize: 11, marginTop: 5 }}>
-                {text.length}/{DIVINE_MSG_MAX_CHARS} — une parole par minute. Le silence
-                est parfois le plus grand des cadeaux.
+                {confirmSmite
+                  ? "⚠ Foudroyer est irréversible : son esprit sera effacé pour toujours."
+                  : `${text.length}/${DIVINE_MSG_MAX_CHARS} — une parole par minute. Le silence est parfois le plus grand des cadeaux.`}
               </div>
             </>
           ) : (

@@ -28,6 +28,8 @@ export interface Decision {
   direction?: { x: number; z: number };
   utterance?: string;
   emotion?: string;
+  /** Monologue intérieur : pensée intime, une phrase (≤140c). */
+  thought?: string;
 }
 
 export type TriggerKind =
