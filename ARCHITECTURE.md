@@ -51,7 +51,7 @@ paiements) est calculée et validée côté serveur.
 │   · food · divine_msgs                     (stub gratuit aujourd'hui)          │
 └──────────────┬───────────────────────────────────────────────┬───────────────┘
        ┌───────▼────────┐                              ┌─────────▼──────────┐
-       │ SQLite (proto) │                              │   API Claude       │
+       │ SQLite (proto) │                              │   API Claude Agent SDK      │
        │  → Postgres    │                              │ Haiku/Sonnet/Opus  │
        └────────────────┘                              └────────────────────┘
 ```
