@@ -1,13 +1,5 @@
 import { Client, Room } from "@colyseus/core";
-import {
-  AnthropicChronicler,
-  AnthropicMind,
-  CognitionOrchestrator,
-  MockChronicler,
-  MockMind,
-  type Chronicler,
-  type MindProvider,
-} from "@devot/agents";
+import { CognitionOrchestrator, createMind, type Chronicler } from "@devot/agents";
 import { createRepos, openDb, type Repos } from "@devot/db";
 import { FreeStubProvider, type PaymentProvider } from "@devot/onchain";
 import {
@@ -59,15 +51,17 @@ export class WorldRoom extends Room<WorldState> {
     const dbPath = process.env.DEVOT_DB ?? new URL("../../world.sqlite", import.meta.url).pathname;
     this.repos = createRepos(openDb(dbPath));
 
-    const useMock = process.env.DEVOT_MOCK === "1" || !process.env.ANTHROPIC_API_KEY;
-    // DEVOT_MOCK_SCRIPT="idle,reproduce,speak" : décisions cycliques du mock,
-    // pratique pour démontrer reproduction/combat sans clé API.
-    const script = process.env.DEVOT_MOCK_SCRIPT?.split(",").map((action) => ({
-      action: action.trim() as never,
-    }));
-    const mind: MindProvider = useMock ? new MockMind(script) : new AnthropicMind();
-    this.chronicler = useMock ? new MockChronicler() : new AnthropicChronicler();
-    console.log(`[world] esprit : ${useMock ? "MockMind" : "Claude (Messages API)"}`);
+    const { kind, mind, chronicler } = createMind();
+    this.chronicler = chronicler;
+    console.log(
+      `[world] esprit : ${
+        kind === "claude"
+          ? "abonnement Claude Code (Agent SDK)"
+          : kind === "api"
+            ? "Claude Messages API (clé)"
+            : "MockMind (simulé)"
+      }`,
+    );
 
     this.orchestrator = new CognitionOrchestrator(
       mind,

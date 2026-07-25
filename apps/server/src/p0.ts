@@ -4,23 +4,17 @@
  * Prouve la mécanique centrale : un devot, tick 250 ms, inférences structurées,
  * HP qui descendent selon l'usage réel, mort + destruction du contexte.
  *
- * Avec ANTHROPIC_API_KEY (ou un profil `ant auth`) : vraies inférences Claude.
- * Sans : esprit factice (MockMind) — même boucle, usage simulé.
- * Forcer le mock : `pnpm p0 -- --mock`.
+ * Backend des esprits (cf. .env.example) : abonnement Claude Code (défaut),
+ * Messages API (MIND=api + clé), ou simulé (MIND=mock / --mock).
  */
-import {
-  AnthropicMind,
-  CognitionOrchestrator,
-  MockMind,
-  type MindProvider,
-} from "@devot/agents";
+import { CognitionOrchestrator, createMind } from "@devot/agents";
 import { createRepos, openDb } from "@devot/db";
 import { FreeStubProvider } from "@devot/onchain";
 import type { DevotEntity, FoodEntity } from "@devot/shared";
 import { TICK_MS } from "@devot/shared";
 import { applyDecision, perceptionSystem, tick, World } from "@devot/sim";
 
-const USE_MOCK = process.argv.includes("--mock") || !process.env.ANTHROPIC_API_KEY;
+if (process.argv.includes("--mock")) process.env.MIND = "mock";
 const DB_PATH = new URL("../p0.sqlite", import.meta.url).pathname;
 const MAX_RUN_MS = 90_000;
 // hp_max réduit pour la démo : ~4-5 pensées avant la mort.
@@ -63,9 +57,17 @@ async function main(): Promise<void> {
   repos.events.record("birth", [founder.id], { founder: true });
   log(`Naissance de ${founder.name} (${founder.hp} HP = ${(founder.hp / 1e6).toFixed(4)} $ de pensée)`);
 
-  // 2. L'esprit : Claude si credentials, mock sinon.
-  const mind: MindProvider = USE_MOCK ? new MockMind() : new AnthropicMind();
-  log(`Esprit : ${USE_MOCK ? "MockMind (aucune clé API détectée)" : "Claude (Messages API)"}`);
+  // 2. L'esprit : abonnement Claude Code (défaut), API (clé), ou mock.
+  const { kind, mind } = createMind();
+  log(
+    `Esprit : ${
+      kind === "claude"
+        ? "abonnement Claude Code (Agent SDK)"
+        : kind === "api"
+          ? "Claude Messages API (clé)"
+          : "MockMind (simulé)"
+    }`,
+  );
 
   const orchestrator = new CognitionOrchestrator(
     mind,

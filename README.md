@@ -8,7 +8,6 @@
 
 ```sh
 pnpm install
-cp .env.example .env            # optionnel : renseigne ANTHROPIC_API_KEY pour de vrais esprits
 pnpm --filter @devot/server dev # terminal 1 — monde sur ws://localhost:2567
 pnpm --filter @devot/client dev # terminal 2 — http://localhost:5173?god=TonNom
 ```
@@ -17,10 +16,17 @@ Ouvre `http://localhost:5173?god=TonNom`, clique « Façonner ton devot fondateu
 sélectionne-le (clic sur son corps) pour lui parler (140 caractères / minute) ou le nourrir.
 Deux navigateurs avec des `?god=` différents = deux dieux dans le même monde.
 
-**Accès Claude** : sans clé, les esprits sont simulés (MockMind — jouable, 0 dépense).
-Pour de vrais agents Claude, il faut une **clé API Console** (platform.claude.com → API keys,
-pay-per-token) dans `.env`. L'abonnement Claude Code / Max **ne suffit pas** : la Messages
-API utilisée par les devots ne l'accepte pas.
+**Accès Claude — trois backends** (variable `MIND`, cf. `.env.example`) :
+
+| `MIND=` | Ce que ça utilise | Coût |
+| --- | --- | --- |
+| `claude` *(défaut)* | Ton **abonnement Claude Code** (Agent SDK, OAuth de la machine) | quota de l'abonnement, **0 facturation au token** |
+| `api` | Messages API avec `ANTHROPIC_API_KEY` (clé Console) | pay-per-token |
+| `mock` | Esprits simulés, hors-ligne | gratuit |
+
+Rien à configurer si Claude Code est installé et connecté sur la machine : le défaut
+`claude` fonctionne directement. Une pensée Haiku prend ~5-15 s (session éphémère) —
+le corps du devot continue de vivre pendant qu'il pense, c'est le design.
 
 ## Prérequis
 
