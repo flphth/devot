@@ -7,22 +7,20 @@
 // L'ordre compte : tout ce qui est >= TISSUE_MIN est du tissu vivant, ce qui
 // permet de tester l'appartenance à un organisme sans table de correspondance.
 export const VOID = 0;
-export const WATER = 1;
-export const ROCK = 2;
-export const BIOMASS = 3;
-export const BONE = 4;
-export const MUSCLE = 5;
-export const STORAGE = 6;
-export const MOUTH = 7;
-export const EYE = 8;
-export const NEURON = 9;
+export const ROCK = 1;
+export const BIOMASS = 2;
+export const BONE = 3;
+export const MUSCLE = 4;
+export const STORAGE = 5;
+export const MOUTH = 6;
+export const EYE = 7;
+export const NEURON = 8;
 
 export const TISSUE_MIN = BONE;
-export const MATERIAL_COUNT = 10;
+export const MATERIAL_COUNT = 9;
 
 export const MATERIAL_NAMES = [
   "vide",
-  "eau",
   "roche",
   "biomasse",
   "os",
@@ -71,12 +69,22 @@ UPKEEP[EYE] = 4;
 UPKEEP[NEURON] = 8;
 
 /**
- * PRÉDATION. Mordre coûte, et ne rend rien directement : le voxel arraché
- * devient de la biomasse au sol, que n'importe quelle bouche peut manger — y
- * compris celle du mordu. Le prédateur doit donc mordre PUIS rester manger, ce
- * qui l'expose. C'est ce qui distingue la prédation du vol.
+ * PRÉDATION. Mordre coûte, et NOURRIT : la chair arrachée passe directement
+ * dans le prédateur, à la même perte de rendement qu'une bouche sur de la
+ * biomasse. Manger son voisin est donc un vrai métier, pas un geste gratuit.
+ *
+ * L'énergie reste conservée : la chair vaut ce que sa construction a coûté
+ * (CORPSE_RETURN_PER_VOXEL), pas davantage, et 20 % se perdent à la conversion.
+ * Mordre reste donc moins rentable que de construire — on ne peut pas vivre
+ * éternellement de son voisin.
+ *
+ * Une version antérieure laissait tomber la chair au sol : cela distinguait
+ * joliment la prédation du vol, mais rendait la morsure si peu payante qu'aucune
+ * lignée ne s'y spécialisait.
  */
 export const ATTACK_COST = 120;
+/** Portée de la morsure : on mord ce qu'on TOUCHE, à une case. */
+export const ATTACK_REACH = 1;
 
 /**
  * REPRODUCTION CROISÉE. Quand un organisme se reproduit au contact d'une lignée
@@ -190,28 +198,74 @@ export const SENESCENCE_PERIOD = 300;
 // ── Terrain ─────────────────────────────────────────────────────────────────
 /** Hauteur du socle rocheux (y < GROUND_Y est de la roche). */
 export const GROUND_Y = 4;
+
+/**
+ * Part des colonnes du monde qui sont fertiles, en pour mille.
+ *
+ * C'est le frein qui remplace l'eau. L'eau, en n'accélérant la pousse qu'à son
+ * contact, bornait la production primaire par la LONGUEUR DES RIVES et non par
+ * la surface du monde. Une fois retirée, la production devenait proportionnelle
+ * à toute la surface : mesuré, le monde se remplissait jusqu'au plafond mémoire
+ * de 2 047 organismes et l'évolution s'y arrêtait (génération 94 au tick 12 000,
+ * puis 97 au tick 20 000 — elle rampe).
+ *
+ * Le relief existe déjà : les creux qui accueillaient l'eau deviennent les terres
+ * basses, seules fertiles ; les hauteurs sont stériles. La nourriture est donc
+ * quelque part plutôt que partout, ce qui donne un sens au fait de se déplacer.
+ *
+ * La limite est RELATIVE au relief de chaque monde, pas une altitude absolue :
+ * avec un seuil fixe, un monde tiré haut n'avait aucune terre fertile et
+ * mourait, un monde tiré bas était fertile partout. Chaque monde calcule donc sa
+ * propre altitude limite pour que cette fraction-là soit fertile, quelle que
+ * soit la forme de ses collines.
+ */
+export const FERTILE_FRACTION = 450;
 /**
  * Probabilité (sur 2^16) qu'une surface fasse pousser de la biomasse AU CONTACT
- * D'UNE AUTRE PLANTE. La végétation colonise : elle avance depuis ses colonies,
- * vite au bord de l'eau, lentement au sec.
+ * D'UNE AUTRE PLANTE. La végétation colonise : elle avance depuis ses colonies.
  *
- * L'écart entre les deux valeurs crée le paysage — rives riches, intérieur
- * pauvre. La dépendance au voisinage, elle, crée la pression sélective : brouter
+ * C'est cette dépendance au voisinage qui crée la pression sélective : brouter
  * détruit le stock de graines local, donc le garde-manger s'épuise et il faut
- * suivre le front. Quand la pousse était spontanée, une bouche immobile posée
- * sur une rive était nourrie à vie et l'évolution éliminait muscles, yeux et
- * neurones — mesuré : zéro cerveau survivant sur trois graines.
+ * suivre le front. Quand la pousse était spontanée, une bouche immobile était
+ * nourrie à vie et l'évolution éliminait muscles, yeux et neurones — mesuré :
+ * zéro cerveau survivant sur trois graines.
+ *
+ * Il y avait auparavant DEUX valeurs, selon la proximité de l'eau. L'eau a été
+ * retirée du monde, et cette valeur unique a dû être recalibrée par la mesure —
+ * en même temps que le frein spatial était rendu au relief (FERTILE_FRACTION).
+ *
+ * Mesuré sur cinq mondes de 6 000 ticks, corps bornés à 32 voxels :
+ *   55  → deux mondes s'éteignent presque (4 et 10 vivants) ;
+ *   70  → 46 à 503 vivants, génération 12 à 46, des cerveaux partout ;
+ *   110 → 169 à 934, génération jusqu'à 128, mais on approche du plafond ;
+ *   400 → trois mondes sur cinq saturent le plafond de 2 047 organismes.
+ *
+ * La colonisation est un processus exponentiel : au-dessus du point où la pousse
+ * dépasse le broutage et la décomposition, la végétation couvre tout ; en
+ * dessous, elle s'éteint. Le réglage est donc un seuil, et toute modification
+ * exige de remesurer.
  */
-export const BIOMASS_SPAWN_CHANCE_WET = 900;
-export const BIOMASS_SPAWN_CHANCE_DRY = 40;
+export const BIOMASS_SPAWN_CHANCE = 70;
 /**
  * Génération spontanée, loin de toute plante. Doit rester très faible — c'est
  * elle qui empêche la stérilité définitive (sans plante, plus aucune plante ne
  * peut naître) sans pour autant renourrir gratuitement les campeurs.
  */
 export const BIOMASS_SPAWN_CHANCE_SEED = 1;
-/** Probabilité (sur 2^16) qu'une flaque d'eau s'évapore. */
-export const WATER_EVAPORATION_CHANCE = 12;
+
+/**
+ * ENCOMBREMENT : une plante ne pousse pas si elle a déjà autant de voisines.
+ *
+ * Sans cette borne, la colonisation finit par faire tapis : toute la terre basse
+ * se couvre, la nourriture redevient partout, et chercher ne sert plus à rien —
+ * exactement le travers que la colonisation devait corriger. Avec elle, la
+ * végétation forme des bosquets bordés de vide : il y a des endroits où manger
+ * et des endroits où marcher.
+ *
+ * Sur six voisins possibles, trois est le point où les taches restent des taches.
+ */
+export const BIOMASS_CROWDING_MAX = 3;
+
 
 // ── Organismes ──────────────────────────────────────────────────────────────
 // Largement au-delà de la cible (quelques centaines) ; dimensionne aussi
@@ -223,6 +277,25 @@ export const NO_OWNER = 0;
 export const ALIVE = 1;
 export const DEAD = 0;
 
-/** Bornes de validation d'un plan de corps (reprises par la validation P5.3). */
-export const MAX_BODY_VOXELS = 512;
-export const MAX_NEURON_VOXELS = 64;
+/**
+ * TAILLE MAXIMALE D'UNE CRÉATURE, en voxels. Bornes de validation d'un plan de
+ * corps, reprises telles quelles par le monde commun au moment de relâcher.
+ *
+ * 32 et non 512. Trois raisons, dans cet ordre :
+ *
+ * 1. une créature doit se LIRE. À 512 voxels on ne distingue plus une bouche
+ *    d'un neurone à l'écran, et la sélection à la souris devient un jeu
+ *    d'adresse ;
+ * 2. le descripteur de corps du protocole dérivé est borné par cette valeur :
+ *    32 voxels font 137 octets, 512 en feraient 2 057 — pour un objet envoyé à
+ *    chaque entrée dans le champ de vision ;
+ * 3. `bodyList` réserve MAX_ORGANISMS × MAX_BODY_VOXELS entiers, soit 4 Mo à
+ *    512 contre 256 Ko à 32.
+ *
+ * La borne n'a jamais mordu dans les faits — les corps mesurés font trois à cinq
+ * voxels, parce que grandir coûte et retarde la reproduction. Elle protège
+ * contre un génome fabriqué à la main, pas contre l'évolution.
+ */
+export const MAX_BODY_VOXELS = 32;
+/** Un corps de 32 voxels n'a pas besoin de plus : la moitié en neurones est déjà extrême. */
+export const MAX_NEURON_VOXELS = 16;

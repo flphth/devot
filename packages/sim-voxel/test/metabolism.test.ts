@@ -8,7 +8,10 @@ import {
   DEAD,
   MOUTH_EFFICIENCY_DEN,
   MOUTH_EFFICIENCY_NUM,
+  MOUTH,
   MOUTH_INTAKE_PER_TICK,
+  MUSCLE,
+  NEURON,
   NUTRIENT_DECAY,
   SENESCENCE_PERIOD,
   STORAGE,
@@ -83,7 +86,7 @@ describe("l'énergie est la vie", () => {
 
     const taken = MOUTH_INTAKE_PER_TICK; // la biomasse est plus riche que la prise
     const gained = ((taken * MOUTH_EFFICIENCY_NUM) / MOUTH_EFFICIENCY_DEN) | 0;
-    expect(w.energy[id]!).toBe(before + gained - UPKEEP[7]!);
+    expect(w.energy[id]!).toBe(before + gained - UPKEEP[MOUTH]!);
     // La biomasse perd ce qui a été mangé, plus sa décomposition naturelle.
     expect(w.nutrient[food]!).toBe(50_000 - taken - NUTRIENT_DECAY);
   });
@@ -114,8 +117,8 @@ describe("l'énergie est la vie", () => {
   });
 
   it("un neurone coûte plus cher qu'un os : penser est le tissu le plus lourd", () => {
-    expect(UPKEEP[9]!).toBeGreaterThan(UPKEEP[BONE]!);
-    expect(UPKEEP[9]!).toBeGreaterThan(UPKEEP[5]!); // plus qu'un muscle au repos
+    expect(UPKEEP[NEURON]!).toBeGreaterThan(UPKEEP[BONE]!);
+    expect(UPKEEP[NEURON]!).toBeGreaterThan(UPKEEP[MUSCLE]!); // plus qu'un muscle au repos
   });
 });
 

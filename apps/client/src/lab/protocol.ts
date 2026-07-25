@@ -90,15 +90,33 @@ export interface ConformityResult {
 
 // ── Empaquetage des voxels ──────────────────────────────────────────────────
 
+/**
+ * Un voxel tient dans un entier 32 bits :
+ *   x 7 · z 7 · y 5 · matériau 4 · sélectionné 1 · teinte 5 · vigueur 3
+ *
+ * La TEINTE identifie la créature (dérivée de son identifiant), la VIGUEUR est
+ * son énergie sur huit niveaux. Les deux voyagent avec le voxel plutôt que
+ * d'être recherchées côté client : chercher à quel organisme appartient chaque
+ * voxel coûtait un parcours croisé par image, et faisait tomber le rendu à
+ * quelques images par seconde dès que la population montait.
+ */
 export function packVoxel(
   x: number,
   y: number,
   z: number,
   mat: number,
   selected: boolean,
+  tint = 0,
+  vigor = 0,
 ): number {
   return (
-    (x & 0x7f) | ((z & 0x7f) << 7) | ((y & 0x1f) << 14) | ((mat & 0xf) << 19) | ((selected ? 1 : 0) << 23)
+    (x & 0x7f) |
+    ((z & 0x7f) << 7) |
+    ((y & 0x1f) << 14) |
+    ((mat & 0xf) << 19) |
+    ((selected ? 1 : 0) << 23) |
+    ((tint & 0x1f) << 24) |
+    ((vigor & 0x7) << 29)
   );
 }
 
@@ -108,6 +126,8 @@ export function unpackVoxel(v: number): {
   z: number;
   mat: number;
   selected: boolean;
+  tint: number;
+  vigor: number;
 } {
   return {
     x: v & 0x7f,
@@ -115,6 +135,8 @@ export function unpackVoxel(v: number): {
     y: (v >> 14) & 0x1f,
     mat: (v >> 19) & 0xf,
     selected: ((v >> 23) & 1) === 1,
+    tint: (v >>> 24) & 0x1f,
+    vigor: (v >>> 29) & 0x7,
   };
 }
 

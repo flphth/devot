@@ -29,7 +29,13 @@ import {
  * pendant la sauvegarde laisse l'ancienne, jamais un fichier tronqué.
  */
 
-const SNAPSHOT_VERSION = 1;
+/**
+ * Passée à 2 avec le retrait de l'eau : la grille sauvegardée contient des
+ * numéros de matériaux, et ils ont été renumérotés. Un ancien instantané est
+ * donc refusé, et le serveur repart d'un monde neuf plutôt que de ressusciter
+ * un monde dont chaque voxel signifierait autre chose.
+ */
+const SNAPSHOT_VERSION = 2;
 
 interface OrganismRecord {
   id: number;

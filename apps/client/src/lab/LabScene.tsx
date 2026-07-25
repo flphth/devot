@@ -2,90 +2,140 @@ import { Grid, OrbitControls } from "@react-three/drei";
 import { useThree, type ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { MATERIAL_COUNT, SX, SY, SZ } from "@devot/sim-voxel";
+import { SX, SY, SZ, TISSUE_MIN } from "@devot/sim-voxel";
+import {
+  OrganicBodies,
+  OrganicLighting,
+  OrganicTerrain,
+  SelectionMarker,
+  type BodyVoxels,
+  type SurfaceData,
+} from "../render/organic.js";
 import { unpackVoxel, type LabFrame } from "./protocol.js";
 
-/** Palette voxel : terrain sobre, tissus saturés pour se lire d'un coup d'œil. */
-const COLORS: Record<number, string> = {
-  1: "#2a6f97", // eau
-  2: "#4a4f57", // roche
-  3: "#7dbc5e", // biomasse
-  4: "#e8e4d8", // os
-  5: "#4ce07a", // muscle
-  6: "#4ca6e0", // réserve
-  7: "#e0634c", // bouche
-  8: "#e8c95c", // œil
-  9: "#9c4ce0", // neurone
-};
+/**
+ * Le laboratoire, en rendu ORGANIQUE : le terrain est une nappe continue, les
+ * corps sont des sphères qui se soudent et respirent. La simulation, elle, reste
+ * une grille de voxels — seul le regard change.
+ */
 
-const MAX_PER_MATERIAL = 40_000;
+const MAX_TISSUE = 24_000;
 
 /**
- * Rendu voxel par matériau : une InstancedMesh par type, remplie depuis la
- * liste dérivée que le worker envoie. Aucun objet par voxel côté React.
+ * Traduit l'image dérivée du worker en ce que la couche de rendu attend : une
+ * hauteur et un matériau par colonne pour le terrain, une liste de positions
+ * pour les corps. C'est le seul endroit qui connaît le format du worker.
  */
-function VoxelLayer({
-  material,
+function useFrameGeometry(frame: LabFrame | null): { surface: SurfaceData; body: BodyVoxels } {
+  const surfaceRef = useRef<SurfaceData>({
+    heights: new Int16Array(SX * SZ).fill(-1),
+    mats: new Uint8Array(SX * SZ),
+    revision: 0,
+  });
+  const bodyRef = useRef<BodyVoxels>({
+    positions: new Float32Array(MAX_TISSUE * 3),
+    mats: new Uint8Array(MAX_TISSUE),
+    vigor: new Float32Array(MAX_TISSUE),
+    tint: new Uint8Array(MAX_TISSUE),
+    selected: new Uint8Array(MAX_TISSUE),
+    count: 0,
+  });
+
+  return useMemo(() => {
+    const s = surfaceRef.current;
+    const b = bodyRef.current;
+    s.heights.fill(-1);
+    s.mats.fill(0);
+    let n = 0;
+
+    if (frame) {
+      for (let k = 0; k < frame.voxels.length; k++) {
+        const v = unpackVoxel(frame.voxels[k]!);
+        if (v.mat >= TISSUE_MIN) {
+          if (n >= MAX_TISSUE) continue;
+          b.positions[n * 3] = v.x - SX / 2;
+          b.positions[n * 3 + 1] = v.y;
+          b.positions[n * 3 + 2] = v.z - SZ / 2;
+          b.mats[n] = v.mat;
+          b.selected[n] = v.selected ? 1 : 0;
+          // Teinte et vigueur arrivent avec le voxel : aucune recherche ici.
+          b.tint[n] = v.tint;
+          b.vigor[n] = v.vigor / 7;
+          n++;
+        } else {
+          const col = v.z * SX + v.x;
+          if (v.y > s.heights[col]!) {
+            s.heights[col] = v.y;
+            s.mats[col] = v.mat;
+          }
+        }
+      }
+    }
+
+    b.count = n;
+    s.revision++;
+    return { surface: { ...s }, body: { ...b } };
+  }, [frame]);
+}
+
+/**
+ * CIBLES DE SÉLECTION. Une créature fait trois à cinq voxels : viser exactement
+ * l'un d'eux à la souris est un jeu d'adresse, pas une interaction. On pose donc
+ * sur chaque organisme une sphère nettement plus large que son corps — assez
+ * visible pour dire « il y a quelqu'un ici », assez transparente pour ne pas
+ * masquer le corps. C'est elle qu'on clique.
+ */
+const PICK_RADIUS = 2.4;
+const MAX_TARGETS = 2048;
+
+function OrganismTargets({
   frame,
   onPick,
 }: {
-  material: number;
   frame: LabFrame | null;
-  onPick?: (x: number, y: number, z: number) => void;
+  onPick: (organismId: number) => void;
 }) {
   const ref = useRef<THREE.InstancedMesh>(null);
-  const color = COLORS[material] ?? "#888888";
-  const isTissue = material >= 4;
+  const idsRef = useRef<number[]>([]);
 
   useEffect(() => {
     const mesh = ref.current;
     if (!mesh) return;
-    if (!frame) {
-      mesh.count = 0;
-      return;
-    }
+    const ids: number[] = [];
     const m = new THREE.Matrix4();
-    const highlight = new THREE.Color("#ffffff");
-    const base = new THREE.Color(color);
-    let n = 0;
-    for (let k = 0; k < frame.voxels.length && n < MAX_PER_MATERIAL; k++) {
-      const v = unpackVoxel(frame.voxels[k]!);
-      if (v.mat !== material) continue;
-      m.makeTranslation(v.x - SX / 2, v.y, v.z - SZ / 2);
-      mesh.setMatrixAt(n, m);
-      if (isTissue) mesh.setColorAt(n, v.selected ? highlight : base);
-      n++;
+    if (frame) {
+      for (let k = 0; k + 4 < frame.organisms.length && ids.length < MAX_TARGETS; k += 5) {
+        m.makeTranslation(
+          frame.organisms[k + 1]! - SX / 2,
+          frame.organisms[k + 2]! + 0.4,
+          frame.organisms[k + 3]! - SZ / 2,
+        );
+        mesh.setMatrixAt(ids.length, m);
+        ids.push(frame.organisms[k]!);
+      }
     }
-    mesh.count = n;
+    idsRef.current = ids;
+    mesh.count = ids.length;
     mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [frame, material, color, isTissue]);
+  }, [frame]);
 
   return (
     <instancedMesh
       ref={ref}
-      args={[undefined, undefined, MAX_PER_MATERIAL]}
+      args={[undefined, undefined, MAX_TARGETS]}
       frustumCulled={false}
-      onClick={
-        onPick
-          ? (e: ThreeEvent<MouseEvent>) => {
-              e.stopPropagation();
-              onPick(
-                Math.round(e.point.x + SX / 2),
-                Math.round(e.point.y),
-                Math.round(e.point.z + SZ / 2),
-              );
-            }
-          : undefined
-      }
+      onClick={(e: ThreeEvent<MouseEvent>) => {
+        const k = e.instanceId;
+        if (k === undefined) return;
+        const id = idsRef.current[k];
+        if (id === undefined) return;
+        e.stopPropagation();
+        onPick(id);
+      }}
     >
-      <boxGeometry args={[1, 1, 1]} />
-      {isTissue ? (
-        <meshLambertMaterial color="#ffffff" />
-      ) : (
-        <meshLambertMaterial color={color} />
-      )}
+      <sphereGeometry args={[PICK_RADIUS, 10, 8]} />
+      <meshBasicMaterial color="#e0b34c" transparent opacity={0.07} depthWrite={false} />
     </instancedMesh>
   );
 }
@@ -108,25 +158,36 @@ export function LabScene({
   frame: LabFrame | null;
   onPickOrganism: (organismId: number) => void;
 }) {
-  const materials = useMemo(
-    () => Array.from({ length: MATERIAL_COUNT - 1 }, (_, k) => k + 1),
-    [],
-  );
+  const { surface, body } = useFrameGeometry(frame);
 
-  /** Clic dans la scène → organisme dont le germe est le plus proche. */
-  const pick = (x: number, y: number, z: number): void => {
+  // Où poser le marqueur : la moyenne des voxels marqués sélectionnés.
+  const marked = useMemo(() => {
+    let sx = 0;
+    let sy = 0;
+    let sz = 0;
+    let n = 0;
+    for (let k = 0; k < body.count; k++) {
+      if (!body.selected[k]) continue;
+      sx += body.positions[k * 3]!;
+      sy += body.positions[k * 3 + 1]!;
+      sz += body.positions[k * 3 + 2]!;
+      n++;
+    }
+    return n === 0 ? null : { x: sx / n, y: sy / n, z: sz / n };
+  }, [body]);
+
+  /** Clic sur la nappe → organisme dont le germe est le plus proche. */
+  const pickNear = (x: number, z: number): void => {
     if (!frame) return;
     let best = 0;
-    let bestD = 25;
+    let bestD = 36; // on pardonne une visée à six voxels près
     for (let k = 0; k + 4 < frame.organisms.length; k += 5) {
-      const id = frame.organisms[k]!;
-      const dx = frame.organisms[k + 1]! - x;
-      const dy = frame.organisms[k + 2]! - y;
-      const dz = frame.organisms[k + 3]! - z;
-      const d = dx * dx + dy * dy + dz * dz;
+      const dx = frame.organisms[k + 1]! - SX / 2 - x;
+      const dz = frame.organisms[k + 3]! - SZ / 2 - z;
+      const d = dx * dx + dz * dz;
       if (d < bestD) {
         bestD = d;
-        best = id;
+        best = frame.organisms[k]!;
       }
     }
     if (best > 0) onPickOrganism(best);
@@ -135,29 +196,32 @@ export function LabScene({
   return (
     <>
       <LabTestHooks />
-      <ambientLight intensity={0.85} color="#eef4ff" />
-      <directionalLight position={[40, 60, 25]} intensity={1.1} color="#fff6e8" />
-      <fog attach="fog" args={["#0b0e14", 120, 260]} />
+      <OrganicLighting />
+      <fog attach="fog" args={["#0b0e14", 150, 320]} />
 
-      {materials.map((m) => (
-        <VoxelLayer key={m} material={m} frame={frame} onPick={m >= 4 ? pick : undefined} />
-      ))}
+      <group
+        onClick={(e: ThreeEvent<MouseEvent>) => {
+          e.stopPropagation();
+          pickNear(e.point.x, e.point.z);
+        }}
+      >
+        <OrganicTerrain surface={surface} />
+      </group>
+      <OrganicBodies body={body} />
+      <SelectionMarker position={marked} />
+      <OrganismTargets frame={frame} onPick={onPickOrganism} />
 
       <Grid
         args={[SX, SZ]}
         position={[0, -0.51, 0]}
         cellColor="#1d2430"
         sectionColor="#26303e"
-        fadeDistance={220}
+        cellSize={8}
+        sectionSize={32}
+        fadeDistance={320}
+        infiniteGrid={false}
       />
-
-      <OrbitControls
-        makeDefault
-        target={[0, SY / 4, 0]}
-        maxPolarAngle={Math.PI / 2.05}
-        minDistance={20}
-        maxDistance={260}
-      />
+      <OrbitControls target={[0, SY / 5, 0]} maxPolarAngle={Math.PI / 2.05} />
     </>
   );
 }

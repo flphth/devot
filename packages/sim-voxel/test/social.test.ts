@@ -3,6 +3,10 @@ import {
   ALIVE,
   ATTACK_COST,
   BIOMASS,
+  CORPSE_RETURN_PER_VOXEL,
+  MOUTH_EFFICIENCY_DEN,
+  MOUTH_EFFICIENCY_NUM,
+  VOID,
   MAX_ORGANISMS,
   MOUTH,
   NEURON,
@@ -64,15 +68,17 @@ describe("prédation entre lignées", () => {
     w.intentAttack[a] = 1;
     passAttack(w);
 
+    // La chair vaut ce que sa construction a coûté, moins la perte de conversion.
+    const meal = ((CORPSE_RETURN_PER_VOXEL * MOUTH_EFFICIENCY_NUM) / MOUTH_EFFICIENCY_DEN) | 0;
     expect(w.bodyLen[b]!, "la victime a perdu un voxel").toBeLessThan(bodyBefore);
-    expect(w.energy[a]!, "mordre coûte").toBe(energyBefore - ATTACK_COST);
+    expect(w.energy[a]!, "mordre coûte, et nourrit").toBe(energyBefore - ATTACK_COST + meal);
     expect(w.bites[a]).toBe(1);
     expect(w.bitten[b]).toBe(1);
   });
 
-  it("la chair arrachée tombe au sol : mordre ne nourrit pas sur le coup", () => {
-    // C'est ce qui distingue la prédation du vol — il faut mordre PUIS rester
-    // manger, donc s'exposer.
+  it("la chair passe directement dans le prédateur", () => {
+    // Manger son voisin est un vrai métier : la chair ne tombe pas au sol pour
+    // qu'un tiers la ramasse, elle nourrit celui qui a mordu.
     const { w, a, b } = twoNeighbours();
     const victimVoxel = w.bodyList[w.bodySlot(b)]!;
     const target = w.idx(w.xOf(victimVoxel) - 1, w.yOf(victimVoxel), w.zOf(victimVoxel));
@@ -82,8 +88,8 @@ describe("prédation entre lignées", () => {
     w.intentAttack[a] = 1;
     passAttack(w);
 
-    expect(w.material[victimVoxel], "le voxel devient de la biomasse").toBe(BIOMASS);
-    expect(w.eaten[a]!, "rien n'est ingéré au moment de la morsure").toBe(eatenBefore);
+    expect(w.material[victimVoxel], "la case est vidée, rien ne reste au sol").toBe(VOID);
+    expect(w.eaten[a]!, "et l'ingestion est comptée").toBeGreaterThan(eatenBefore);
   });
 
   it("on ne se mord pas soi-même", () => {

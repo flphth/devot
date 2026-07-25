@@ -601,7 +601,6 @@ export class VoxelWorldRoom extends Room<VoxelWorldState> {
     const y = w.yOf(seed);
     const z = w.zOf(seed);
     let food = 0;
-    let water = 0;
     let others = 0;
     const R = 6;
     for (let dz = -R; dz <= R; dz++) {
@@ -611,14 +610,12 @@ export class VoxelWorldRoom extends Room<VoxelWorldState> {
           const i = w.idx(x + dx, y + dy, z + dz);
           const m = w.material[i]!;
           if (m === BIOMASS) food++;
-          else if (m === 1) water++;
           else if (w.isTissue(i) && w.owner[i] !== id) others++;
         }
       }
     }
     const parts = [
       food > 0 ? `${food} voxels de nourriture` : "aucune nourriture",
-      water > 0 ? `de l'eau (${water} voxels)` : "pas d'eau",
       others > 0 ? `${others} voxels d'un autre corps` : "personne",
     ];
     return parts.join(", ") + ".";

@@ -156,6 +156,9 @@ export async function runTerrainPassOnGpu(w: VoxelWorld, ticks: number): Promise
     uni[4] = w.seed >>> 0;
     uni[5] = w.activeTop;
     uni[6] = VOXEL_COUNT;
+    // L'altitude fertile est propre à chaque monde : elle doit voyager avec lui,
+    // sinon le GPU applique la règle de pousse à un autre relief que le CPU.
+    uni[7] = w.fertileMaxY;
 
     for (let t = 0; t < ticks; t++) {
       // Le tick est le SEUL paramètre qui change : l'état ne quitte pas le GPU.

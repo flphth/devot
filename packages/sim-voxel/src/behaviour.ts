@@ -2,6 +2,8 @@ import {
   ALIVE,
   ATTACK_COST,
   BIOMASS,
+  MOUTH_EFFICIENCY_DEN,
+  MOUTH_EFFICIENCY_NUM,
   MIN_CHILD_ENERGY,
   MUSCLE_CONTRACTION_COST,
   NEURON_THINKING_COST,
@@ -11,7 +13,6 @@ import {
   ROCK,
   TISSUE_MIN,
   VOID,
-  WATER,
 } from "./constants.js";
 import { MOVE_DX, MOVE_DZ, chosenDirection, sense, think } from "./brain.js";
 import {
@@ -101,7 +102,7 @@ export function passMove(w: VoxelWorld): void {
       // corps bloquent (pas de destruction gratuite de matière).
       if (own === id) {
         // notre propre voxel : il se déplacera aussi
-      } else if (tm !== VOID && tm !== WATER) {
+      } else if (tm !== VOID) {
         ok = false;
       }
       w.moveTargets[k] = ti;
@@ -155,11 +156,17 @@ export function passAttack(w: VoxelWorld): void {
     if (target < 0) continue;
 
     const victim = w.owner[target]!;
-    if (damageVoxel(w, target)) {
-      w.energy[id] = w.energy[id]! - ATTACK_COST;
-      w.bites[id] = w.bites[id]! + 1;
-      w.bitten[victim] = w.bitten[victim]! + 1;
-    }
+    if (!damageVoxel(w, target)) continue;
+
+    // La chair passe dans le prédateur : `damageVoxel` a posé de la biomasse à
+    // la place du tissu, on la lui donne au lieu de la laisser au sol.
+    const flesh = w.nutrient[target]!;
+    const gained = ((flesh * MOUTH_EFFICIENCY_NUM) / MOUTH_EFFICIENCY_DEN) | 0;
+    w.setMaterial(target, VOID);
+    w.energy[id] = w.energy[id]! - ATTACK_COST + gained;
+    w.eaten[id] = w.eaten[id]! + gained;
+    w.bites[id] = w.bites[id]! + 1;
+    w.bitten[victim] = w.bitten[victim]! + 1;
   }
 }
 
@@ -265,7 +272,7 @@ function freeNeighbourOfBody(w: VoxelWorld, id: number): number {
       if (!w.inBounds(nx, ny, nz)) continue;
       const ni = w.idx(nx, ny, nz);
       const m = w.material[ni]!;
-      if (m === VOID || m === WATER) return ni;
+      if (m === VOID) return ni;
     }
   }
   return -1;

@@ -132,8 +132,26 @@ export function LabHud({ lab }: { lab: LabState }) {
               fontSize: 12,
             }}
           />
-          <button onClick={() => actions.reseed(Number(seedText) || 1, 160)} style={btn()}>
+          <button
+            onClick={() => {
+              // « Nouveau monde » veut dire NOUVEAU : on tire une graine, et le
+              // relief entier change avec elle. Garder la graine affichée
+              // rejouerait le même paysage, ce qui n'est utile que pour
+              // reproduire un run — d'où le second bouton.
+              const seed = (Math.floor(Math.random() * 0x7fffffff) | 0) || 1;
+              setSeedText(String(seed));
+              actions.reseed(seed, 160);
+            }}
+            style={btn(true)}
+          >
             nouveau monde
+          </button>
+          <button
+            onClick={() => actions.reseed(Number(seedText) || 1, 160)}
+            style={btn()}
+            title="Rejouer exactement ce monde"
+          >
+            rejouer
           </button>
         </div>
       </div>

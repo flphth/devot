@@ -8,10 +8,13 @@ import {
   CX,
   CZ,
   DEAD,
+  FERTILE_FRACTION,
   GROUND_Y,
   MAX_BODY_VOXELS,
   MAX_NEURON_VOXELS,
   MAX_ORGANISMS,
+  MOUTH,
+  MUSCLE,
   NEURON,
   NO_OWNER,
   NUTRIENT_FRESH,
@@ -23,10 +26,9 @@ import {
   TISSUE_MIN,
   VOID,
   VOXEL_COUNT,
-  WATER,
 } from "./constants.js";
 import { NUM_INPUTS, NUM_OUTPUTS, type Genome } from "./genome.js";
-import { SeededRng } from "./rng.js";
+import { SeededRng, hash32 } from "./rng.js";
 
 /**
  * L'état du monde, en Structure of Arrays.
@@ -149,6 +151,13 @@ export class VoxelWorld {
    * seul `generateTerrain` la resserre, et la croissance la repousse.
    */
   activeTop = SY - 1;
+
+  /**
+   * Altitude au-dessus de laquelle plus rien ne pousse, propre à ce monde.
+   * `generateTerrain` la calcule d'après son propre relief (cf.
+   * FERTILE_FRACTION) ; un monde construit à la main est fertile partout.
+   */
+  fertileMaxY = SY;
 
   constructor(seed = 1) {
     // `hash32` n'a aucun terme constant : hash32(0,0,0) === 0. Une graine nulle
@@ -273,14 +282,13 @@ export class VoxelWorld {
     this.bodyLen[id] = len + 1;
     this.material[i] = mat;
     this.owner[i] = id;
-    this.voxelCount[id]!;
     this.voxelCount[id] = this.voxelCount[id]! + 1;
     if (mat === NEURON) this.neuronCount[id] = this.neuronCount[id]! + 1;
     else if (mat === STORAGE) {
       this.storageCount[id] = this.storageCount[id]! + 1;
       this.refreshCapacity(id);
-    } else if (mat === 5) this.muscleCount[id] = this.muscleCount[id]! + 1;
-    else if (mat === 7) this.mouthCount[id] = this.mouthCount[id]! + 1;
+    } else if (mat === MUSCLE) this.muscleCount[id] = this.muscleCount[id]! + 1;
+    else if (mat === MOUTH) this.mouthCount[id] = this.mouthCount[id]! + 1;
     this.touch(i);
     return true;
   }
@@ -299,8 +307,8 @@ export class VoxelWorld {
       else if (mat === STORAGE) {
         this.storageCount[id] = Math.max(0, this.storageCount[id]! - 1);
         this.refreshCapacity(id);
-      } else if (mat === 5) this.muscleCount[id] = Math.max(0, this.muscleCount[id]! - 1);
-      else if (mat === 7) this.mouthCount[id] = Math.max(0, this.mouthCount[id]! - 1);
+      } else if (mat === MUSCLE) this.muscleCount[id] = Math.max(0, this.muscleCount[id]! - 1);
+      else if (mat === MOUTH) this.mouthCount[id] = Math.max(0, this.mouthCount[id]! - 1);
       return;
     }
   }
@@ -395,16 +403,52 @@ export class VoxelWorld {
     this.nutrient.fill(0);
     this.owner.fill(NO_OWNER);
 
+    // Relief : plusieurs octaves de bruit de valeur, TIRÉES DE LA GRAINE.
+    //
+    // Le générateur précédent était une somme de sinus à fréquences fixes : il
+    // ne lisait pas la graine du tout, et tous les mondes avaient donc
+    // exactement le même relief. Seuls la biomasse et les organismes changeaient.
+    // Ici chaque octave tire ses valeurs par hachage de (case, graine), donc
+    // deux graines donnent deux paysages — et le même monde se rejoue à
+    // l'identique, ce qui reste la condition de la conformité CPU ↔ GPU.
     for (let z = 0; z < SZ; z++) {
       for (let x = 0; x < SX; x++) {
         const h =
-          GROUND_Y +
-          (Math.sin(x * 0.11) + Math.sin(z * 0.13)) * 1.5 +
-          Math.sin(x * 0.031 + z * 0.027) * 2.5;
+          1 +
+          this.valueNoise(x, z, 48, 0x1111) * 9 +
+          this.valueNoise(x, z, 19, 0x2222) * 4 +
+          this.valueNoise(x, z, 7, 0x3333) * 1.5;
         const top = Math.max(1, Math.min(SY - 2, Math.round(h)));
+        // Le relief seul : les creux restent des creux, il n'y a plus d'eau
+        // pour les remplir. Ce sont désormais les TERRES BASSES, les seules
+        // fertiles (cf. FERTILE_MAX_Y) — donc ce qui vaut la peine d'être atteint.
         for (let y = 0; y < top; y++) this.material[this.idx(x, y, z)] = ROCK;
-        // Les creux sous le niveau de référence se remplissent d'eau.
-        for (let y = top; y <= GROUND_Y; y++) this.material[this.idx(x, y, z)] = WATER;
+      }
+    }
+
+    // Altitude fertile : le quantile du relief qui laisse FERTILE_FRACTION des
+    // colonnes en terre basse. Calculée par comptage, donc sans tri.
+    const heights = new Int32Array(SY + 1);
+    for (let z = 0; z < SZ; z++) {
+      for (let x = 0; x < SX; x++) {
+        let top = 0;
+        for (let y = SY - 1; y > 0; y--) {
+          if (this.material[this.idx(x, y, z)] === ROCK) {
+            top = y;
+            break;
+          }
+        }
+        heights[top]!++;
+      }
+    }
+    const target = ((SX * SZ * FERTILE_FRACTION) / 1000) | 0;
+    let cumulative = 0;
+    this.fertileMaxY = SY;
+    for (let y = 0; y <= SY; y++) {
+      cumulative += heights[y]!;
+      if (cumulative >= target) {
+        this.fertileMaxY = y;
+        break;
       }
     }
 
@@ -415,7 +459,8 @@ export class VoxelWorld {
           const i = this.idx(x, y, z);
           if (this.material[i] !== VOID) continue;
           const below = this.material[this.idx(x, y - 1, z)]!;
-          if (below !== ROCK && below !== WATER) continue;
+          if (below !== ROCK) continue;
+          if (y > this.fertileMaxY) continue;
           if (rng.chance(8, 100)) {
             this.material[i] = BIOMASS;
             this.nutrient[i] = NUTRIENT_FRESH;
@@ -440,6 +485,33 @@ export class VoxelWorld {
     this.nutrientNext.set(this.nutrient);
     this.ownerNext.set(this.owner);
     this.chunkVersion.fill(1);
+  }
+
+  /**
+   * Bruit de valeur bilinéaire, dans [0,1], dérivé du hachage et de la graine.
+   *
+   * Interpolation lissée (3t² − 2t³) entre quatre coins tirés au hachage : c'est
+   * le minimum pour obtenir des collines plutôt que du grain. Hors boucle
+   * chaude — appelé une fois par colonne à la génération — donc les flottants
+   * sont sans conséquence pour la conformité.
+   */
+  private valueNoise(x: number, z: number, period: number, salt: number): number {
+    const fx = x / period;
+    const fz = z / period;
+    const x0 = Math.floor(fx);
+    const z0 = Math.floor(fz);
+    const tx = fx - x0;
+    const tz = fz - z0;
+    const corner = (ix: number, iz: number): number =>
+      (hash32(ix, iz, this.seed ^ salt) >>> 8) / 0x1000000;
+    const smooth = (t: number): number => t * t * (3 - 2 * t);
+    const u = smooth(tx);
+    const v = smooth(tz);
+    const a = corner(x0, z0);
+    const b = corner(x0 + 1, z0);
+    const c = corner(x0, z0 + 1);
+    const d = corner(x0 + 1, z0 + 1);
+    return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
   }
 
   /** Échange les tampons après une passe cellulaire (ping-pong). */

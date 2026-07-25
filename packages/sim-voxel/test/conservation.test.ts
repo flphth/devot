@@ -15,7 +15,6 @@ import {
   registerGenome,
   spawnOrganism,
   stepN,
-  WATER,
 } from "../src/index.js";
 import { PLAN_SEED_BONE, flatWorld, stepNYielding } from "./helpers.js";
 import { registerPlan } from "../src/index.js";

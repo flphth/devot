@@ -6,7 +6,6 @@ import {
   SY,
   SeededRng,
   VoxelWorld,
-  WATER,
   findSpawnSpot,
   registerPlan,
   spawnOrganism,
@@ -88,28 +87,6 @@ describe("boucle chaude", () => {
 
     stepN(w, 40);
     expect(w.material[high]).toBe(ROCK);
-  });
-
-  it("l'eau posée en haut du monde retombe au sol", () => {
-    const w = new VoxelWorld(4);
-    w.generateTerrain();
-    const before = countMaterial(w, WATER);
-    w.setMaterial(w.idx(64, SY - 2, 64), WATER);
-    expect(countMaterial(w, WATER)).toBe(before + 1);
-
-    stepN(w, SY + 10);
-    // Elle a rejoint la masse d'eau. Le total ne baisse que par évaporation
-    // des surfaces exposées (le terrain généré en a beaucoup) — jamais par
-    // troncature, qui se verrait comme une chute brutale.
-    expect(countMaterial(w, WATER)).toBeGreaterThan(before * 0.98);
-    // Et plus rien ne flotte en altitude.
-    let highWater = 0;
-    for (let y = 20; y < SY; y++) {
-      for (let z = 0; z < 128; z++) {
-        for (let x = 0; x < 128; x++) if (w.material[w.idx(x, y, z)] === WATER) highWater++;
-      }
-    }
-    expect(highWater).toBe(0);
   });
 
   it("les versions de chunk suivent les changements de terrain", () => {

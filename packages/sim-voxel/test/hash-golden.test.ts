@@ -55,9 +55,14 @@ describe("hash32 — vecteurs de référence pour le port WGSL", () => {
     }
   });
 
-  it("les deux premiers bits, qui pilotent l'eau, sont bien répartis", () => {
-    // Le choix de direction de l'eau lit `hash32(...) & 3`. Un biais y créerait
-    // un courant fantôme dans une direction préférée.
+  it("les bits de poids faible sont bien répartis", () => {
+    // Les passes ne lisent jamais le hachage en entier : elles en prennent des
+    // tranches basses (`& 0xffff` pour la pousse, `% 1000` pour le croisement).
+    // Un biais dans ces bits-là créerait un motif fantôme dans le monde, invisible
+    // à la lecture du code. C'est donc eux qu'on surveille, pas la valeur entière.
+    //
+    // Ce test naquit pour le choix de direction de l'eau, qui lisait `& 3` ;
+    // l'eau a été retirée du monde, la propriété reste nécessaire.
     const counts = [0, 0, 0, 0];
     for (let i = 0; i < 40_000; i++) counts[hash32(i, 7, 99) & 3]!++;
     for (const c of counts) {

@@ -60,7 +60,7 @@ const { w, ids } = build(SEED);
 const s0 = collectStats(w);
 log(
   `Naissance de ${ids.length} organismes (brouteurs, vers, penseurs) sur un terrain ` +
-    `de ${fmt(s0.biomassVoxels)} voxels de biomasse et ${fmt(s0.waterVoxels)} d'eau.\n`,
+    `de ${fmt(s0.biomassVoxels)} voxels de biomasse.`,
 );
 
 // ── Morphogenèse observable sur un individu ─────────────────────────────────

@@ -138,7 +138,7 @@ déterministe ni portable sur GPU.
 
 | Passe | Nature | Effet |
 | --- | --- | --- |
-| `passTerrain` | cellulaire (fusionnée) | eau, pousse et décomposition de la biomasse, alimentation des bouches — **une seule traversée** de la grille |
+| `passTerrain` | cellulaire (fusionnée) | pousse et décomposition de la biomasse, alimentation des bouches — **une seule traversée** de la grille |
 | `passMetabolism` | réduction par organisme | somme l'entretien voxel par voxel |
 | `passBrain` | par organisme | perception, décision, et prélèvement du coût de la pensée |
 | `passMetabolism` (suite) | par organisme | l'entretien inclut une **surcharge d'âge** : vieillir coûte |
@@ -218,13 +218,33 @@ Deux règles en découlent, et elles sont liées :
 - une dépouille vaut la réserve du mort plus une part du coût de construction de
   son corps, avec `CORPSE_RETURN_PER_VOXEL < GROWTH_COST` ;
 - la végétation **colonise** : une plante ne pousse qu'au contact d'une autre
-  plante (vite au bord de l'eau, lentement au sec), la génération spontanée
-  restant très rare. Brouter détruit donc le stock de graines local : le
-  garde-manger s'épuise et il faut suivre le front de végétation.
+  plante, la génération spontanée restant très rare. Brouter détruit donc le
+  stock de graines local : le garde-manger s'épuise et il faut suivre le front
+  de végétation.
 
 C'est cette seconde règle qui crée la pression sélective. L'ancien gradient
 rive/intérieur n'y suffisait pas : une bouche immobile posée sur une rive était
 nourrie à vie.
+
+**L'EAU A ÉTÉ RETIRÉE DU MONDE.** Elle avait deux rôles : remplir les creux, et
+créer un gradient de fertilité (rives riches, intérieur pauvre). Le premier était
+décoratif ; le second avait déjà été supplanté par la colonisation, qui produit
+une pression bien plus forte. Mais elle en avait un troisième, qui n'était pas
+écrit : elle bornait SPATIALEMENT la production primaire. La pousse rapide
+n'existait qu'au bord de l'eau, donc le total était borné par la longueur des
+rives, pas par la surface du monde.
+
+Sans elle, la colonisation est un pur processus exponentiel et le réglage devient
+un seuil raide — mesuré sur cinq mondes de 6 000 ticks : 25 tue le monde, 48
+donne 145 vivants et la génération 30, 70 sature le plafond de population. La
+valeur retenue est 48. Toute modification exige de remesurer.
+
+Les matériaux ont été renumérotés à cette occasion (l'os passe de 4 à 3, etc.).
+Les trois formats qui transportent des numéros de matériaux ont donc changé de
+version — génome (`DGV2`), protocole dérivé (`WIRE_VERSION` 2), instantané du
+monde (version 2) — pour refuser franchement une donnée ancienne plutôt que la
+lire de travers. La renumérotation a d'ailleurs révélé un bug latent : le monde
+comptait ses muscles et ses bouches avec des numéros écrits en dur.
 
 Une troisième règle en découle, moins évidente : la **sénescence**. Puisqu'un
 corps sans neurone est stérile mais vivant, il devenait, bien nourri, un blob

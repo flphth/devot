@@ -7,170 +7,48 @@ import {
   SY,
   VOID,
   VoxelWorld,
-  WATER,
   step,
   stepN,
 } from "../src/index.js";
 import { countMaterial, flatWorld } from "./helpers.js";
 
-/**
- * Bassin hermétique : sol et couvercle de roche COLLÉS à la couche d'eau, donc
- * aucune eau n'est exposée au vide — l'évaporation est structurellement
- * impossible. La moitié droite est vide : l'eau peut s'y étaler. Toute
- * variation du total serait donc un bug du schéma d'étalement, pas un effet
- * de bord du modèle.
- */
-function hermeticBasin(): { w: VoxelWorld; waterCount: number } {
-  const w = new VoxelWorld(77);
-  w.material.fill(VOID);
-  w.nutrient.fill(0);
-  w.owner.fill(0);
-
-  const x0 = 10;
-  const x1 = 29;
-  const z0 = 10;
-  const z1 = 29;
-
-  for (let z = z0 - 1; z <= z1 + 1; z++) {
-    for (let x = x0 - 1; x <= x1 + 1; x++) {
-      w.material[w.idx(x, 0, z)] = ROCK; // sol
-      w.material[w.idx(x, 2, z)] = ROCK; // couvercle, directement sur l'eau
-      const onWall = x === x0 - 1 || x === x1 + 1 || z === z0 - 1 || z === z1 + 1;
-      if (onWall) w.material[w.idx(x, 1, z)] = ROCK; // parois
-    }
-  }
-
-  // L'eau n'occupe que la moitié gauche : il reste de la place où s'étaler.
-  let n = 0;
-  const mid = (x0 + x1) >> 1;
-  for (let z = z0; z <= z1; z++) {
-    for (let x = x0; x <= mid; x++) {
-      w.material[w.idx(x, 1, z)] = WATER;
-      n++;
-    }
-  }
-
-  w.materialNext.set(w.material);
-  w.nutrientNext.set(w.nutrient);
-  w.ownerNext.set(w.owner);
-  w.activeTop = 5;
-  return { w, waterCount: n };
-}
-
-describe("eau — le consentement mutuel conserve la matière", () => {
-  it("dans un bassin hermétique, la quantité d'eau est exactement conservée", () => {
-    const { w, waterCount } = hermeticBasin();
-    expect(countMaterial(w, WATER)).toBe(waterCount);
-    for (let k = 0; k < 80; k++) {
-      step(w);
-      // Ni duplication ni disparition : c'est l'invariant du consentement
-      // mutuel — une source ne cède qu'à la destination qui l'a choisie.
-      expect(countMaterial(w, WATER)).toBe(waterCount);
-    }
-  });
-
-  it("et pendant ce temps l'eau se déplace réellement", () => {
-    const { w } = hermeticBasin();
-    const right = w.idx(28, 1, 20); // moitié initialement vide
-    expect(w.material[right]).toBe(VOID);
-    stepN(w, 120);
-    let filled = 0;
-    for (let z = 10; z <= 29; z++) {
-      for (let x = 20; x <= 29; x++) if (w.material[w.idx(x, 1, z)] === WATER) filled++;
-    }
-    expect(filled).toBeGreaterThan(0);
-  });
-
-  it("l'eau tombe jusqu'au sol", () => {
-    const w = flatWorld();
-    w.setMaterial(w.idx(40, SY - 2, 40), WATER);
-    expect(countMaterial(w, WATER)).toBe(1);
-
-    stepN(w, SY + 8);
-    expect(countMaterial(w, WATER)).toBe(1);
-    // Elle repose sur la roche — mais elle a pu s'étaler en tombant, donc on
-    // vérifie son altitude, pas sa colonne d'origine.
-    let y = -1;
-    for (let yy = 0; yy < SY; yy++) {
-      for (let x = 30; x < 50 && y < 0; x++) {
-        for (let z = 30; z < 50; z++) {
-          if (w.material[w.idx(x, yy, z)] === WATER) {
-            y = yy;
-            break;
-          }
-        }
-      }
-      if (y >= 0) break;
-    }
-    expect(y).toBe(1);
-  });
-
-  it("une colonne d'eau s'étale sur plusieurs colonnes", () => {
-    const w = flatWorld();
-    for (let y = 1; y <= 6; y++) w.setMaterial(w.idx(64, y, 64), WATER);
-    const total = countMaterial(w, WATER);
-    stepN(w, 60);
-    expect(countMaterial(w, WATER)).toBe(total);
-
-    let columns = 0;
-    for (let x = 56; x <= 72; x++) {
-      for (let z = 56; z <= 72; z++) {
-        if (w.material[w.idx(x, 1, z)] === WATER) columns++;
-      }
-    }
-    expect(columns).toBeGreaterThan(1);
-  });
-});
-
 describe("biomasse", () => {
-  it("pousse au contact de l'eau, sur un sol solide", () => {
-    const w = flatWorld();
-    for (let x = 30; x < 40; x++) {
-      for (let z = 30; z < 40; z++) w.setMaterial(w.idx(x, 1, z), WATER);
-    }
-    expect(countMaterial(w, BIOMASS)).toBe(0);
-    stepN(w, 200);
-    expect(countMaterial(w, BIOMASS)).toBeGreaterThan(0);
-  });
-
-  it("colonise depuis une plante existante, et beaucoup plus vite au bord de l'eau", () => {
-    // La végétation ne surgit pas de nulle part : elle avance depuis ses
-    // colonies. C'est cette dépendance au voisinage qui rend le broutage
-    // épuisant pour la plante — donc payant pour l'animal qui suit le front.
-    // On compare deux colonies identiques, l'une posée au bord d'une flaque,
-    // l'autre en terrain sec, en comptant leur seule expansion locale.
-    const spread = (wet: boolean): number => {
+  it("une colonie s'étend, un sol nu reste nu", () => {
+    // LA règle de la végétation : elle ne surgit pas de nulle part, elle avance
+    // depuis ses colonies. C'est cette dépendance au voisinage qui rend le
+    // broutage épuisant pour la plante — donc payant pour l'animal qui suit le
+    // front. On observe une bande ÉTROITE, juste devant la colonie : sur une
+    // grande surface et un temps long, la génération spontanée finirait par
+    // ensemencer elle aussi, et la comparaison ne dirait plus rien.
+    const spread = (seeded: boolean): number => {
       const w = flatWorld(3);
-      if (wet) {
-        for (let z = 60; z <= 68; z++) {
-          for (let x = 60; x <= 68; x++) w.setMaterial(w.idx(x, 1, z), WATER);
-        }
+      if (seeded) {
+        for (let z = 62; z <= 66; z++) w.setMaterial(w.idx(59, 1, z), BIOMASS, NUTRIENT_FRESH);
       }
-      // Une colonie de départ, juste à côté de la zone observée.
-      for (let z = 62; z <= 66; z++) w.setMaterial(w.idx(59, 1, z), BIOMASS, NUTRIENT_FRESH);
-      stepN(w, 120);
+      stepN(w, 400);
       let grown = 0;
-      for (let z = 55; z <= 73; z++) {
-        for (let x = 60; x <= 73; x++) {
+      for (let z = 61; z <= 67; z++) {
+        for (let x = 60; x <= 66; x++) {
           if (w.material[w.idx(x, 1, z)] === BIOMASS) grown++;
         }
       }
       return grown;
     };
 
-    const nearWater = spread(true);
-    const onDryGround = spread(false);
-    expect(onDryGround).toBeGreaterThan(0); // le sec n'est pas stérile
-    expect(nearWater, `${nearWater} au bord de l'eau contre ${onDryGround} au sec`).toBeGreaterThan(
-      onDryGround * 2,
-    );
+    const fromColony = spread(true);
+    const fromNothing = spread(false);
+    expect(fromColony, "une colonie doit s'étendre").toBeGreaterThan(0);
+    expect(
+      fromColony,
+      `${fromColony} devant une colonie contre ${fromNothing} sur sol nu`,
+    ).toBeGreaterThan(fromNothing * 3);
   });
 
   it("une plante isolée n'apparaît qu'exceptionnellement", () => {
     // Le pendant du test précédent : la génération spontanée existe — sinon un
     // monde sans plante resterait stérile pour toujours — mais elle est si rare
     // qu'elle ne peut pas renourrir un individu immobile.
-    const w = flatWorld(4); // aucune plante, aucune eau
+    const w = flatWorld(4); // sol de roche nu, aucune plante
     stepN(w, 40);
     const isolated = countMaterial(w, BIOMASS);
     // 16 384 surfaces × 40 ticks × 1/65536 ≈ 10 pousses spontanées attendues,

@@ -1,5 +1,5 @@
 /**
- * Port WGSL de la passe terrain (eau + biomasse).
+ * Port WGSL de la passe terrain (colonisation et décomposition de la biomasse).
  *
  * Chaque ligne a son équivalent exact dans `passes.ts` du noyau. Deux
  * propriétés rendent ce port possible sans dérive :
@@ -18,19 +18,21 @@
  * le test de conformité doit détecter, mais qu'aucun test ne peut détecter dans
  * un environnement sans WebGPU. Interpoler rend la dérive impossible.
  *
- * PÉRIMÈTRE : ce noyau couvre les règles de terrain (chute et étalement de
- * l'eau, évaporation, pousse et décomposition de la biomasse). L'alimentation
- * des bouches et les passes par organisme restent sur le CPU — le test de
- * conformité compare donc un monde SANS organisme, où la passe terrain est la
- * seule à agir.
+ * PÉRIMÈTRE : ce noyau couvre les règles de terrain (pousse et décomposition de
+ * la biomasse). L'alimentation des bouches et les passes par organisme restent
+ * sur le CPU — le test de conformité compare donc un monde SANS organisme, où la
+ * passe terrain est la seule à agir.
  */
 import {
-  BIOMASS_SPAWN_CHANCE_DRY,
+  BIOMASS_CROWDING_MAX,
+  BIOMASS_SPAWN_CHANCE,
   BIOMASS_SPAWN_CHANCE_SEED,
-  BIOMASS_SPAWN_CHANCE_WET,
   NUTRIENT_DECAY as CORE_NUTRIENT_DECAY,
   NUTRIENT_FRESH as CORE_NUTRIENT_FRESH,
-  WATER_EVAPORATION_CHANCE,
+  BIOMASS as CORE_BIOMASS,
+  ROCK as CORE_ROCK,
+  TISSUE_MIN as CORE_TISSUE_MIN,
+  VOID as CORE_VOID,
 } from "@devot/sim-voxel";
 
 export const TERRAIN_WGSL = /* wgsl */ `
@@ -42,7 +44,8 @@ struct Params {
   seed: u32,
   activeTop: u32,
   voxelCount: u32,
-  _pad: u32,
+  /** Altitude au-dessus de laquelle plus rien ne pousse, propre au monde. */
+  fertileMaxY: u32,
 };
 
 @group(0) @binding(0) var<storage, read>       matIn  : array<u32>;
@@ -51,18 +54,18 @@ struct Params {
 @group(0) @binding(3) var<storage, read_write> nutOut : array<u32>;
 @group(0) @binding(4) var<uniform>             P      : Params;
 
-const VOID_M    : u32 = 0u;
-const WATER_M   : u32 = 1u;
-const ROCK_M    : u32 = 2u;
-const BIOMASS_M : u32 = 3u;
-const TISSUE_MIN_M : u32 = 4u;
+// Interpolés depuis le noyau, comme les probabilités : recopier des numéros de
+// matériaux à la main est exactement ce qui avait déjà dérivé en silence.
+const VOID_M    : u32 = ${CORE_VOID}u;
+const ROCK_M    : u32 = ${CORE_ROCK}u;
+const BIOMASS_M : u32 = ${CORE_BIOMASS}u;
+const TISSUE_MIN_M : u32 = ${CORE_TISSUE_MIN}u;
 
 const NUTRIENT_FRESH : u32 = ${CORE_NUTRIENT_FRESH}u;
 const NUTRIENT_DECAY : u32 = ${CORE_NUTRIENT_DECAY}u;
-const WET_CHANCE  : u32 = ${BIOMASS_SPAWN_CHANCE_WET}u;
-const DRY_CHANCE  : u32 = ${BIOMASS_SPAWN_CHANCE_DRY}u;
+const GROW_CHANCE : u32 = ${BIOMASS_SPAWN_CHANCE}u;
 const SEED_CHANCE : u32 = ${BIOMASS_SPAWN_CHANCE_SEED}u;
-const EVAP_CHANCE : u32 = ${WATER_EVAPORATION_CHANCE}u;
+const CROWDING_MAX : u32 = ${BIOMASS_CROWDING_MAX}u;
 
 fn hash32(a: u32, b: u32, c: u32) -> u32 {
   var h: u32 = a ^ (b * 0x9e3779b1u);
@@ -87,26 +90,6 @@ fn matAt(x: i32, y: i32, z: i32) -> u32 {
   return matIn[idxOf(x, y, z)];
 }
 
-fn canFall(x: i32, y: i32, z: i32) -> bool {
-  return y > 0 && matAt(x, y - 1, z) == VOID_M;
-}
-
-fn isSupported(x: i32, y: i32, z: i32) -> bool {
-  return y == 0 || matAt(x, y - 1, z) != VOID_M;
-}
-
-fn latDx(d: u32) -> i32 {
-  if (d == 0u) { return 1; }
-  if (d == 1u) { return -1; }
-  return 0;
-}
-
-fn latDz(d: u32) -> i32 {
-  if (d == 2u) { return 1; }
-  if (d == 3u) { return -1; }
-  return 0;
-}
-
 // Voisinage à 6 faces, même ordre que NEIGHBOR_DX/DY/DZ du noyau.
 fn neighborDx(d: i32) -> i32 {
   if (d == 0) { return 1; }
@@ -126,67 +109,24 @@ fn neighborDz(d: i32) -> i32 {
   return 0;
 }
 
-fn latOpposite(d: u32) -> u32 {
-  if (d == 0u) { return 1u; }
-  if (d == 1u) { return 0u; }
-  if (d == 2u) { return 3u; }
-  return 2u;
-}
-
-/** Consentement mutuel : identique à \`sourceGivesTo\`, ordre de test compris. */
-fn sourceGivesTo(x: i32, y: i32, z: i32) -> i32 {
-  for (var d: u32 = 0u; d < 4u; d = d + 1u) {
-    let dx = x + latDx(d);
-    let dz = z + latDz(d);
-    if (matAt(dx, y, dz) != VOID_M) { continue; }
-    if (!isSupported(dx, y, dz)) { continue; }
-    if (matAt(dx, y + 1, dz) == WATER_M) { continue; }
-    let di = idxOf(dx, y, dz);
-    if ((hash32(di, P.tick, P.seed) & 3u) != latOpposite(d)) { continue; }
-    return i32(d);
-  }
-  return -1;
-}
-
-fn nextForWater(i: u32, x: i32, y: i32, z: i32) -> u32 {
-  if (canFall(x, y, z)) { return VOID_M; }
-  if (sourceGivesTo(x, y, z) >= 0) { return VOID_M; }
-  if (matAt(x, y + 1, z) == VOID_M &&
-      (hash32(i, P.tick, P.seed ^ 1u) & 0xffffu) < EVAP_CHANCE) {
-    return VOID_M;
-  }
-  return WATER_M;
-}
-
 fn nextForSupportedVoid(i: u32, x: i32, y: i32, z: i32, below: u32) -> u32 {
-  let pick = hash32(i, P.tick, P.seed) & 3u;
-  let sx = x + latDx(pick);
-  let sz = z + latDz(pick);
-  if (matAt(sx, y, sz) == WATER_M && !canFall(sx, y, sz)) {
-    let give = sourceGivesTo(sx, y, sz);
-    if (give >= 0 && latOpposite(u32(give)) == pick) { return WATER_M; }
-  }
-
   if (below != ROCK_M && below != BIOMASS_M) { return VOID_M; }
+  // Les hauteurs sont stériles : seules les terres basses portent la végétation.
+  if (u32(y) > P.fertileMaxY) { return VOID_M; }
   let roll = hash32(i, P.tick, P.seed ^ 2u) & 0xffffu;
-  if (roll >= WET_CHANCE) { return VOID_M; }
+  if (roll >= GROW_CHANCE) { return VOID_M; }
 
-  // La biomasse COLONISE : il lui faut une plante voisine. Voisinage à 6 faces,
-  // même ordre que NEIGHBOR_D* côté CPU — l'ordre n'a pas d'effet ici puisqu'on
-  // n'en tire que deux booléens, mais il reste identique par principe.
-  var nearPlant : bool = below == BIOMASS_M;
-  var nearWater : bool = false;
+  // La biomasse COLONISE : il lui faut une voisine, mais pas trop. Voisinage à
+  // 6 faces, même ordre que NEIGHBOR_D* côté CPU.
+  var neighbours : u32 = 0u;
+  if (below == BIOMASS_M) { neighbours = 1u; }
   for (var d: i32 = 0; d < 6; d = d + 1) {
-    let m = matAt(x + neighborDx(d), y + neighborDy(d), z + neighborDz(d));
-    if (m == WATER_M) { nearWater = true; }
-    else if (m == BIOMASS_M) { nearPlant = true; }
+    if (matAt(x + neighborDx(d), y + neighborDy(d), z + neighborDz(d)) == BIOMASS_M) {
+      neighbours = neighbours + 1u;
+    }
   }
-  if (nearPlant) {
-    var chance : u32 = DRY_CHANCE;
-    if (nearWater) { chance = WET_CHANCE; }
-    if (roll < chance) { return BIOMASS_M; }
-    return VOID_M;
-  }
+  if (neighbours > 0u && neighbours <= CROWDING_MAX) { return BIOMASS_M; }
+  if (neighbours > CROWDING_MAX) { return VOID_M; }
   if (roll < SEED_CHANCE) { return BIOMASS_M; }
   return VOID_M;
 }
@@ -217,12 +157,6 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     return;
   }
 
-  if (m == WATER_M) {
-    matOut[i] = nextForWater(i, x, y, z);
-    nutOut[i] = 0u;
-    return;
-  }
-
   if (m == BIOMASS_M) {
     // Aucune bouche dans le monde de conformité : seule la décomposition agit.
     let remaining = nutIn[i];
@@ -237,12 +171,6 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   }
 
   // m == VOID
-  let above = select(ROCK_M, matIn[i + ystride], u32(y) + 1u < P.sy);
-  if (above == WATER_M) {
-    matOut[i] = WATER_M;
-    nutOut[i] = 0u;
-    return;
-  }
   let below = select(ROCK_M, matIn[i - ystride], y > 0);
   if (below == VOID_M) {
     matOut[i] = VOID_M;

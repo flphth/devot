@@ -25,8 +25,12 @@ import type { VoxelWorld } from "./world.js";
 /** Nombre de voxels dans un chunk cubique. */
 export const CHUNK_VOLUME = CHUNK * CHUNK * CHUNK;
 
-/** Version de format. Un client plus ancien doit refuser, pas deviner. */
-export const WIRE_VERSION = 1;
+/**
+ * Version de format. Un client plus ancien doit refuser, pas deviner.
+ * Passée à 2 avec le retrait de l'eau : les palettes portent des numéros de
+ * matériaux, et ces numéros ont changé.
+ */
+export const WIRE_VERSION = 2;
 
 // ── Chunks de terrain ───────────────────────────────────────────────────────
 

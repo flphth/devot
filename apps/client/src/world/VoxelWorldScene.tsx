@@ -1,44 +1,33 @@
 import { Grid, OrbitControls } from "@react-three/drei";
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import * as THREE from "three";
-import { CHUNK, SX, SY, SZ, VIEW_RADIUS } from "@devot/sim-voxel";
+import { CHUNK, SX, SY, SZ, TISSUE_MIN, VIEW_RADIUS, hash32 } from "@devot/sim-voxel";
+import {
+  OrganicBodies,
+  OrganicLighting,
+  OrganicTerrain,
+  SelectionMarker,
+  type BodyVoxels,
+  type SurfaceData,
+} from "../render/organic.js";
 import type { VoxelWorldClient } from "./useVoxelWorld.js";
-
-const COLORS: Record<number, string> = {
-  1: "#2a6f97", // eau
-  2: "#4a4f57", // roche
-  3: "#7dbc5e", // biomasse
-  4: "#e8e4d8", // os
-  5: "#4ce07a", // muscle
-  6: "#4ca6e0", // réserve
-  7: "#e0634c", // bouche
-  8: "#e8c95c", // œil
-  9: "#9c4ce0", // neurone
-};
-
-const MAX_PER_MATERIAL = 60_000;
 
 /**
  * Le monde commun, tel que le client le connaît : les chunks qu'il a reçus et
  * les corps qu'on lui a décrits. Le reste du monde n'est pas caché par un
- * effet — il n'est simplement pas là.
+ * effet — il n'est simplement pas là, et la nappe de terrain s'y interrompt.
  *
- * Seule la face SUPÉRIEURE de chaque colonne de terrain est instanciée : sous
- * elle, rien n'est visible, et instancier 500 000 cubes tuerait le rendu.
+ * Même rendu organique que le laboratoire : c'est le même monde, il doit avoir
+ * le même visage.
  */
-function TerrainLayer({ material, world }: { material: number; world: VoxelWorldClient }) {
-  const ref = useRef<THREE.InstancedMesh>(null);
-  const color = COLORS[material] ?? "#888888";
 
-  useEffect(() => {
-    const mesh = ref.current;
-    if (!mesh) return;
-    const m = new THREE.Matrix4();
-    let n = 0;
+const MAX_TISSUE = 24_000;
 
-    // Hauteur du plus haut voxel non vide par colonne, tous chunks confondus.
-    const top = new Int16Array(SX * SZ).fill(-1);
-    const mat = new Uint8Array(SX * SZ);
+/** Assemble les chunks reçus en une surface, et les corps décrits en sphères. */
+function useWorldGeometry(world: VoxelWorldClient): { surface: SurfaceData; body: BodyVoxels } {
+  const surface = useMemo(() => {
+    const heights = new Int16Array(SX * SZ).fill(-1);
+    const mats = new Uint8Array(SX * SZ);
     for (const chunk of world.chunks.values()) {
       let at = 0;
       for (let ly = 0; ly < CHUNK; ly++) {
@@ -48,71 +37,49 @@ function TerrainLayer({ material, world }: { material: number; world: VoxelWorld
           for (let lx = 0; lx < CHUNK; lx++) {
             const value = chunk.materials[at++]!;
             if (value === 0) continue;
-            const x = chunk.cx * CHUNK + lx;
-            const col = z * SX + x;
-            if (y > top[col]!) {
-              top[col] = y;
-              mat[col] = value;
+            const col = z * SX + chunk.cx * CHUNK + lx;
+            if (y > heights[col]!) {
+              heights[col] = y;
+              mats[col] = value;
             }
           }
         }
       }
     }
+    return { heights, mats, revision: world.chunkRevision };
+  }, [world.chunkRevision, world.chunks]);
 
-    for (let col = 0; col < top.length && n < MAX_PER_MATERIAL; col++) {
-      if (top[col]! < 0 || mat[col] !== material) continue;
-      const x = col % SX;
-      const z = (col / SX) | 0;
-      m.makeTranslation(x - SX / 2, top[col]!, z - SZ / 2);
-      mesh.setMatrixAt(n++, m);
-    }
-    mesh.count = n;
-    mesh.instanceMatrix.needsUpdate = true;
-  }, [world.chunkRevision, material, world.chunks]);
-
-  return (
-    <instancedMesh ref={ref} args={[undefined, undefined, MAX_PER_MATERIAL]} frustumCulled={false}>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshLambertMaterial color={color} />
-    </instancedMesh>
-  );
-}
-
-/** Les corps : un cube par voxel de tissu, à partir des descripteurs reçus. */
-function BodiesLayer({ material, world }: { material: number; world: VoxelWorldClient }) {
-  const ref = useRef<THREE.InstancedMesh>(null);
-  const color = COLORS[material] ?? "#888888";
-
-  useEffect(() => {
-    const mesh = ref.current;
-    if (!mesh) return;
-    const m = new THREE.Matrix4();
+  const body = useMemo(() => {
+    const positions = new Float32Array(MAX_TISSUE * 3);
+    const mats = new Uint8Array(MAX_TISSUE);
+    const vigor = new Float32Array(MAX_TISSUE);
+    const tint = new Uint8Array(MAX_TISSUE);
+    const selected = new Uint8Array(MAX_TISSUE);
     let n = 0;
     for (const org of world.organisms) {
-      const body = world.bodies.get(org.id);
-      if (!body) continue;
-      for (let k = 0; k < body.mat.length && n < MAX_PER_MATERIAL; k++) {
-        if (body.mat[k] !== material) continue;
-        // La position vient de l'état par tick, la forme du descripteur : c'est
-        // exactement la séparation qui rend le protocole si léger.
-        m.makeTranslation(
-          org.x + body.dx[k]! - SX / 2,
-          org.y + body.dy[k]!,
-          org.z + body.dz[k]! - SZ / 2,
-        );
-        mesh.setMatrixAt(n++, m);
+      const shape = world.bodies.get(org.id);
+      if (!shape) continue;
+      const vig = org.energy / 1000;
+      const isSelected = org.id === world.selected ? 1 : 0;
+      // Même dérivation que dans le laboratoire : une créature garde sa couleur
+      // en passant d'un monde à l'autre.
+      const hue = hash32(org.id, 0x7a1e, 0) & 0x1f;
+      for (let k = 0; k < shape.mat.length && n < MAX_TISSUE; k++) {
+        if (shape.mat[k]! < TISSUE_MIN) continue;
+        positions[n * 3] = org.x + shape.dx[k]! - SX / 2;
+        positions[n * 3 + 1] = org.y + shape.dy[k]!;
+        positions[n * 3 + 2] = org.z + shape.dz[k]! - SZ / 2;
+        mats[n] = shape.mat[k]!;
+        vigor[n] = vig;
+        tint[n] = hue;
+        selected[n] = isSelected;
+        n++;
       }
     }
-    mesh.count = n;
-    mesh.instanceMatrix.needsUpdate = true;
-  }, [world.organisms, world.bodies, material]);
+    return { positions, mats, vigor, tint, selected, count: n };
+  }, [world.organisms, world.bodies, world.selected]);
 
-  return (
-    <instancedMesh ref={ref} args={[undefined, undefined, MAX_PER_MATERIAL]} frustumCulled={false}>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshLambertMaterial color={color} />
-    </instancedMesh>
-  );
+  return { surface, body };
 }
 
 /** Le bord du champ de vision : montrer où s'arrête ce que le serveur consent. */
@@ -141,10 +108,15 @@ function ViewBoundary({ world }: { world: VoxelWorldClient }) {
 }
 
 export function VoxelWorldScene({ world }: { world: VoxelWorldClient }) {
+  const { surface, body } = useWorldGeometry(world);
+  const marked = useMemo(() => {
+    const org = world.organisms.find((o) => o.id === world.selected);
+    return org ? { x: org.x - SX / 2, y: org.y, z: org.z - SZ / 2 } : null;
+  }, [world.organisms, world.selected]);
   return (
     <>
-      <ambientLight intensity={0.75} />
-      <directionalLight position={[60, 90, 40]} intensity={1.15} />
+      <OrganicLighting />
+      <fog attach="fog" args={["#0b0e14", 160, 340]} />
       <Grid
         args={[SX, SZ]}
         cellSize={8}
@@ -155,12 +127,9 @@ export function VoxelWorldScene({ world }: { world: VoxelWorldClient }) {
         infiniteGrid={false}
         fadeDistance={400}
       />
-      {[1, 2, 3].map((m) => (
-        <TerrainLayer key={m} material={m} world={world} />
-      ))}
-      {[4, 5, 6, 7, 8, 9].map((m) => (
-        <BodiesLayer key={m} material={m} world={world} />
-      ))}
+      <OrganicTerrain surface={surface} />
+      <OrganicBodies body={body} />
+      <SelectionMarker position={marked} />
       <ViewBoundary world={world} />
       <OrbitControls target={[0, SY / 6, 0]} maxPolarAngle={Math.PI / 2.1} />
     </>

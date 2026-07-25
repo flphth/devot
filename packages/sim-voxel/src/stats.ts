@@ -1,4 +1,4 @@
-import { ALIVE, BIOMASS, EYE, MAX_ORGANISMS, VOXEL_COUNT, WATER } from "./constants.js";
+import { ALIVE, BIOMASS, EYE, MAX_ORGANISMS, VOXEL_COUNT } from "./constants.js";
 import { hash32 } from "./rng.js";
 import { VoxelWorld } from "./world.js";
 
@@ -31,7 +31,6 @@ export interface WorldStats {
   avgGeneration: number;
   biomassVoxels: number;
   biomassNutrient: number;
-  waterVoxels: number;
   /** Mesures d'émergence : aucune fitness n'est imposée, on observe. */
   avgNeurons: number;
   avgMouths: number;
@@ -74,13 +73,12 @@ export function collectStats(w: VoxelWorld): WorldStats {
 
   let biomassVoxels = 0;
   let biomassNutrient = 0;
-  let waterVoxels = 0;
   for (let i = 0; i < VOXEL_COUNT; i++) {
     const m = w.material[i]!;
     if (m === BIOMASS) {
       biomassVoxels++;
       biomassNutrient += w.nutrient[i]!;
-    } else if (m === WATER) waterVoxels++;
+    }
   }
 
   return {
@@ -93,7 +91,6 @@ export function collectStats(w: VoxelWorld): WorldStats {
     avgGeneration: per(sumGen),
     biomassVoxels,
     biomassNutrient,
-    waterVoxels,
     avgNeurons: per(sumNeurons),
     avgMouths: per(sumMouths),
     avgMuscles: per(sumMuscles),

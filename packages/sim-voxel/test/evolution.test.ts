@@ -15,9 +15,11 @@ import {
 import { stepNYielding } from "./helpers.js";
 
 /**
- * Mondes volontairement courts : la génération 3 est atteinte dès ~400 ticks
- * avec 120 fondateurs. Les runs longs (et la mesure d'amélioration, qui exige
- * plusieurs mondes) vivent dans `bench/evolve*.ts`, pas dans la suite de tests.
+ * Mondes volontairement courts. Le budget de ticks a été relevé quand l'eau a
+ * été retirée : la production primaire est désormais bornée par le relief, donc
+ * les premières générations arrivent plus tard qu'au temps des rives fertiles.
+ * Les runs longs (et la mesure d'amélioration, qui exige plusieurs mondes)
+ * vivent dans `bench/evolve*.ts`, pas dans la suite de tests.
  */
 function seededWorld(seed: number, founders = 120): VoxelWorld {
   const w = new VoxelWorld(seed);
@@ -35,7 +37,7 @@ describe("sélection naturelle", () => {
   it("les lignées se succèdent : la génération maximale progresse", async () => {
     const w = seededWorld(4242);
     expect(collectStats(w).maxGeneration).toBe(0);
-    await stepNYielding(w, 600);
+    await stepNYielding(w, 1200);
     const s = collectStats(w);
     expect(s.maxGeneration).toBeGreaterThan(2);
     expect(s.population).toBeGreaterThan(0);

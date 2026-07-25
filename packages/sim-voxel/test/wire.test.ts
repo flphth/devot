@@ -5,10 +5,10 @@ import {
   CHUNK_VOLUME,
   MOUTH,
   NEURON,
+  ROCK,
   SeededRng,
   VOID,
   VoxelWorld,
-  WATER,
   chunkCoords,
   chunkIndex,
   chunkVisible,
@@ -226,14 +226,11 @@ describe("le monde entier ne passe jamais sur le fil", () => {
     expect(bytes).toBeLessThan(60_000);
   });
 
-  it("l'eau et la biomasse restent lisibles après aller-retour", () => {
+  it("roche et biomasse restent lisibles après aller-retour", () => {
     const w = flatWorld();
-    for (let x = 10; x < 26; x++) {
-      for (let z = 10; z < 26; z++) w.setMaterial(w.idx(x, 1, z), WATER);
-    }
     w.setMaterial(w.idx(12, 2, 12), BIOMASS, 1000);
     const d = decodeChunk(encodeChunk(w, 0, 0, 0));
-    expect(Array.from(d.materials).filter((m) => m === WATER).length).toBeGreaterThan(0);
+    expect(Array.from(d.materials).filter((m) => m === ROCK).length).toBeGreaterThan(0);
     expect(Array.from(d.materials).filter((m) => m === BIOMASS).length).toBeGreaterThan(0);
   });
 });

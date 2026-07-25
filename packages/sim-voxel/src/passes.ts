@@ -24,26 +24,18 @@ import {
   TISSUE_MIN,
   UPKEEP,
   VOID,
-  WATER,
-  WATER_EVAPORATION_CHANCE,
-  BIOMASS_SPAWN_CHANCE_DRY,
+  BIOMASS_CROWDING_MAX,
+  BIOMASS_SPAWN_CHANCE,
   BIOMASS_SPAWN_CHANCE_SEED,
-  BIOMASS_SPAWN_CHANCE_WET,
 } from "./constants.js";
 import { hash32 } from "./rng.js";
 import { NEIGHBOR_DX, NEIGHBOR_DY, NEIGHBOR_DZ, VoxelWorld } from "./world.js";
-
-/** Directions latérales, ordre fixe : +x, -x, +z, -z. */
-const LAT_DX = new Int8Array([1, -1, 0, 0]);
-const LAT_DZ = new Int8Array([0, 0, 1, -1]);
-/** Direction opposée dans LAT (utilisée par le consentement mutuel de l'eau). */
-const LAT_OPPOSITE = new Int8Array([1, 0, 3, 2]);
 
 /** Pas d'index entre deux niveaux y consécutifs. */
 const YSTRIDE = SX * SZ;
 
 /**
- * Passe terrain fusionnée : eau, biomasse et alimentation en UNE traversée.
+ * Passe terrain fusionnée : biomasse et alimentation en UNE traversée.
  *
  * Toutes les règles sont « tirées » (pull) : chaque voxel calcule son état
  * suivant à partir de l'état PRÉCÉDENT uniquement. C'est ce qui rend la passe
@@ -95,14 +87,6 @@ export function passTerrain(w: VoxelWorld): void {
         }
         ownN[i] = NO_OWNER;
 
-        if (m === WATER) {
-          const next = nextForWater(w, i, x, y, z, tick, seed);
-          matN[i] = next;
-          nutN[i] = 0;
-          if (next !== m) chunkVersion[chunkRowBase + ((x / 16) | 0)]!++;
-          continue;
-        }
-
         if (m === BIOMASS) {
           // Une bouche adjacente la consomme (au plus une par tick : la
           // biomasse elle-même choisit son mangeur, donc un seul écrivain).
@@ -132,16 +116,8 @@ export function passTerrain(w: VoxelWorld): void {
         }
 
         // m === VOID.
-        // Sortie rapide : la majorité du monde est de l'air au-dessus du vide.
-        // Un vide non soutenu ne peut ni retenir d'eau latérale ni porter de
-        // biomasse ; seule une chute d'eau depuis le dessus peut l'occuper.
-        const above = y + 1 < SY ? mat[i + YSTRIDE]! : ROCK;
-        if (above === WATER) {
-          matN[i] = WATER;
-          nutN[i] = 0;
-          chunkVersion[chunkRowBase + ((x / 16) | 0)]!++;
-          continue;
-        }
+        // Sortie rapide : la majorité du monde est de l'air au-dessus du vide,
+        // et un vide non soutenu ne peut pas porter de biomasse.
         const below = y > 0 ? mat[i - YSTRIDE]! : ROCK;
         if (below === VOID) {
           matN[i] = VOID;
@@ -172,66 +148,12 @@ function matAt(w: VoxelWorld, x: number, y: number, z: number): number {
   return w.material[(y * SZ + z) * SX + x]!;
 }
 
-/** Une eau peut tomber si le voxel du dessous est vide. */
-function canFall(w: VoxelWorld, x: number, y: number, z: number): boolean {
-  return y > 0 && matAt(w, x, y - 1, z) === VOID;
-}
 
-/** Un vide peut retenir de l'eau si quelque chose le soutient. */
-function isSupported(w: VoxelWorld, x: number, y: number, z: number): boolean {
-  return y === 0 || matAt(w, x, y - 1, z) !== VOID;
-}
+
+
 
 /**
- * Étalement latéral par CONSENTEMENT MUTUEL : la destination tire au sort une
- * seule source possible, la source ne cède qu'à la destination qu'elle
- * choisit elle-même. Les deux côtés évaluent le même prédicat sur l'état
- * précédent, donc l'eau n'est ni dupliquée ni détruite, quel que soit l'ordre.
- */
-function sourceGivesTo(
-  w: VoxelWorld,
-  x: number,
-  y: number,
-  z: number,
-  tick: number,
-  seed: number,
-): number {
-  for (let d = 0; d < 4; d++) {
-    const dx = x + LAT_DX[d]!;
-    const dz = z + LAT_DZ[d]!;
-    if (matAt(w, dx, y, dz) !== VOID) continue;
-    if (!isSupported(w, dx, y, dz)) continue;
-    // Une destination déjà remplie par le dessus ne prend rien latéralement.
-    if (matAt(w, dx, y + 1, dz) === WATER) continue;
-    const di = (y * SZ + dz) * SX + dx;
-    // La destination tire une direction : pointe-t-elle vers nous ?
-    if ((hash32(di, tick, seed) & 3) !== LAT_OPPOSITE[d]!) continue;
-    return d; // première destination consentante, ordre fixe
-  }
-  return -1;
-}
-
-function nextForWater(
-  w: VoxelWorld,
-  i: number,
-  x: number,
-  y: number,
-  z: number,
-  tick: number,
-  seed: number,
-): number {
-  if (canFall(w, x, y, z)) return VOID; // elle tombe
-  if (sourceGivesTo(w, x, y, z, tick, seed) >= 0) return VOID; // elle s'étale
-  // Évaporation, seulement si exposée à l'air.
-  if (matAt(w, x, y + 1, z) === VOID && (hash32(i, tick, seed ^ 0x1) & 0xffff) < WATER_EVAPORATION_CHANCE) {
-    return VOID;
-  }
-  return WATER;
-}
-
-/**
- * Vide SOUTENU (quelque chose sous lui) et sans eau au-dessus : les deux seuls
- * cas restants sont l'étalement latéral de l'eau et la pousse de biomasse.
+ * Vide SOUTENU : le seul cas restant est la pousse de biomasse.
  * L'appelant a déjà écarté le cas fréquent — l'air au-dessus du vide.
  */
 function nextForSupportedVoid(
@@ -244,40 +166,33 @@ function nextForSupportedVoid(
   tick: number,
   seed: number,
 ): number {
-  // 1. Une eau latérale nous choisit-elle ? (consentement mutuel)
-  const pick = hash32(i, tick, seed) & 3;
-  const sx = x + LAT_DX[pick]!;
-  const sz = z + LAT_DZ[pick]!;
-  if (matAt(w, sx, y, sz) === WATER && !canFall(w, sx, y, sz)) {
-    const give = sourceGivesTo(w, sx, y, sz, tick, seed);
-    if (give >= 0 && LAT_OPPOSITE[give]! === pick) return WATER;
-  }
-
-  // 2. La biomasse COLONISE : elle ne pousse qu'au contact d'une autre plante,
-  //    vite près de l'eau, lentement au sec. Une graine peut aussi apparaître
-  //    seule, mais rarement.
+  // La biomasse COLONISE : elle ne pousse qu'au contact d'une autre plante,
+  //    Une graine peut aussi apparaître seule, mais rarement.
   //
-  //    C'est cette dépendance au voisinage qui rend le broutage épuisant pour
-  //    la plante et payant pour l'animal : tant que la pousse était spontanée,
-  //    une bouche posée sur une rive était nourrie à vie sans bouger, et
-  //    l'évolution éliminait tout ce qui sert à chercher — muscles, yeux,
-  //    neurones. Maintenant, brouter détruit le stock de graines local : le
-  //    front de végétation recule, et il faut le suivre.
+  //  C'est cette dépendance au voisinage qui rend le broutage épuisant pour la
+  //  plante et payant pour l'animal : tant que la pousse était spontanée, une
+  //  bouche posée là où ça pousse était nourrie à vie sans bouger, et l'évolution
+  //  éliminait tout ce qui sert à chercher — muscles, yeux, neurones. Maintenant,
+  //  brouter détruit le stock de graines local : le front de végétation recule,
+  //  et il faut le suivre.
   if (below !== ROCK && below !== BIOMASS) return VOID;
+  // Les hauteurs sont stériles : seules les terres basses portent la végétation.
+  // C'est ce qui borne la production primaire dans l'espace (cf. FERTILE_FRACTION).
+  if (y > w.fertileMaxY) return VOID;
   const roll = hash32(i, tick, seed ^ 0x2) & 0xffff;
   // Écarte d'abord le cas de très loin le plus fréquent, avant tout voisinage.
-  if (roll >= BIOMASS_SPAWN_CHANCE_WET) return VOID;
+  if (roll >= BIOMASS_SPAWN_CHANCE) return VOID;
 
-  let nearPlant = below === BIOMASS;
-  let nearWater = false;
+  let neighbours = below === BIOMASS ? 1 : 0;
   for (let d = 0; d < 6; d++) {
-    const m = matAt(w, x + NEIGHBOR_DX[d]!, y + NEIGHBOR_DY[d]!, z + NEIGHBOR_DZ[d]!);
-    if (m === WATER) nearWater = true;
-    else if (m === BIOMASS) nearPlant = true;
+    if (matAt(w, x + NEIGHBOR_DX[d]!, y + NEIGHBOR_DY[d]!, z + NEIGHBOR_DZ[d]!) === BIOMASS) {
+      neighbours++;
+    }
   }
-  if (nearPlant) {
-    return roll < (nearWater ? BIOMASS_SPAWN_CHANCE_WET : BIOMASS_SPAWN_CHANCE_DRY) ? BIOMASS : VOID;
-  }
+  // Il faut une voisine pour coloniser, mais pas trop : au-delà, la place est
+  // prise et la végétation cesse de s'épaissir (cf. BIOMASS_CROWDING_MAX).
+  if (neighbours > 0 && neighbours <= BIOMASS_CROWDING_MAX) return BIOMASS;
+  if (neighbours > BIOMASS_CROWDING_MAX) return VOID;
   // Génération spontanée : le seul rempart contre un monde définitivement
   // stérile, puisque sans plante aucune plante ne peut plus naître.
   return roll < BIOMASS_SPAWN_CHANCE_SEED ? BIOMASS : VOID;

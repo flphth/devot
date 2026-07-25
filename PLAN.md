@@ -61,9 +61,8 @@ Le monde est une grille de voxels. Chacun est d'un seul type.
 | Voxel | Rôle |
 | --- | --- |
 | **Vide** | l'air, où les créatures se déplacent |
-| **Eau** | s'écoule, s'accumule dans les creux, fait pousser la biomasse à son contact |
-| **Roche** | le socle, inerte, indestructible en proto |
-| **Biomasse** | la nourriture. Apparaît près de l'eau, porte une richesse nutritive, se décompose seule |
+| **Roche** | le socle et le relief, inerte, indestructible en proto |
+| **Biomasse** | la nourriture. Colonise depuis les plantes existantes, porte une richesse nutritive, se décompose seule |
 
 ### 3.2 Tissus d'organisme
 

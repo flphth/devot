@@ -379,7 +379,13 @@ export function validateGenome(g: Genome): GenomeRejection | null {
 
 // ── Sérialisation binaire (réseau + persistance) ─────────────────────────────
 
-const MAGIC = 0x44475631; // "DGV1"
+/**
+ * "DGV2". Incrémenté quand l'eau a été retirée du monde : les matériaux ont été
+ * renumérotés (l'os passe de 4 à 3, et ainsi de suite), donc un génome écrit
+ * avant cette date décrirait un corps fait des mauvais tissus. Mieux vaut le
+ * refuser franchement que le lire de travers.
+ */
+const MAGIC = 0x44475632;
 
 /** Encode un génome en octets. Quelques kilo-octets au plus. */
 export function encodeGenome(g: Genome): Uint8Array {

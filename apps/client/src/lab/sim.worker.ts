@@ -20,7 +20,6 @@ import {
   VOID,
   VOXEL_COUNT,
   VoxelWorld,
-  WATER,
   collectStats,
   decodeGenome,
   encodeGenome,
@@ -29,6 +28,7 @@ import {
   mutationSeed,
   randomGenome,
   registerGenome,
+  hash32,
   spawnFromGenome,
   spawnOrganism,
   step,
@@ -48,6 +48,12 @@ import { runTerrainPassOnGpu, gpuAvailable } from "./gpu/terrainGpu.js";
 
 const MAX_RENDER_VOXELS = 60_000;
 const FRAME_INTERVAL_MS = 70;
+/**
+ * Temps maximal passé à simuler avant de rendre la main. Au-delà, le worker ne
+ * répond plus et l'interface se fige — c'est ce qui arrivait à ×1000 dès que la
+ * population devenait dense.
+ */
+const MAX_BURST_MS = 60;
 
 let world: VoxelWorld | null = null;
 let ticksPerFrame = 1;
@@ -101,6 +107,15 @@ function buildWorld(seed: number, founders: number): VoxelWorld {
 
 // ── Instantané de rendu (liste dérivée, jamais la grille entière) ────────────
 
+/**
+ * Teinte d'une créature. Un hachage de son identifiant plutôt qu'un compteur :
+ * deux voisines ont ainsi des couleurs franchement différentes, alors que des
+ * identifiants consécutifs donneraient des nuances voisines et indistinctes.
+ */
+function tintOf(id: number): number {
+  return hash32(id, 0x7a1e, 0) & 0x1f;
+}
+
 function buildFrame(w: VoxelWorld): LabFrame {
   const voxels = new Int32Array(MAX_RENDER_VOXELS);
   let n = 0;
@@ -111,9 +126,14 @@ function buildFrame(w: VoxelWorld): LabFrame {
     const base = w.bodySlot(id);
     const len = w.bodyLen[id]!;
     const sel = id === selectedId;
+    // Teinte propre à la créature, et vigueur sur huit niveaux : c'est le worker
+    // qui les connaît, il ne faut pas les faire redécouvrir au rendu.
+    const tint = tintOf(id);
+    const cap = w.capacity[id]! || 1;
+    const vigor = Math.max(0, Math.min(7, ((w.energy[id]! * 8) / cap) | 0));
     for (let k = 0; k < len && n < MAX_RENDER_VOXELS; k++) {
       const i = w.bodyList[base + k]!;
-      voxels[n++] = packVoxel(w.xOf(i), w.yOf(i), w.zOf(i), w.material[i]!, sel);
+      voxels[n++] = packVoxel(w.xOf(i), w.yOf(i), w.zOf(i), w.material[i]!, sel, tint, vigor);
     }
   }
 
@@ -235,7 +255,7 @@ function forceBreed(w: VoxelWorld, id: number): void {
       if (!w.inBounds(x + dx, y + dy, z + dz)) continue;
       const ni = w.idx(x + dx, y + dy, z + dz);
       const m = w.material[ni]!;
-      if (m !== VOID && m !== WATER) continue;
+      if (m !== VOID) continue;
       const child = spawnFromGenome(
         w,
         mutate(g, mutationSeed(id, w.tick, w.seed)),
@@ -315,11 +335,21 @@ function loop(): void {
   if (!paused) {
     const now = performance.now();
     if (measureStartedAt === 0) measureStartedAt = now;
-    for (let k = 0; k < ticksPerFrame; k++) {
+    // Salve BORNÉE PAR LE TEMPS, pas par le nombre de ticks.
+    //
+    // Avec un compte fixe, une salve de 1 000 ticks sur un monde chargé bloquait
+    // le worker plusieurs secondes d'affilée : plus une image, plus une réponse
+    // aux commandes — le laboratoire paraissait gelé. Le coût d'un tick dépend
+    // de la population, donc aucun nombre fixe n'est sûr. On avance donc tant
+    // qu'il reste du budget, et on rend la main.
+    const deadline = now + MAX_BURST_MS;
+    let done = 0;
+    while (done < ticksPerFrame && performance.now() < deadline) {
       applyShields(w);
       step(w);
+      done++;
     }
-    ticksSinceMeasure += ticksPerFrame;
+    ticksSinceMeasure += done;
     if (now - measureStartedAt > 500) {
       ticksPerSecond = (ticksSinceMeasure * 1000) / (now - measureStartedAt);
       ticksSinceMeasure = 0;
