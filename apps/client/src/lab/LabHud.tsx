@@ -86,7 +86,11 @@ export function LabHud({ lab }: { lab: LabState }) {
         <div style={{ fontWeight: 800, letterSpacing: 0.4, marginBottom: 8 }}>
           🧪 LABORATOIRE
           <span style={{ float: "right", fontWeight: 400, fontSize: 11, opacity: 0.6 }}>
-            {stats?.backend === "webgpu" ? "WebGPU" : "CPU"}
+            {stats?.backend === "webgpu"
+              ? "WebGPU"
+              : stats?.gpuReady
+                ? "CPU · GPU prêt"
+                : "CPU"}
           </span>
         </div>
 

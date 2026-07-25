@@ -94,8 +94,16 @@ export function randomGenome(seed: number, size = 8): Genome {
   // voxel ne peut pas manger, il doit d'abord pousser — donc dépenser une
   // énergie qu'il n'a pas encore. Faire du germe une bouche brise ce blocage.
   type[0] = MOUTH;
+  // PUIS UN NEURONE, tout de suite. Sans système nerveux un corps n'agit pas :
+  // il ne se déplace pas et surtout ne se reproduit pas (cf. `think`). Un
+  // fondateur sans neurone est donc une impasse garantie, et un fondateur dont
+  // le neurone arrive tard dans le plan traverse une longue enfance stérile —
+  // la croissance suit l'ordre du plan, un voxel par tick. Mesuré : en tirant ce
+  // voxel au hasard, la moitié des mondes stagnaient à la génération 1 après
+  // 6 000 ticks. La mutation peut toujours le retirer ensuite ; cette lignée
+  // s'éteint alors, et c'est précisément le propos.
   dx[1] = 1;
-  type[1] = TISSUE_CHOICES[rng.below(TISSUE_CHOICES.length)]!;
+  type[1] = NEURON;
   let placed = 2;
 
   while (placed < n) {

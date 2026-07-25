@@ -56,6 +56,20 @@ let selectedId = 0;
 /** Organismes protégés par le joueur : leur énergie ne descend pas à zéro. */
 const shielded = new Set<number>();
 
+/**
+ * Le port WGSL est-il exécutable ici ? Sondé une fois, sans bloquer le démarrage :
+ * le chemin CPU ne dépend pas de la réponse.
+ */
+let gpuReady = false;
+void gpuAvailable().then((yes) => {
+  gpuReady = yes;
+  log(
+    yes
+      ? "WebGPU disponible : le banc de conformité peut comparer les deux moteurs."
+      : "WebGPU indisponible : seul le moteur CPU est utilisable ici.",
+  );
+});
+
 let lastFrameAt = 0;
 let ticksSinceMeasure = 0;
 let measureStartedAt = 0;
@@ -147,7 +161,12 @@ function buildFrame(w: VoxelWorld): LabFrame {
       totalEnergy: s.totalEnergy,
       worldHash: worldHash(w),
       ticksPerSecond,
+      // La simulation vivante tourne sur CPU : le port GPU couvre le terrain,
+      // pas les passes par organisme, et terrain et organismes sont couplés à
+      // chaque tick (cf. ARCHITECTURE §5). On signale néanmoins si le port est
+      // exécutable ici, car c'est ce qui rend le banc de conformité possible.
       backend: "cpu",
+      gpuReady,
     },
     voxels: voxels.subarray(0, n),
     organisms: Int32Array.from(orgList),
@@ -371,9 +390,19 @@ self.onmessage = (e: MessageEvent<LabCommand>) => {
       );
       break;
     }
-    case "conformity":
-      void runConformity(cmd.ticks).then((result) => post({ type: "conformity", result }));
+    case "conformity": {
+      // Le banc simule DEUX mondes de plus : le laisser concourir avec la boucle
+      // à ×1000 l'affamait, et le résultat n'arrivait jamais. On arrête le temps
+      // pendant la mesure, puis on rend la vitesse d'avant.
+      const wasPaused = paused;
+      paused = true;
+      log("Mesure de conformité en cours : le monde est suspendu.");
+      void runConformity(cmd.ticks).then((result) => {
+        paused = wasPaused;
+        post({ type: "conformity", result });
+      });
       break;
+    }
   }
 };
 

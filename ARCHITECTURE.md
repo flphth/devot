@@ -257,14 +257,34 @@ Le même `sim-voxel` tourne dans un worker du navigateur. **Le chemin CPU est
 obligatoire** : le laboratoire doit rester utilisable si WebGPU est absent ou
 échoue. WebGPU est un accélérateur, pas une dépendance.
 
-En mode accéléré, l'état reste résident sur GPU et on ne relit que des
-**agrégats** (population, générations, énergie totale, taille moyenne) — jamais
-les voxels. C'est ce qui rend le x1000 possible.
+En mode accéléré, l'état reste résident sur GPU d'un tick au suivant (tampons
+ping-pong, jamais de retour en mémoire centrale entre deux ticks) et on ne relit
+qu'à la fin. C'est ce qui rend le x1000 possible.
 
-**Test de conformité obligatoire** : même graine, même nombre de ticks, l'état
-final CPU et GPU doivent coïncider (comparaison par `worldHash`) ou différer d'un
-écart explicitement borné et documenté. Sans ce test, le port GPU n'est pas
-considéré comme terminé.
+**Test de conformité — VÉRIFIÉ.** Même graine, 120 ticks, monde sans organisme
+(la passe terrain est alors la seule à agir) : `worldHash` vaut `6e6fcf37` des
+deux côtés. Le port WGSL est donc bit à bit équivalent au noyau, y compris pour
+la règle de colonisation (§4.7).
+
+Deux pièges ont coûté cher à lever, notés ici pour la prochaine fois :
+
+- `navigator.gpu` n'existe qu'en **contexte sécurisé**. Sur `about:blank` il est
+  absent quels que soient les drapeaux — ce qui m'avait fait conclure à tort que
+  WebGPU était indisponible dans ce conteneur. Il faut charger une page servie
+  par `localhost`.
+- en navigateur headless, il faut **`--enable-unsafe-webgpu`**. Avec lui,
+  l'adaptateur SwiftShader de Chromium suffit (aucun pilote système à installer).
+
+**Pourquoi la boucle vivante du laboratoire reste sur CPU.** Le port GPU couvre
+les règles de terrain ; l'alimentation des bouches et toutes les passes par
+organisme restent sur CPU. Or terrain et organismes sont couplés à chaque tick :
+les tissus font obstacle à l'eau et aux plantes, et une bouche consomme la
+biomasse qu'elle touche. Synchroniser naïvement coûterait 4 Mo montants et 4 Mo
+descendants par tick (524 288 voxels × 4 octets × deux tableaux), soit 800 Mo/s
+à seulement 100 ticks/s : le transfert mangerait tout le gain. Accélérer
+réellement le laboratoire suppose donc de porter AUSSI les passes par organisme,
+ou de ne synchroniser qu'un voisinage compact autour des corps. C'est un chantier
+à part entière, pas un oubli — et le port terrain, lui, est vérifié et prêt.
 
 ---
 

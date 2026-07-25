@@ -36,6 +36,8 @@ export interface LabStats {
   /** Ticks simulés par seconde réelle — mesure l'accélération obtenue. */
   ticksPerSecond: number;
   backend: "cpu" | "webgpu";
+  /** Le port WGSL est-il exécutable ici ? (contexte sécurisé + adaptateur) */
+  gpuReady: boolean;
 }
 
 export interface LabOrganismInfo {
