@@ -35,10 +35,17 @@ interface ZgInference {
   getServiceMetadata(provider: string): Promise<{ endpoint: string; model: string }>;
   getRequestHeaders(provider: string, content: string): Promise<Record<string, string>>;
   processResponse(provider: string, chatId: string, content?: string): Promise<boolean>;
+  acknowledgeProviderSigner?(provider: string): Promise<unknown>;
+}
+
+interface ZgLedger {
+  getLedger(): Promise<unknown>;
+  addLedger(amountOG: number): Promise<unknown>;
 }
 
 interface ZgBroker {
   inference: ZgInference;
+  ledger?: ZgLedger;
 }
 
 export interface ZgMindOptions {
@@ -50,6 +57,8 @@ export interface ZgMindOptions {
   jsonMode?: boolean;
   /** Provisional A0GI→USD rate for pricing. G2 recalibrates against a real run. */
   a0giUsd?: number;
+  /** OG to deposit into the ledger on first run (0G needs a prepaid balance). */
+  ledgerOG?: number;
   gate?: InferenceGate;
   /** Inject a broker (tests / a pre-built broker); skips SDK+key bootstrap. */
   broker?: ZgBroker;
@@ -83,6 +92,7 @@ export class ZgMind implements MindProvider {
   private service?: ZgService;
   private endpoint?: string;
   private model?: string;
+  private ready = false;
   private readonly gate: InferenceGate;
 
   constructor(private readonly opts: ZgMindOptions = {}) {
@@ -140,9 +150,37 @@ export class ZgMind implements MindProvider {
     return { provider: svc.provider, endpoint: meta.endpoint, model: meta.model, svc };
   }
 
+  /**
+   * One-time on-chain bootstrap so a funded run is a single command: create the
+   * ledger account + deposit the prepaid balance 0G inference requires, and
+   * acknowledge the provider's TEE signer. Skipped for injected brokers (tests).
+   * Fails loudly with the exact shortfall when the wallet is unfunded.
+   */
+  private async ensureAccount(broker: ZgBroker, provider: string): Promise<void> {
+    if (this.ready) return;
+    if (this.opts.broker || !broker.ledger) {
+      this.ready = true;
+      return;
+    }
+    const ledgerOG = this.opts.ledgerOG ?? Number(process.env.ZG_LEDGER_OG ?? "2");
+    try {
+      await broker.ledger.getLedger();
+    } catch {
+      // No account yet → create it and deposit the prepaid inference balance.
+      await broker.ledger.addLedger(ledgerOG);
+    }
+    try {
+      await broker.inference.acknowledgeProviderSigner?.(provider);
+    } catch {
+      // Already acknowledged, or not required by this provider.
+    }
+    this.ready = true;
+  }
+
   async think(req: ThinkRequest): Promise<ThinkResult> {
     const broker = await this.getBroker();
     const { provider, endpoint, model, svc } = await this.resolveService();
+    await this.ensureAccount(broker, provider);
     const a0giUsd = this.opts.a0giUsd ?? Number(process.env.ZG_A0GI_USD ?? "2");
     const jsonMode = this.opts.jsonMode ?? process.env.ZG_RESPONSE_FORMAT === "json_object";
 
