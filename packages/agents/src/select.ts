@@ -45,7 +45,7 @@ export function createMind(env: NodeJS.ProcessEnv = process.env): {
     case "claude":
       if (env.ANTHROPIC_API_KEY) {
         console.warn(
-          "[agents] MIND=claude : ANTHROPIC_API_KEY détectée mais ignorée — les esprits utilisent l'abonnement Claude Code (mets MIND=api pour utiliser la clé).",
+          "[agents] MIND=claude: ANTHROPIC_API_KEY detected but ignored — minds run on the Claude Code subscription (set MIND=api to use the key).",
         );
       }
       return {

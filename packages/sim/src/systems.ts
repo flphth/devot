@@ -85,7 +85,7 @@ function movementSystem(devot: DevotEntity, world: World, dt: number): void {
     }
     case "attack": {
       const target = world.devots.get(goal.targetId);
-      if (!target || target.state === "mort") {
+      if (!target || target.state === "dead") {
         devot.currentGoal = { kind: "wander" };
         return;
       }
@@ -108,7 +108,7 @@ function combatSystem(
 ): void {
   if (devot.currentGoal.kind !== "attack") return;
   const victim = world.devots.get(devot.currentGoal.targetId);
-  if (!victim || victim.state === "mort") {
+  if (!victim || victim.state === "dead") {
     devot.currentGoal = { kind: "wander" };
     return;
   }
@@ -126,7 +126,7 @@ function combatSystem(
     result.triggers.push({
       kind: "threat",
       devotId: victim.id,
-      eventText: `${devot.name} t'attaque et aspire ta vie ! Tu perds tes HP à chaque instant de contact. Il est en x=${devot.pos.x.toFixed(1)}, z=${devot.pos.z.toFixed(1)}.`,
+      eventText: `${devot.name} is attacking you and draining your life! You lose HP every moment of contact. They are at x=${devot.pos.x.toFixed(1)}, z=${devot.pos.z.toFixed(1)}.`,
       createdAt: now,
     });
   }
@@ -160,19 +160,19 @@ function hungerSystem(devot: DevotEntity, result: TickResult, now: number): void
   const ratio = devot.hp / devot.hpMax;
   const prev = devot.state;
 
-  if (ratio <= AGONIZING_THRESHOLD) devot.state = "agonisant";
-  else if (ratio <= HUNGRY_THRESHOLD) devot.state = "affame";
-  else devot.state = "vivant";
+  if (ratio <= AGONIZING_THRESHOLD) devot.state = "dying";
+  else if (ratio <= HUNGRY_THRESHOLD) devot.state = "starving";
+  else devot.state = "alive";
 
   // Déclencheur de survie au franchissement de seuil (pas à chaque tick).
-  if (devot.state !== prev && (devot.state === "affame" || devot.state === "agonisant")) {
+  if (devot.state !== prev && (devot.state === "starving" || devot.state === "dying")) {
     result.triggers.push({
       kind: "survival",
       devotId: devot.id,
       eventText:
-        devot.state === "agonisant"
-          ? "Tes forces t'abandonnent. Tu sens la mort approcher. Il te reste très peu de vie."
-          : "La faim te tenaille. Ta vie s'amenuise et tu n'as rien mangé récemment.",
+        devot.state === "dying"
+          ? "Your strength is failing you. You feel death approaching. Very little life remains."
+          : "Hunger gnaws at you. Your life is dwindling and you have not eaten recently.",
       createdAt: now,
     });
   }
@@ -180,7 +180,7 @@ function hungerSystem(devot: DevotEntity, result: TickResult, now: number): void
   // Un affamé sans but se met d'office à chercher à manger : le corps
   // garde le devot crédible même quand l'esprit dort.
   if (
-    (devot.state === "affame" || devot.state === "agonisant") &&
+    (devot.state === "starving" || devot.state === "dying") &&
     (devot.currentGoal.kind === "idle" || devot.currentGoal.kind === "wander")
   ) {
     devot.currentGoal = { kind: "wander" };
@@ -190,10 +190,10 @@ function hungerSystem(devot: DevotEntity, result: TickResult, now: number): void
 function deathSystem(devot: DevotEntity, result: TickResult): void {
   if (devot.hp <= 0) {
     devot.hp = 0;
-    devot.state = "mort";
+    devot.state = "dead";
     result.deaths.push({
       devotId: devot.id,
-      cause: devot.underAttackBy ? `dévoré par ${devot.underAttackBy}` : "épuisement vital",
+      cause: devot.underAttackBy ? `devoured by ${devot.underAttackBy}` : "vital exhaustion",
     });
   }
 }
@@ -226,7 +226,7 @@ export function perceptionSystem(world: World, now: number = Date.now()): Trigge
           // choisie à la création cesse d'être décorative. Le modèle voit une
           // silhouette avant de voir un identifiant, et décide seul de ce qu'il
           // en fait — craindre, suivre, éviter. Aucune règle ne l'impose.
-          eventText: `Tu rencontres ${other.name} (id "${other.id}"), un devot ${sameGod ? "de ta propre lignée" : "d'une lignée rivale, veillé par un autre dieu"}, ${describeIdentity(other.identityJson)}. Il est en x=${other.pos.x.toFixed(1)}, z=${other.pos.z.toFixed(1)}.`,
+          eventText: `You meet ${other.name} (id "${other.id}"), a devot ${sameGod ? "of your own line" : "of a rival line, watched over by another god"}, ${describeIdentity(other.identityJson)}. They are at x=${other.pos.x.toFixed(1)}, z=${other.pos.z.toFixed(1)}.`,
           createdAt: now,
         });
       }
@@ -239,7 +239,7 @@ export function perceptionSystem(world: World, now: number = Date.now()): Trigge
       triggers.push({
         kind: "encounter",
         devotId: devot.id,
-        eventText: `Tu aperçois de la nourriture (${food.type}, id "${food.id}") non loin de toi, vers x=${food.pos.x.toFixed(1)}, z=${food.pos.z.toFixed(1)}.`,
+        eventText: `You spot food (${food.type}, id "${food.id}") not far from you, toward x=${food.pos.x.toFixed(1)}, z=${food.pos.z.toFixed(1)}.`,
         createdAt: now,
       });
     }
@@ -249,7 +249,7 @@ export function perceptionSystem(world: World, now: number = Date.now()): Trigge
 
 /** Applique une décision d'esprit au corps (nouveau but, parole…). */
 export function applyDecision(devot: DevotEntity, decision: Decision, world: World): void {
-  if (devot.state === "mort") return;
+  if (devot.state === "dead") return;
   switch (decision.action) {
     case "craft": {
       // FORGER : la matière première est la vie. Le coût est prélevé ici, une
@@ -312,7 +312,7 @@ export function applyDecision(devot: DevotEntity, decision: Decision, world: Wor
       break;
     case "attack": {
       const target = decision.targetId ? world.devots.get(decision.targetId) : undefined;
-      if (target && target.id !== devot.id && target.state !== "mort") {
+      if (target && target.id !== devot.id && target.state !== "dead") {
         devot.currentGoal = { kind: "attack", targetId: target.id };
       }
       break;

@@ -21,9 +21,9 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     pos: { x: 0, y: 0, z: 0 },
     hp: 20_000,
     hpMax: 50_000,
-    state: "vivant",
+    state: "alive",
     profile: "frugal",
-    traits: ["curieux"],
+    traits: ["curious"],
     identityJson: "",
     items: [],
     age: 0,
@@ -34,8 +34,8 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
   };
 }
 
-describe("combat — prédation vitale", () => {
-  it("transfère les HP de la victime vers l'agresseur (avec perte)", () => {
+describe("combat — vital predation", () => {
+  it("transfers HP from victim to attacker (with loss)", () => {
     const world = new World();
     const attacker = makeDevot({ pos: { x: 0, y: 0, z: 0 } });
     const victim = makeDevot({ pos: { x: 0.5, y: 0, z: 0 } });
@@ -82,7 +82,7 @@ describe("combat — prédation vitale", () => {
     expect(result.combats).toHaveLength(0); // pas encore au contact
   });
 
-  it("une victime tuée au combat meurt 'dévorée'", () => {
+  it("a victim killed in combat dies 'devoured'", () => {
     const world = new World();
     const attacker = makeDevot();
     const victim = makeDevot({ pos: { x: 0.5, y: 0, z: 0 }, hp: 100 });
@@ -92,7 +92,7 @@ describe("combat — prédation vitale", () => {
 
     const result = tick(world);
     expect(result.deaths).toHaveLength(1);
-    expect(result.deaths[0]!.cause).toContain("dévoré");
+    expect(result.deaths[0]!.cause).toContain("devoured");
   });
 
   it("on ne peut pas s'attaquer soi-même", () => {
@@ -107,7 +107,7 @@ describe("combat — prédation vitale", () => {
 describe("reproduction", () => {
   it("bourgeonnement : coût au parent, vie transmise à l'enfant, traits mutés", () => {
     const world = new World();
-    const parent = makeDevot({ hp: 20_000, traits: ["curieux", "pieux"] });
+    const parent = makeDevot({ hp: 20_000, traits: ["curious", "pious"] });
     world.devots.set(parent.id, parent);
 
     const outcome = resolveReproduction(world, parent, undefined, () => 0.99);
@@ -143,22 +143,22 @@ describe("reproduction", () => {
     expect(outcome.child.godId).toBe("g1");
   });
 
-  it("refuse si le parent est trop faible", () => {
+  it("refuses if the parent is too weak", () => {
     const world = new World();
     const parent = makeDevot({ hp: REPRO_MIN_HP - 1 });
     world.devots.set(parent.id, parent);
     const outcome = resolveReproduction(world, parent, undefined);
-    expect(outcome).toEqual({ reason: "trop faible pour procréer" });
+    expect(outcome).toEqual({ reason: "too weak to procreate" });
   });
 
-  it("refuse si le partenaire est trop éloigné", () => {
+  it("refuses if the partner is too far away", () => {
     const world = new World();
     const a = makeDevot();
     const b = makeDevot({ pos: { x: 20, y: 0, z: 0 } });
     world.devots.set(a.id, a);
     world.devots.set(b.id, b);
     const outcome = resolveReproduction(world, a, b.id);
-    expect(outcome).toEqual({ reason: "partenaire trop éloigné" });
+    expect(outcome).toEqual({ reason: "partner too far away" });
   });
 
   it("une décision reproduce pose une intention consommable", () => {
@@ -170,46 +170,46 @@ describe("reproduction", () => {
   });
 });
 
-describe("perception — l'allure pèse socialement", () => {
-  it("une rencontre décrit ce que l'autre PORTE, pas seulement son identifiant", () => {
-    // C'est tout l'enjeu de T2 : l'apparence choisie à la création doit arriver
-    // dans le prompt du voisin. Sans cela elle reste décorative.
+describe("perception — appearance carries social weight", () => {
+  it("an encounter describes what the other WEARS, not just their id", () => {
+    // This is the whole point of T2: the appearance chosen at creation must reach
+    // the neighbour's prompt. Without that it stays decorative.
     const world = new World();
-    const royal = makeDevot({
-      name: "Roi",
+    const king = makeDevot({
+      name: "King",
       pos: { x: 0, y: 0, z: 0 },
       identityJson: encodeIdentity({
         appearance: {
-          hat: "couronne",
+          hat: "crown",
           shirt: "#e0b34c",
           pants: "#5a3a4a",
-          cape: "longue",
-          face: "aucun",
+          cape: "long",
+          face: "none",
           skin: "#f0c9a4",
-          build: "massif",
+          build: "heavy",
         },
         stats: { vitality: 5, power: 4, speed: 2, sight: 1 },
         soul: "",
         signature: "DVT-000-0000",
       }),
     });
-    const gueux = makeDevot({ name: "Gueux", godId: "g2", pos: { x: 1, y: 0, z: 0 } });
-    world.devots.set(royal.id, royal);
-    world.devots.set(gueux.id, gueux);
+    const pauper = makeDevot({ name: "Pauper", godId: "g2", pos: { x: 1, y: 0, z: 0 } });
+    world.devots.set(king.id, king);
+    world.devots.set(pauper.id, pauper);
 
     const triggers = perceptionSystem(world);
-    const seen = triggers.find((t) => t.devotId === gueux.id);
-    expect(seen, "le gueux doit apercevoir le roi").toBeDefined();
-    expect(seen!.eventText).toContain("couronne");
-    expect(seen!.eventText).toContain("safran"); // la couleur nommée, pas le code hexadécimal
-    expect(seen!.eventText).toContain("cape longue");
-    expect(seen!.eventText).toContain("massif");
-    // Et jamais de code couleur brut : « #e0b34c » ne dit rien à un modèle.
+    const seen = triggers.find((t) => t.devotId === pauper.id);
+    expect(seen, "the pauper must spot the king").toBeDefined();
+    expect(seen!.eventText).toContain("crown");
+    expect(seen!.eventText).toContain("saffron"); // the named colour, not the hex code
+    expect(seen!.eventText).toContain("long cape");
+    expect(seen!.eventText).toContain("heavy");
+    // And never a raw colour code: "#e0b34c" means nothing to a model.
     expect(seen!.eventText).not.toContain("#");
   });
 
-  it("un devot sans identité reste décrit, sans faire échouer la perception", () => {
-    // Un devot d'avant cette version, ou né en mode god, n'a pas d'identité.
+  it("a devot with no identity is still described, without breaking perception", () => {
+    // A devot from before this version, or born in god mode, has no identity.
     const world = new World();
     const a = makeDevot({ pos: { x: 0, y: 0, z: 0 }, identityJson: "" });
     const b = makeDevot({ godId: "g2", pos: { x: 1, y: 0, z: 0 }, identityJson: "" });
@@ -217,6 +217,6 @@ describe("perception — l'allure pèse socialement", () => {
     world.devots.set(b.id, b);
     const triggers = perceptionSystem(world);
     expect(triggers.length).toBeGreaterThan(0);
-    expect(triggers[0]!.eventText).toContain("allure ordinaire");
+    expect(triggers[0]!.eventText).toContain("unremarkable appearance");
   });
 });

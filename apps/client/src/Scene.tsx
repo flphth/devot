@@ -206,7 +206,7 @@ function VoxelDevot({
   const bodyGroup = useRef<THREE.Group>(null);
   const target = useRef(new THREE.Vector3(devot.x, 0, devot.z));
   const heading = useRef(0);
-  const dead = devot.state === "mort";
+  const dead = devot.state === "dead";
 
   target.current.set(devot.x, 0, devot.z);
 
@@ -242,9 +242,9 @@ function VoxelDevot({
     // Marche : bob + balancement. Faim : tremblement. Pensée : pulsation.
     const bob = moving ? Math.abs(Math.sin(t * 9)) * 0.07 : 0;
     const tremble =
-      devot.state === "agonisant"
+      devot.state === "dying"
         ? Math.sin(t * 40) * 0.02
-        : devot.state === "affame"
+        : devot.state === "starving"
           ? Math.sin(t * 25) * 0.01
           : 0;
     b.position.y = bob;
@@ -265,9 +265,9 @@ function VoxelDevot({
   const carried = (devot.items ? devot.items.split(",") : []) as ItemKind[];
   // L'état vital délave les couleurs : un agonisant est visiblement éteint.
   const appearance =
-    devot.state === "agonisant"
+    devot.state === "dying"
       ? { ...look, shirt: fade(look.shirt, "#444444", 0.55), skin: fade(look.skin, "#444444", 0.45) }
-      : devot.state === "affame"
+      : devot.state === "starving"
         ? { ...look, shirt: fade(look.shirt, "#888888", 0.3) }
         : look;
   const ratio = devot.hpMax > 0 ? devot.hp / devot.hpMax : 0;
@@ -384,7 +384,7 @@ function VoxelFood({
     const g = ref.current;
     if (!g) return;
     g.position.lerp(target.current, 1 - Math.exp(-dt * 10));
-    if (food.kind === "manne") {
+    if (food.kind === "manna") {
       g.rotation.y = clock.elapsedTime * 1.2;
       g.position.y = 0.15 + Math.sin(clock.elapsedTime * 2) * 0.08;
     }
@@ -412,7 +412,7 @@ function VoxelFood({
             <meshStandardMaterial color="#4c8a3f" flatShading />
           </mesh>
         </group>
-      ) : food.kind === "manne" ? (
+      ) : food.kind === "manna" ? (
         <mesh position={[0, 0.2, 0]}>
           <octahedronGeometry args={[0.22]} />
           <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.7} flatShading />
@@ -537,7 +537,7 @@ export function Scene({
 
   // Brouillard de guerre : le monde n'est net qu'autour de mes devots vivants.
   const vision: VisionCircle[] = snapshot.devots
-    .filter((d) => d.godId === godId && d.state !== "mort")
+    .filter((d) => d.godId === godId && d.state !== "dead")
     .map((d) => ({ x: d.x, z: d.z }));
 
   const visibleDevots = snapshot.devots.filter(

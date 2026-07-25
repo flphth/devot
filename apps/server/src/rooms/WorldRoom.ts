@@ -81,8 +81,8 @@ export class WorldRoom extends Room<WorldState> {
         kind === "claude"
           ? "abonnement Claude Code (Agent SDK)"
           : kind === "api"
-            ? "Claude Messages API (clé)"
-            : "MockMind (simulé)"
+            ? "Claude Messages API (key)"
+            : "MockMind (simulated)"
       }`,
     );
 
@@ -173,17 +173,17 @@ export class WorldRoom extends Room<WorldState> {
     if (!godId) return;
 
     if (!canRecreateFounder(this.world, godId)) {
-      return this.reject(client, "createFounder", "Ta lignée vit encore.");
+      return this.reject(client, "createFounder", "Your line is still alive.");
     }
 
     // Traits choisis par le joueur : 2 à 3, tous issus de la banque.
     const traits = msg.traits ?? [];
     const pool = TRAIT_POOL as readonly string[];
     if (traits.length < 2 || traits.length > 3) {
-      return this.reject(client, "createFounder", "Choisis 2 ou 3 traits.");
+      return this.reject(client, "createFounder", "Choose 2 or 3 traits.");
     }
     if (traits.some((t) => !pool.includes(t)) || new Set(traits).size !== traits.length) {
-      return this.reject(client, "createFounder", "Traits invalides.");
+      return this.reject(client, "createFounder", "Invalid traits.");
     }
 
     // APPARENCE ET STATS. Rien de ce qui arrive ici n'est cru sur parole : le
@@ -206,12 +206,12 @@ export class WorldRoom extends Room<WorldState> {
 
     const receipt = await this.payments.chargeDevotCreation(godId);
     if (!receipt.ok) {
-      return this.reject(client, "createFounder", "Paiement refusé.");
+      return this.reject(client, "createFounder", "Payment refused.");
     }
 
     const devot = this.spawnDevot(godId, {
       name: msg.name,
-      traits: ["premier de sa lignée", ...traits],
+      traits: ["first of their line", ...traits],
       isFounder: true,
       identity,
     });
@@ -221,7 +221,7 @@ export class WorldRoom extends Room<WorldState> {
       kind: "idle_reflection",
       devotId: devot.id,
       eventText:
-        "Tu viens de naître. Tu ouvres les yeux sur le monde pour la première fois. Tu sais déjà que penser te coûte la vie.",
+        "You have just been born. You open your eyes on the world for the first time. You already know that thinking costs you your life.",
       createdAt: Date.now(),
     });
   }
@@ -259,7 +259,7 @@ export class WorldRoom extends Room<WorldState> {
       identityJson: encodeIdentity(identity),
       // Un devot naît les mains nues : tout objet devra être forgé, et payé.
       items: [],
-      state: "vivant",
+      state: "alive",
       profile: "frugal",
       traits: opts.traits,
       age: 0,
@@ -281,15 +281,15 @@ export class WorldRoom extends Room<WorldState> {
     if (devot.godId !== godId) {
       return this.reject(client, "smite", "Ce devot ne t'appartient pas.");
     }
-    if (devot.state === "mort") {
-      return this.reject(client, "smite", "Il est déjà mort.");
+    if (devot.state === "dead") {
+      return this.reject(client, "smite", "They are already dead.");
     }
 
     devot.hp = 0;
-    devot.state = "mort";
+    devot.state = "dead";
     this.repos.devots.kill(devot.id, "foudre divine");
     this.repos.events.record("smite", [devot.id], { godId });
-    console.log(`[world] ⚡ ${devot.name} foudroyé par son dieu — contexte détruit.`);
+    console.log(`[world] ⚡ ${devot.name} smitten by their god — context destroyed.`);
     this.broadcast("smite", { devotId: devot.id, x: devot.pos.x, z: devot.pos.z });
     const s = this.state.devots.get(devot.id);
     if (s) s.utterance = "";
@@ -363,19 +363,19 @@ export class WorldRoom extends Room<WorldState> {
     if (devot.godId !== godId) {
       return this.reject(client, "speak", "Ce devot ne t'appartient pas.");
     }
-    if (devot.state === "mort") {
+    if (devot.state === "dead") {
       return this.reject(client, "speak", "Les morts n'entendent plus.");
     }
     if (typeof msg.text !== "string" || msg.text.length === 0) {
       return this.reject(client, "speak", "Message vide.");
     }
     if (msg.text.length > DIVINE_MSG_MAX_CHARS) {
-      return this.reject(client, "speak", `${DIVINE_MSG_MAX_CHARS} caractères maximum.`);
+      return this.reject(client, "speak", `${DIVINE_MSG_MAX_CHARS} characters maximum.`);
     }
     const now = Date.now();
     if (now - god.lastSpeakAt < DIVINE_MSG_COOLDOWN_MS) {
       const wait = Math.ceil((DIVINE_MSG_COOLDOWN_MS - (now - god.lastSpeakAt)) / 1000);
-      return this.reject(client, "speak", `Ta voix doit se reposer encore ${wait} s.`);
+      return this.reject(client, "speak", `Your voice must rest for another ${wait} s.`);
     }
 
     god.lastSpeakAt = now;
@@ -385,7 +385,7 @@ export class WorldRoom extends Room<WorldState> {
     this.orchestrator.enqueue({
       kind: "divine_message",
       devotId: devot.id,
-      eventText: `Une voix venue du ciel te dit : « ${msg.text} »`,
+      eventText: `A voice from the sky tells you: "${msg.text}"`,
       createdAt: now,
     });
   }
@@ -395,7 +395,7 @@ export class WorldRoom extends Room<WorldState> {
     if (!godId) return;
 
     const receipt = await this.payments.chargeFeed(godId);
-    if (!receipt.ok) return this.reject(client, "feed", "Paiement refusé.");
+    if (!receipt.ok) return this.reject(client, "feed", "Payment refused.");
 
     let x = msg.x;
     let z = msg.z;
@@ -456,8 +456,8 @@ export class WorldRoom extends Room<WorldState> {
           devotId: birth.child.id,
           eventText:
             birth.parents.length > 1
-              ? "Tu viens de naître de l'union de deux devots. Tu portes en toi des souvenirs d'une vie que tu n'as pas vécue."
-              : "Tu viens de naître, bourgeonné d'un seul parent. Ses souvenirs coulent en toi.",
+              ? "You have just been born of the union of two devots. You carry memories of a life you never lived."
+              : "You have just been born, budded from a single parent. Their memories flow through you.",
           createdAt: Date.now(),
         });
       }).finally(() => {
@@ -469,7 +469,7 @@ export class WorldRoom extends Room<WorldState> {
       this.repos.devots.kill(devotId, cause);
       const s = this.state.devots.get(devotId);
       const name = this.world.devots.get(devotId)?.name ?? devotId;
-      console.log(`[world] ☠ ${name} est mort (${cause}) — contexte détruit.`);
+      console.log(`[world] ☠ ${name} died (${cause}) — context destroyed.`);
       if (s) s.utterance = "";
     }
 
@@ -514,12 +514,12 @@ export class WorldRoom extends Room<WorldState> {
         y: 0,
         z: at?.z ?? (Math.random() - 0.5) * 2 * this.world.size * 0.9,
       },
-      type: at ? kind : rare ? "manne" : Math.random() < 0.3 ? "fruit" : "grain",
+      type: at ? kind : rare ? "manna" : Math.random() < 0.3 ? "fruit" : "grain",
       hpValue: hpValue ?? 0,
       source,
     };
     if (f.hpValue === 0) {
-      f.hpValue = f.type === "manne" ? HP_MAX_DEFAULT : f.type === "fruit" ? 6000 : 2000;
+      f.hpValue = f.type === "manna" ? HP_MAX_DEFAULT : f.type === "fruit" ? 6000 : 2000;
     }
     this.world.food.set(f.id, f);
   }

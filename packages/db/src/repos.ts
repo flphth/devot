@@ -61,7 +61,7 @@ export class DevotRepo {
   kill(devotId: string, cause: string): void {
     this.db
       .update(devots)
-      .set({ hp: 0, state: "mort", diedAt: Date.now() })
+      .set({ hp: 0, state: "dead", diedAt: Date.now() })
       .where(eq(devots.id, devotId))
       .run();
     this.db.delete(messages).where(eq(messages.devotId, devotId)).run();
@@ -140,7 +140,7 @@ export class MessageRepo {
   /** Remplace tout l'historique par un souvenir condensé (chroniqueur, P2). */
   replaceWithSummary(devotId: string, summary: string): void {
     this.db.delete(messages).where(eq(messages.devotId, devotId)).run();
-    this.append(devotId, "user", `[Souvenirs condensés de ta vie passée] ${summary}`);
+    this.append(devotId, "user", `[Condensed memories of your past life] ${summary}`);
   }
 }
 

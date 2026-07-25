@@ -3,7 +3,7 @@ import { hpCost } from "../src/hpCost.js";
 
 describe("hpCost — vie ↔ tokens", () => {
   it("convertit l'usage Haiku en µ$ de HP", () => {
-    // 1M in à 1$ + 1M out à 5$ = 6$ = 6e6 µ$
+    // 1M in at $1 + 1M out at $5 = $6 = 6e6 µ$
     const loss = hpCost(
       {
         inputTokens: 1_000_000,
@@ -16,7 +16,7 @@ describe("hpCost — vie ↔ tokens", () => {
     expect(loss).toBeCloseTo(6_000_000, 0);
   });
 
-  it("un prophète (Opus) saigne 5× plus vite qu'un frugal (Haiku) en entrée", () => {
+  it("a prophet (Opus) bleeds 5× faster than a frugal one (Haiku) on input", () => {
     const usage = {
       inputTokens: 10_000,
       outputTokens: 0,
@@ -29,7 +29,7 @@ describe("hpCost — vie ↔ tokens", () => {
     );
   });
 
-  it("les tokens lus depuis le cache coûtent ~0,1× l'entrée", () => {
+  it("tokens read from cache cost ~0.1× the input price", () => {
     const cached = hpCost(
       { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 10_000, cacheCreationInputTokens: 0 },
       "claude-sonnet-4-6",
@@ -41,7 +41,7 @@ describe("hpCost — vie ↔ tokens", () => {
     expect(cached).toBeCloseTo(raw * 0.1, 6);
   });
 
-  it("une pensée typique Haiku (~1200 in / 60 out) coûte ~1500 HP", () => {
+  it("a typical Haiku thought (~1200 in / 60 out) costs ~1500 HP", () => {
     const loss = hpCost(
       { inputTokens: 1200, outputTokens: 60, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
       "claude-haiku-4-5",

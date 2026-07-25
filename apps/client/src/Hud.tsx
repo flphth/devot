@@ -143,12 +143,12 @@ export function Hud({
 
   const god = snapshot.gods.find((g) => g.id === godId);
   const myDevots = snapshot.devots.filter((d) => d.godId === godId);
-  const hasLiving = myDevots.some((d) => d.state !== "mort");
+  const hasLiving = myDevots.some((d) => d.state !== "dead");
   const cooldownLeft = god
     ? Math.max(0, DIVINE_MSG_COOLDOWN_MS - (now - god.lastSpeakAt))
     : 0;
   const canSpeak =
-    cooldownLeft === 0 && selected && selected.godId === godId && selected.state !== "mort";
+    cooldownLeft === 0 && selected && selected.godId === godId && selected.state !== "dead";
 
   const toggleTrait = (t: string) =>
     setTraits((prev) =>
@@ -175,8 +175,8 @@ export function Hud({
             letterSpacing: 1,
           }}
         >
-          ⚡ MODE GOD — clic : spawn devot · glisser la nourriture · brouillard off ·
-          touche 1 pour sortir
+          ⚡ GOD MODE — click: spawn devot · drag food · fog off ·
+          press 1 to exit
         </div>
       )}
 
@@ -185,7 +185,7 @@ export function Hud({
       {/* Panthéon / création */}
       <div style={{ ...panel, top: 14, left: 14, width: 250 }}>
         <div style={{ fontWeight: 700, marginBottom: 6 }}>
-          {god ? `⚡ ${god.name}` : "Connexion…"}
+          {god ? `⚡ ${god.name}` : "Connecting…"}
         </div>
         {/* La création vit désormais dans son propre écran, plein et centré
             (CreationScreen) : ce panneau n'est plus que le panthéon. */}
@@ -193,7 +193,7 @@ export function Hud({
           <div key={d.id} style={{ marginTop: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span>
-                {d.state === "mort" ? "☠ " : d.thinking ? "💭 " : ""}
+                {d.state === "dead" ? "☠ " : d.thinking ? "💭 " : ""}
                 {d.name}
               </span>
               <span style={{ opacity: 0.7 }}>{d.state}</span>
@@ -267,7 +267,7 @@ export function Hud({
                   placeholder={
                     cooldownLeft > 0
                       ? `Ta voix se repose (${Math.ceil(cooldownLeft / 1000)} s)…`
-                      : "Parle à ton devot (140 caractères, il t'en coûtera sa vie)…"
+                      : "Speak to your devot (140 characters, it will cost them their life)…"
                   }
                   disabled={!canSpeak}
                   style={{
@@ -296,7 +296,7 @@ export function Hud({
                 </button>
                 <button
                   onClick={() => actions.feed(selected.id)}
-                  title="Déposer de la nourriture près de lui"
+                  title="Drop food near them"
                   style={{
                     padding: "8px 12px",
                     borderRadius: 8,
@@ -309,14 +309,14 @@ export function Hud({
                 >
                   🍞
                 </button>
-                {selected.state !== "mort" && (
+                {selected.state !== "dead" && (
                   <button
                     onClick={() => {
                       if (!confirmSmite) return setConfirmSmite(true);
                       actions.smite(selected.id);
                       setConfirmSmite(false);
                     }}
-                    title="Foudroyer ton devot — sa mémoire sera détruite à jamais"
+                    title="Smite your devot — their memory will be destroyed forever"
                     style={{
                       padding: "8px 12px",
                       borderRadius: 8,
@@ -333,7 +333,7 @@ export function Hud({
               </div>
               <div style={{ opacity: 0.55, fontSize: 11, marginTop: 5 }}>
                 {confirmSmite
-                  ? "⚠ Foudroyer est irréversible : son esprit sera effacé pour toujours."
+                  ? "⚠ Smiting is irreversible: their mind will be erased forever."
                   : `${text.length}/${DIVINE_MSG_MAX_CHARS} — une parole par minute. Le silence est parfois le plus grand des cadeaux.`}
               </div>
             </>
@@ -373,16 +373,16 @@ export function Hud({
  */
 function CombatLog({ combats, devots }: { combats: CombatFx[]; devots: DevotView[] }) {
   if (combats.length === 0) return null;
-  const nameOf = (id: string) => devots.find((d) => d.id === id)?.name ?? "un inconnu";
+  const nameOf = (id: string) => devots.find((d) => d.id === id)?.name ?? "a stranger";
   const recent = [...combats].slice(-6).reverse();
   const total = combats.reduce((sum, c) => sum + c.drained, 0);
 
   return (
     <div style={{ ...panel, bottom: 14, left: 14, width: 300 }}>
-      <div style={{ fontWeight: 700, marginBottom: 2 }}>⚔ Vols de vie</div>
+      <div style={{ fontWeight: 700, marginBottom: 2 }}>⚔ Life theft</div>
       <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 8, lineHeight: 1.35 }}>
-        Les PV sont le budget de pensée. Prendre la vie d'un devot, c'est lui prendre du temps
-        de réflexion : il pense moins, décide plus mal, puis meurt.
+        HP are the thinking budget. Taking a devot's life takes away their thinking time:
+        they think less, decide worse, then die.
       </div>
       {recent.map((c) => (
         <div key={c.id} style={{ fontSize: 12, marginTop: 3 }}>
@@ -396,7 +396,7 @@ function CombatLog({ combats, devots }: { combats: CombatFx[]; devots: DevotView
         </div>
       ))}
       <div style={{ fontSize: 11, opacity: 0.55, marginTop: 8 }}>
-        {total.toLocaleString("fr-FR")} PV ont changé de mains sous tes yeux.
+        {total.toLocaleString("fr-FR")} HP changed hands before your eyes.
       </div>
     </div>
   );

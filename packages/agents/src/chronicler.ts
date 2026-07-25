@@ -25,7 +25,7 @@ function renderHistory(name: string, history: StoredMessage[]): string {
   const lines = history.map((m) => {
     const content =
       typeof m.content === "string" ? m.content : JSON.stringify(m.content);
-    return `${m.role === "user" ? "événement" : "pensée"}: ${content.slice(0, 400)}`;
+    return `${m.role === "user" ? "event" : "thought"}: ${content.slice(0, 400)}`;
   });
   return `### Vie de ${name}\n${lines.join("\n")}`;
 }
@@ -43,14 +43,14 @@ export class AnthropicChronicler implements Chronicler {
   ): Promise<ChronicleResult> {
     const instruction =
       purpose === "aging"
-        ? "Condense la vie de ce devot en un souvenir à la première personne (« je me souviens... »), 150 mots maximum. Garde l'essentiel : événements marquants, relations, leçons apprises, peurs et espoirs."
-        : "Fusionne les vies de ces parents en un héritage de souvenirs pour leur enfant, à la première personne (« je me souviens d'une vie que je n'ai pas vécue... »), 150 mots maximum. Garde ce qui aidera l'enfant à survivre et ce qui forge une identité.";
+        ? 'Condense this devot\'s life into a first-person memory ("I remember..."), 150 words maximum. Keep what matters: defining events, relationships, lessons learned, fears and hopes.'
+        : 'Merge these parents\' lives into an inheritance of memories for their child, in the first person ("I remember a life I never lived..."), 150 words maximum. Keep what will help the child survive and what forges an identity.';
 
     const res = await this.client.messages.create({
       model: CHRONICLER_MODEL,
       max_tokens: 400,
       system:
-        "Tu es le chroniqueur d'un monde où des créatures pensantes vivent et meurent. Tu condenses leurs mémoires. Réponds uniquement par le souvenir condensé, sans préambule.",
+        "You are the chronicler of a world where thinking creatures live and die. You condense their memories. Reply only with the condensed memory, with no preamble.",
       messages: [
         {
           role: "user",
@@ -82,8 +82,8 @@ export class MockChronicler implements Chronicler {
     const eventCount = histories.reduce((n, h) => n + h.history.length, 0);
     const summary =
       purpose === "aging"
-        ? `Je me souviens de ma vie : ${eventCount} moments vécus, condensés en un seul souvenir.`
-        : `Je me souviens d'une vie que je n'ai pas vécue : celle de ${names}, ${eventCount} moments transmis à ma naissance.`;
+        ? `I remember my life: ${eventCount} moments lived, condensed into a single memory.`
+        : `I remember a life I never lived: that of ${names}, ${eventCount} moments passed on at my birth.`;
     return {
       summary,
       usage: {

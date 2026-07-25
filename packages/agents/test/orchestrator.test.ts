@@ -14,7 +14,7 @@ function makeDevot(id: string, hp = 10_000): DevotEntity {
     pos: { x: 0, y: 0, z: 0 },
     hp,
     hpMax: 10_000,
-    state: "vivant",
+    state: "alive",
     profile: "frugal",
     traits: [],
     identityJson: "",
@@ -49,7 +49,7 @@ async function settle(orchestrator: CognitionOrchestrator): Promise<void> {
 }
 
 describe("orchestrateur cognitif", () => {
-  it("une pensée déduit les HP selon l'usage réel et persiste l'historique", async () => {
+  it("a thought deducts HP from real usage and persists the history", async () => {
     const devot = makeDevot("d1");
     const { orchestrator, repos, applied } = setup([devot]);
 
@@ -65,12 +65,12 @@ describe("orchestrateur cognitif", () => {
     expect(applied[0]!.hpLoss).toBeGreaterThan(0);
     // MockMind : 1200 in / 60 out sur Haiku → 1500 HP.
     expect(devot.hp).toBeCloseTo(10_000 - 1500, 0);
-    // Historique : tour user (événement) + tour assistant (décision).
+    // History: user turn (event) + assistant turn (decision).
     expect(repos.devots.contextSize("d1")).toBe(2);
     expect(devot.thinking).toBe(false);
   });
 
-  it("une seule pensée en vol par devot", async () => {
+  it("only one thought in flight per devot", async () => {
     const devot = makeDevot("d1");
     const { orchestrator, applied } = setup([devot]);
 
@@ -86,7 +86,7 @@ describe("orchestrateur cognitif", () => {
     expect(applied).toHaveLength(1);
   });
 
-  it("un devot sous le coût plancher ne pense pas (il ne peut pas dépenser plus que sa vie)", async () => {
+  it("a devot below the cost floor does not think (it cannot spend more than its life)", async () => {
     const devot = makeDevot("d1", THOUGHT_COST_FLOOR_HP - 1);
     const { orchestrator, applied } = setup([devot]);
 
@@ -102,9 +102,9 @@ describe("orchestrateur cognitif", () => {
     expect(devot.hp).toBe(THOUGHT_COST_FLOOR_HP - 1);
   });
 
-  it("un devot mort n'est jamais sollicité", async () => {
+  it("a dead devot is never asked to think", async () => {
     const devot = makeDevot("d1");
-    devot.state = "mort";
+    devot.state = "dead";
     const { orchestrator, applied } = setup([devot]);
 
     orchestrator.enqueue({
@@ -117,7 +117,7 @@ describe("orchestrateur cognitif", () => {
     expect(applied).toHaveLength(0);
   });
 
-  it("priorise le message divin sur la réflexion oisive", async () => {
+  it("prioritises the divine message over idle reflection", async () => {
     const a = makeDevot("a");
     const b = makeDevot("b");
     // Un seul slot effectif : on vérifie l'ordre de sortie de la file.

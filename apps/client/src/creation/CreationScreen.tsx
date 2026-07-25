@@ -115,11 +115,11 @@ export function CreationScreen({
               letterSpacing: 0.5,
             }}
           >
-            Façonne ton fondateur
+            Shape your founder
           </div>
           <div style={{ color: "#7f8a9c", font: "13px system-ui, sans-serif", marginTop: 6 }}>
-            ⚡ {godName} — le premier de ta lignée. Tout ce que tu choisis ici le suivra jusqu'à
-            sa mort, et se transmettra à sa descendance.
+            ⚡ {godName} — the first of your line. Everything you choose here follows them to the
+            grave, and passes on to their descendants.
           </div>
         </div>
 
@@ -133,10 +133,10 @@ export function CreationScreen({
         >
           {/* ── Colonne 1 : l'âme ─────────────────────────────────────────── */}
           <div style={CARD}>
-            <SectionTitle>Son âme</SectionTitle>
+            <SectionTitle>Their soul</SectionTitle>
             <Help>
-              Deux à trois traits. Ils entrent littéralement dans sa tête : c'est avec eux qu'il
-              décidera.
+              Two or three traits. They go literally into their head: these are what they will
+              decide with.
             </Help>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
               {TRAIT_POOL.map((t) => (
@@ -146,16 +146,16 @@ export function CreationScreen({
               ))}
             </div>
 
-            <SectionTitle style={{ marginTop: 18 }}>Ce qu'il croit être</SectionTitle>
+            <SectionTitle style={{ marginTop: 18 }}>What they believe they are</SectionTitle>
             <Help>
-              Une phrase, écrite par toi, qu'il portera comme une conviction. Elle sera dans son
-              prompt à chaque pensée.
+              One sentence, written by you, that they will carry as a conviction. It will be in
+              their prompt at every thought.
             </Help>
             <textarea
               value={soul}
               maxLength={SOUL_MAX_CHARS}
               onChange={(e) => setSoul(e.target.value)}
-              placeholder="« je suis né pour protéger les miens »"
+              placeholder="&quot;I was born to protect my own&quot;"
               style={{
                 width: "100%",
                 marginTop: 8,
@@ -207,8 +207,8 @@ export function CreationScreen({
                 {signature}
               </div>
               <div style={{ color: "#7f8a9c", fontSize: 11, marginTop: 4 }}>
-                Sa signature — dérivée de chacun de tes choix. Change une seule chose et elle
-                change.
+                Their signature — derived from each of your choices. Change one thing and it
+                changes.
               </div>
 
               {rejection && (
@@ -224,7 +224,7 @@ export function CreationScreen({
                   }}
                   data-testid="creation-rejection"
                 >
-                  Le serveur a refusé : {rejection}
+                  The server refused: {rejection}
                 </div>
               )}
 
@@ -245,48 +245,48 @@ export function CreationScreen({
                 }}
               >
                 {traits.length < 2
-                  ? "Choisis au moins deux traits"
+                  ? "Choose at least two traits"
                   : left !== 0
-                    ? `Répartis encore ${left} point${Math.abs(left) > 1 ? "s" : ""}`
-                    : "Lui donner la vie"}
+                    ? `${left} point${Math.abs(left) > 1 ? "s" : ""} left to spend`
+                    : "Give them life"}
               </button>
             </div>
           </div>
 
           {/* ── Colonne 3 : le corps ──────────────────────────────────────── */}
           <div style={CARD}>
-            <SectionTitle>Son allure</SectionTitle>
-            <Row label="Chapeau">
+            <SectionTitle>Their look</SectionTitle>
+            <Row label="Hat">
               <Options values={HATS} value={appearance.hat} onPick={(v) => set("hat", v)} color={godColor} />
             </Row>
-            <Row label="T-shirt">
+            <Row label="Shirt">
               <Swatches values={SHIRT_COLORS} value={appearance.shirt} onPick={(v) => set("shirt", v)} />
             </Row>
-            <Row label="Pantalon">
+            <Row label="Trousers">
               <Swatches values={PANTS_COLORS} value={appearance.pants} onPick={(v) => set("pants", v)} />
             </Row>
-            <Row label="Peau">
+            <Row label="Skin">
               <Swatches values={SKIN_COLORS} value={appearance.skin} onPick={(v) => set("skin", v)} />
             </Row>
             <Row label="Cape">
               <Options values={CAPES} value={appearance.cape} onPick={(v) => set("cape", v)} color={godColor} />
             </Row>
-            <Row label="Visage">
+            <Row label="Face">
               <Options values={FACES} value={appearance.face} onPick={(v) => set("face", v)} color={godColor} />
             </Row>
-            <Row label="Corpulence">
+            <Row label="Build">
               <Options values={BUILDS} value={appearance.build} onPick={(v) => set("build", v)} color={godColor} />
             </Row>
 
             <SectionTitle style={{ marginTop: 18 }}>
-              Son corps —{" "}
+              Their body —{" "}
               <span style={{ color: left === 0 ? "#7dbc5e" : godColor }}>
-                {left} point{Math.abs(left) > 1 ? "s" : ""} à placer
+                {left} point{Math.abs(left) > 1 ? "s" : ""} to spend
               </span>
             </SectionTitle>
             <Help>
-              Une enveloppe fixe : ce que tu donnes ici, tu le retires ailleurs. Il n'existe pas de
-              devot bon partout.
+              A fixed budget: what you give here, you take from somewhere else. There is no devot
+              who is good at everything.
             </Help>
             <div style={{ marginTop: 10 }}>
               {STAT_KEYS.map((k) => (
@@ -469,7 +469,7 @@ function StatRow({
         onClick={() => onBump(-1)}
         disabled={value <= STAT_MIN}
         style={stepBtn(value > STAT_MIN)}
-        aria-label={`baisser ${STAT_LABELS[statKey]}`}
+        aria-label={`lower ${STAT_LABELS[statKey]}`}
       >
         −
       </button>
@@ -477,7 +477,7 @@ function StatRow({
         onClick={() => onBump(1)}
         disabled={!canRaise}
         style={stepBtn(canRaise)}
-        aria-label={`monter ${STAT_LABELS[statKey]}`}
+        aria-label={`raise ${STAT_LABELS[statKey]}`}
       >
         +
       </button>

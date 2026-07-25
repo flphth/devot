@@ -45,7 +45,7 @@ export class DevotState extends Schema {
     this.z = 0;
     this.hp = 0;
     this.hpMax = 0;
-    this.state = "vivant";
+    this.state = "alive";
     this.profile = "frugal";
     this.thinking = false;
     this.utterance = "";

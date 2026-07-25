@@ -121,14 +121,14 @@ export class MockMind implements MindProvider {
           // produirait une décision incomplète que le monde refuserait, et le
           // mode de développement ne pourrait jamais exercer la forge.
           item: ITEM_KINDS[this.callCount % ITEM_KINDS.length],
-          thought: "Je fais ce qui est écrit en moi.",
+          thought: "I do what is written in me.",
           ...scripted,
         }
       : eventText.includes("nourriture")
         ? {
             action: "move",
             direction: { x: 1, z: 0 },
-            thought: "Manger, c'est gagner du temps de pensée.",
+            thought: "Eating buys thinking time.",
           }
         : { action: "idle", emotion: "prudence", thought: "Le silence me garde en vie." };
 

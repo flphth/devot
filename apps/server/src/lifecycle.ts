@@ -50,11 +50,11 @@ export async function processReproductions(
         repos.messages.append(
           child.id,
           "user",
-          `[Souvenirs hérités de ${parents.map((p) => p.name).join(" et ")}] ${summary}`,
+          `[Memories inherited from ${parents.map((p) => p.name).join(" and ")}] ${summary}`,
         );
       }
     } catch (err) {
-      console.error(`[lifecycle] héritage échoué pour ${child.id}:`, err);
+      console.error(`[lifecycle] inheritance failed for ${child.id}:`, err);
     }
 
     births.push(outcome);
@@ -67,6 +67,6 @@ export async function processReproductions(
 /** Un dieu peut refaçonner un fondateur ssi tous ses devots sont morts. */
 export function canRecreateFounder(world: World, godId: string): boolean {
   return ![...world.devots.values()].some(
-    (d: DevotEntity) => d.godId === godId && d.state !== "mort",
+    (d: DevotEntity) => d.godId === godId && d.state !== "dead",
   );
 }

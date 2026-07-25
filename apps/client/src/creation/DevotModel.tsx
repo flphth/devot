@@ -13,13 +13,13 @@ import { BUILDS, type Appearance, type Build, type ItemKind } from "@devot/share
 
 /** La corpulence agit sur la largeur, pas sur la hauteur : on reste à l'échelle. */
 const BUILD_WIDTH: Record<Build, number> = {
-  fluet: 0.78,
-  normal: 1,
-  massif: 1.28,
+  slim: 0.78,
+  average: 1,
+  heavy: 1.28,
 };
 
 export function buildWidth(build: Build): number {
-  return BUILD_WIDTH[BUILDS.includes(build) ? build : "normal"];
+  return BUILD_WIDTH[BUILDS.includes(build) ? build : "average"];
 }
 
 export function DevotModel({
@@ -79,7 +79,7 @@ export function DevotModel({
         <meshStandardMaterial color={skin} flatShading />
       </mesh>
       {/* yeux : masqués si le visage est couvert */}
-      {appearance.face !== "masque" && appearance.face !== "bandeau" && (
+      {appearance.face !== "mask" && appearance.face !== "blindfold" && (
         <>
           <mesh position={[-0.09, 0.95, 0.185]}>
             <boxGeometry args={[0.07, 0.09, 0.02]} />
@@ -101,8 +101,8 @@ export function DevotModel({
 }
 
 function FaceGear({ appearance }: { appearance: Appearance }) {
-  if (appearance.face === "aucun") return null;
-  if (appearance.face === "lunettes") {
+  if (appearance.face === "none") return null;
+  if (appearance.face === "glasses") {
     return (
       <group position={[0, 0.95, 0.19]}>
         <mesh position={[-0.09, 0, 0]}>
@@ -120,7 +120,7 @@ function FaceGear({ appearance }: { appearance: Appearance }) {
       </group>
     );
   }
-  if (appearance.face === "bandeau") {
+  if (appearance.face === "blindfold") {
     return (
       <mesh position={[0, 0.95, 0.005]}>
         <boxGeometry args={[0.42, 0.08, 0.38]} />
@@ -139,16 +139,16 @@ function FaceGear({ appearance }: { appearance: Appearance }) {
 
 function Hat({ appearance }: { appearance: Appearance }) {
   switch (appearance.hat) {
-    case "aucun":
+    case "none":
       return null;
-    case "bonnet":
+    case "cap":
       return (
         <mesh position={[0, 1.14, 0]}>
           <boxGeometry args={[0.42, 0.16, 0.38]} />
           <meshStandardMaterial color="#8a5a3a" flatShading />
         </mesh>
       );
-    case "large":
+    case "widebrim":
       return (
         <group>
           <mesh position={[0, 1.13, 0]}>
@@ -161,7 +161,7 @@ function Hat({ appearance }: { appearance: Appearance }) {
           </mesh>
         </group>
       );
-    case "casque":
+    case "helmet":
       return (
         <group>
           <mesh position={[0, 1.13, 0]}>
@@ -174,7 +174,7 @@ function Hat({ appearance }: { appearance: Appearance }) {
           </mesh>
         </group>
       );
-    case "couronne":
+    case "crown":
     default:
       return (
         <group position={[0, 1.14, 0]}>
@@ -194,8 +194,8 @@ function Hat({ appearance }: { appearance: Appearance }) {
 }
 
 function Cape({ appearance, width }: { appearance: Appearance; width: number }) {
-  if (appearance.cape === "aucune") return null;
-  const height = appearance.cape === "courte" ? 0.34 : 0.62;
+  if (appearance.cape === "none") return null;
+  const height = appearance.cape === "short" ? 0.34 : 0.62;
   return (
     <mesh position={[0, 0.72 - height / 2, -0.2]}>
       <boxGeometry args={[0.5 * width, height, 0.05]} />
@@ -213,19 +213,19 @@ function Cape({ appearance, width }: { appearance: Appearance; width: number }) 
 function CarriedItems({ items, width }: { items: readonly ItemKind[]; width: number }) {
   return (
     <group>
-      {items.includes("lance") && (
+      {items.includes("spear") && (
         <mesh position={[0.36 * width, 0.62, 0]} rotation={[0, 0, 0.18]}>
           <boxGeometry args={[0.045, 0.95, 0.045]} />
           <meshStandardMaterial color="#b98a4d" flatShading />
         </mesh>
       )}
-      {items.includes("bouclier") && (
+      {items.includes("shield") && (
         <mesh position={[-(0.38 * width), 0.55, 0.06]}>
           <boxGeometry args={[0.06, 0.4, 0.34]} />
           <meshStandardMaterial color="#9aa3ae" metalness={0.5} roughness={0.4} />
         </mesh>
       )}
-      {items.includes("bottes") && (
+      {items.includes("boots") && (
         <>
           <mesh position={[-0.12 * width, 0.05, 0.02]}>
             <boxGeometry args={[0.19 * width, 0.12, 0.26]} />
@@ -237,7 +237,7 @@ function CarriedItems({ items, width }: { items: readonly ItemKind[]; width: num
           </mesh>
         </>
       )}
-      {items.includes("lunette") && (
+      {items.includes("scope") && (
         <mesh position={[0.13, 0.98, 0.24]} rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[0.05, 0.06, 0.16, 10]} />
           <meshStandardMaterial color="#c8b06a" metalness={0.6} roughness={0.3} />

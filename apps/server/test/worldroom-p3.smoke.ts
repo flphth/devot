@@ -41,8 +41,8 @@ async function main(): Promise<void> {
   await sleep(300);
   check("deux dieux dans l'état", state().gods.size === 2);
 
-  roomA.send("createFounder", { name: "Kain", traits: ["féroce", "envieux"] });
-  roomB.send("createFounder", { name: "Abel", traits: ["pacifique", "pieux"] });
+  roomA.send("createFounder", { name: "Kain", traits: ["fierce", "envious"] });
+  roomB.send("createFounder", { name: "Abel", traits: ["peaceful", "pious"] });
   await sleep(800);
   check("deux fondateurs de lignées différentes", state().devots.size === 2);
 
@@ -61,12 +61,12 @@ async function main(): Promise<void> {
   // Poll : le combat mutuel (les deux se drainent) peut prendre 10-20 s.
   const kainHpBeforeKill = room.world.devots.get(kain.id)!.hp;
   const deadline = Date.now() + 25_000;
-  while (Date.now() < deadline && state().devots.get(abel.id)?.state !== "mort") {
+  while (Date.now() < deadline && state().devots.get(abel.id)?.state !== "dead") {
     await sleep(500);
   }
   check(
     "Abel est mort au combat (PvP inter-lignées)",
-    state().devots.get(abel.id)?.state === "mort",
+    state().devots.get(abel.id)?.state === "dead",
   );
   check("Abel a bien été drainé jusqu'à 0 HP", state().devots.get(abel.id)?.hp === 0);
   console.log(
@@ -74,10 +74,10 @@ async function main(): Promise<void> {
   );
 
   // La lignée d'Abel est éteinte : son dieu peut refaçonner un fondateur.
-  roomB.send("createFounder", { name: "Abel-le-Second", traits: ["prudent", "pieux"] });
+  roomB.send("createFounder", { name: "Abel-le-Second", traits: ["cautious", "pious"] });
   await sleep(800);
   const abelGodDevots = [...state().devots.values()].filter(
-    (d: any) => d.godId === "god-abel" && d.state !== "mort",
+    (d: any) => d.godId === "god-abel" && d.state !== "dead",
   );
   check("le dieu d'Abel a refaçonné un fondateur", abelGodDevots.length === 1);
   check(

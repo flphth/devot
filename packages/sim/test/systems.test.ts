@@ -11,7 +11,7 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     pos: { x: 0, y: 0, z: 0 },
     hp: 10_000,
     hpMax: 10_000,
-    state: "vivant",
+    state: "alive",
     profile: "frugal",
     traits: [],
     identityJson: "",
@@ -28,8 +28,8 @@ function makeFood(id: string, x: number, z: number, hpValue = 500): FoodEntity {
   return { id, pos: { x, y: 0, z }, type: "grain", hpValue, source: "spawn" };
 }
 
-describe("couche réactive (0 token)", () => {
-  it("un devot qui cherche la nourriture s'en rapproche à chaque tick", () => {
+describe("reactive layer (0 tokens)", () => {
+  it("a devot seeking food moves closer to it every tick", () => {
     const world = new World();
     const devot = makeDevot({ currentGoal: { kind: "seek_food", foodId: "f1" } });
     world.devots.set(devot.id, devot);
@@ -50,29 +50,29 @@ describe("couche réactive (0 token)", () => {
     const result = tick(world);
     expect(result.eaten).toHaveLength(1);
     expect(world.food.size).toBe(0);
-    // +500 de nourriture, -1 de métabolisme
+    // +500 from food, -1 from metabolism
     expect(devot.hp).toBeCloseTo(5000 + 500 - 1, 5);
   });
 
-  it("hp ≤ 0 → mort détectée par le DeathSystem", () => {
+  it("hp ≤ 0 → death detected by the DeathSystem", () => {
     const world = new World();
     const devot = makeDevot({ hp: 0.5 });
     world.devots.set(devot.id, devot);
 
     const result = tick(world);
-    expect(result.deaths).toEqual([{ devotId: "d1", cause: "épuisement vital" }]);
-    expect(devot.state).toBe("mort");
+    expect(result.deaths).toEqual([{ devotId: "d1", cause: "vital exhaustion" }]);
+    expect(devot.state).toBe("dead");
     expect(devot.hp).toBe(0);
   });
 
-  it("émet un déclencheur de survie au franchissement du seuil de faim", () => {
+  it("emits a survival trigger when the hunger threshold is crossed", () => {
     const world = new World();
     // Juste au-dessus du seuil affamé (40%) : le métabolisme le fait franchir.
     const devot = makeDevot({ hp: 4000.5, hpMax: 10_000 });
     world.devots.set(devot.id, devot);
 
     const result = tick(world);
-    expect(devot.state).toBe("affame");
+    expect(devot.state).toBe("starving");
     expect(result.triggers.some((t) => t.kind === "survival")).toBe(true);
 
     // Pas de re-déclenchement au tick suivant (seulement au franchissement).
@@ -82,7 +82,7 @@ describe("couche réactive (0 token)", () => {
 
   it("un devot mort ne bouge plus et ne vieillit plus", () => {
     const world = new World();
-    const devot = makeDevot({ hp: 0, state: "mort", age: 42 });
+    const devot = makeDevot({ hp: 0, state: "dead", age: 42 });
     world.devots.set(devot.id, devot);
     tick(world);
     expect(devot.age).toBe(42);

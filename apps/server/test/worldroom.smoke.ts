@@ -47,21 +47,21 @@ async function main(): Promise<void> {
   room.send("createFounder", { name: "Sans-Traits" });
   await sleep(400);
   check("création sans traits rejetée", state().devots.size === 0);
-  room.send("createFounder", { name: "Ève", traits: ["curieux", "pieux", "inexistant"] });
+  room.send("createFounder", { name: "Ève", traits: ["curious", "pious", "inexistant"] });
   await sleep(400);
   check("création avec trait hors pool rejetée", state().devots.size === 0);
 
-  room.send("createFounder", { name: "Ève", traits: ["curieux", "pieux"] });
+  room.send("createFounder", { name: "Ève", traits: ["curious", "pious"] });
   await sleep(600);
   check("le fondateur apparaît dans l'état", state().devots.size === 1);
 
   const devotId: string = [...state().devots.keys()][0] as string;
   const devot = state().devots.get(devotId);
   check("le fondateur appartient au dieu", devot.godId === godId);
-  check("le fondateur est vivant avec des HP", devot.hp > 0 && devot.state !== "mort");
+  check("le fondateur est vivant avec des HP", devot.hp > 0 && devot.state !== "dead");
 
   // 2. Un second fondateur est refusé tant que le premier vit
-  room.send("createFounder", { traits: ["prudent", "pieux"] });
+  room.send("createFounder", { traits: ["cautious", "pious"] });
   await sleep(400);
   check("recréation refusée (fondateur vivant)", state().devots.size === 1);
 
@@ -115,7 +115,7 @@ async function main(): Promise<void> {
   room.onMessage("smite", () => (smiteFx = true));
   room.send("smite", { devotId });
   await sleep(500);
-  check("le devot foudroyé est mort", state().devots.get(devotId).state === "mort");
+  check("le devot foudroyé est mort", state().devots.get(devotId).state === "dead");
   check("l'effet d'éclair est diffusé", smiteFx);
 
   // 8. Mode god : spawn debug + déplacement de nourriture

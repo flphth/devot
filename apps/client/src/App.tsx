@@ -30,7 +30,7 @@ export default function App() {
   // L'écran de création s'impose tant que le dieu n'a aucun devot vivant :
   // c'est le premier contact avec le jeu, et le seul moment où l'on façonne.
   const god = snapshot.gods.find((g) => g.id === godId) ?? null;
-  const hasLiving = snapshot.devots.some((d) => d.godId === godId && d.state !== "mort");
+  const hasLiving = snapshot.devots.some((d) => d.godId === godId && d.state !== "dead");
   const creating = status === "connected" && godId !== null && !hasLiving;
 
   // Hooks de test pilotés (dev uniquement) : état + sélection programmable.
@@ -127,8 +127,8 @@ export default function App() {
           }}
         >
           {status === "connecting"
-            ? "Ascension vers le monde…"
-            : "Le monde est inaccessible. Le serveur tourne-t-il ? (pnpm --filter @devot/server dev)"}
+            ? "Ascending into the world…"
+            : "The world is unreachable. Is the server running? (pnpm --filter @devot/server dev)"}
         </div>
       )}
     </div>

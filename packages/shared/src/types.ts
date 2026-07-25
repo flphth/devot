@@ -1,7 +1,7 @@
 import type { ItemKind } from "./craft.js";
 import type { ModelId } from "./constants.js";
 
-export type DevotLifeState = "vivant" | "affame" | "agonisant" | "mort";
+export type DevotLifeState = "alive" | "starving" | "dying" | "dead";
 
 export type CognitionProfileName = "frugal" | "equilibre" | "prophete";
 
@@ -109,7 +109,7 @@ export interface DevotEntity {
 export interface FoodEntity {
   id: string;
   pos: Vec3;
-  type: "grain" | "fruit" | "manne" | "corrompu";
+  type: "grain" | "fruit" | "manna" | "tainted";
   hpValue: number;
   source: "spawn" | "god";
 }

@@ -16,9 +16,9 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     pos: { x: 0, y: 0, z: 0 },
     hp: 20_000,
     hpMax: 50_000,
-    state: "vivant",
+    state: "alive",
     profile: "frugal",
-    traits: ["curieux"],
+    traits: ["curious"],
     identityJson: "",
     items: [],
     age: 0,
@@ -30,14 +30,14 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
 }
 
 describe("naissances (lifecycle serveur)", () => {
-  it("concrétise une intention et donne à l'enfant des souvenirs hérités", async () => {
+  it("carries out an intention and gives the child inherited memories", async () => {
     const db = openDb(":memory:");
     const repos = createRepos(db);
     const world = new World();
     const parent = makeDevot();
     world.devots.set(parent.id, parent);
     repos.devots.insertFromEntity(parent);
-    repos.messages.append(parent.id, "user", "Tu as trouvé de la manne.");
+    repos.messages.append(parent.id, "user", "You have found manna.");
     repos.messages.append(parent.id, "assistant", '{"action":"eat"}');
 
     parent.pendingReproduction = {};
@@ -48,17 +48,17 @@ describe("naissances (lifecycle serveur)", () => {
     expect(world.devots.has(child.id)).toBe(true);
     expect(parent.pendingReproduction).toBeUndefined();
 
-    // Héritage : l'enfant naît avec un souvenir condensé de son parent.
+    // Inheritance: the child is born with a condensed memory of its parent.
     const childHistory = repos.messages.history(child.id);
     expect(childHistory).toHaveLength(1);
-    expect(String(childHistory[0]!.content)).toContain("Souvenirs hérités");
+    expect(String(childHistory[0]!.content)).toContain("Memories inherited");
 
-    // Lignée persistée : parent_a renseigné.
+    // Line persisted: parent_a filled in.
     const row = repos.devots.get(child.id);
     expect(row?.parentA).toBe(parent.id);
   });
 
-  it("enregistre l'échec sans naissance si le parent est trop faible", async () => {
+  it("records the failure with no birth when the parent is too weak", async () => {
     const db = openDb(":memory:");
     const repos = createRepos(db);
     const world = new World();
@@ -82,15 +82,15 @@ describe("recréation du fondateur", () => {
     world.devots.set(devot.id, devot);
     expect(canRecreateFounder(world, "g1")).toBe(false);
 
-    devot.state = "mort";
+    devot.state = "dead";
     expect(canRecreateFounder(world, "g1")).toBe(true);
     // La lignée d'un autre dieu n'interfère pas.
     expect(canRecreateFounder(world, "g2")).toBe(true);
   });
 });
 
-describe("vieillir, c'est oublier (compaction)", () => {
-  it("l'orchestrateur condense un historique trop long avant de penser", async () => {
+describe("to grow old is to forget (compaction)", () => {
+  it("the orchestrator condenses an over-long history before thinking", async () => {
     const db = openDb(":memory:");
     const repos = createRepos(db);
     const devot = makeDevot();
@@ -123,6 +123,6 @@ describe("vieillir, c'est oublier (compaction)", () => {
     // Historique : 1 souvenir condensé + le tour de la pensée qui vient d'avoir lieu.
     const history = repos.messages.history(devot.id);
     expect(history.length).toBe(3);
-    expect(String(history[0]!.content)).toContain("Souvenirs condensés");
+    expect(String(history[0]!.content)).toContain("Condensed memories");
   });
 });

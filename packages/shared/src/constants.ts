@@ -79,16 +79,16 @@ export const CONTEXT_COMPACT_THRESHOLD_MSGS = 24;
 
 // Banque de traits pour les mutations à la naissance.
 export const TRAIT_POOL = [
-  "curieux",
-  "prudent",
-  "vorace",
-  "pieux",
-  "rebelle",
-  "pacifique",
-  "féroce",
-  "mélancolique",
-  "joueur",
-  "taciturne",
-  "généreux",
-  "envieux",
+  "curious",
+  "cautious",
+  "ravenous",
+  "pious",
+  "defiant",
+  "peaceful",
+  "fierce",
+  "melancholic",
+  "playful",
+  "taciturn",
+  "generous",
+  "envious",
 ] as const;

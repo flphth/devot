@@ -62,7 +62,7 @@ export class CognitionOrchestrator {
     private getDevot: (id: string) => DevotEntity | undefined,
     private onDecision: (applied: AppliedThought) => void,
     private onError: (devotId: string, err: unknown) => void = (id, err) =>
-      console.error(`[orchestrator] pensée échouée pour ${id}:`, err),
+      console.error(`[orchestrator] thought failed for ${id}:`, err),
     /** Optionnel : active le vieillissement (compaction de l'historique). */
     private chronicler?: Chronicler,
   ) {}
@@ -70,7 +70,7 @@ export class CognitionOrchestrator {
   /** Dépose un déclencheur ; l'esprit sera sollicité en tâche de fond. */
   enqueue(trigger: Trigger): void {
     const devot = this.getDevot(trigger.devotId);
-    if (!devot || devot.state === "mort") return;
+    if (!devot || devot.state === "dead") return;
     // Un devot déjà en train de penser, ou déjà en file, n'est pas relancé.
     if (this.inFlight.has(trigger.devotId)) return;
     if (this.queue.some((t) => t.devotId === trigger.devotId)) return;
@@ -87,7 +87,7 @@ export class CognitionOrchestrator {
     while (this.queue.length > 0 && this.limit.activeCount + this.limit.pendingCount < MAX_CONCURRENT_INFERENCES) {
       const trigger = this.queue.shift()!;
       const devot = this.getDevot(trigger.devotId);
-      if (!devot || devot.state === "mort") continue;
+      if (!devot || devot.state === "dead") continue;
 
       // Pré-check budget : un devot trop pauvre pour penser s'abstient.
       if (devot.hp <= THOUGHT_COST_FLOOR_HP) continue;
@@ -133,7 +133,7 @@ export class CognitionOrchestrator {
 
       // Le devot peut être mort pendant que l'esprit pensait.
       const current = this.getDevot(devot.id);
-      if (!current || current.state === "mort") return;
+      if (!current || current.state === "dead") return;
 
       // Persiste l'échange dans l'historique du devot.
       this.repos.messages.append(devot.id, "user", result.userTurn);

@@ -17,90 +17,90 @@ import {
 } from "../src/appearance.js";
 
 /**
- * L'apparence arrive d'un client, donc rien n'est cru sur parole. Ces tests
- * couvrent exactement ce qu'un client modifié tenterait : une pièce inventée,
- * une couleur hors palette, et surtout des stats au maximum partout.
+ * Appearance arrives from a client, so nothing is taken on trust. These tests
+ * cover exactly what a tampered client would attempt: a made-up piece, a colour
+ * outside the palette, and above all stats maxed out everywhere.
  */
 
-describe("apparence — ce que le serveur accepte", () => {
-  it("laisse passer une apparence légale", () => {
+describe("appearance — what the server accepts", () => {
+  it("lets a legal appearance through", () => {
     expect(validateAppearance(DEFAULT_APPEARANCE)).toBeNull();
   });
 
-  it("refuse une pièce qui n'existe pas", () => {
+  it("refuses a piece that does not exist", () => {
     expect(validateAppearance({ ...DEFAULT_APPEARANCE, hat: "haut-de-forme" })).toMatchObject({
-      reason: expect.stringContaining("Chapeau"),
+      reason: expect.stringContaining("hat"),
     });
     expect(validateAppearance({ ...DEFAULT_APPEARANCE, cape: "immense" })).not.toBeNull();
     expect(validateAppearance({ ...DEFAULT_APPEARANCE, build: "colossal" })).not.toBeNull();
   });
 
-  it("refuse une couleur hors palette", () => {
-    // Une couleur libre serait un vecteur d'injection dans le rendu et dans les
-    // descriptions envoyées au modèle.
+  it("refuses a colour outside the palette", () => {
+    // A free-form colour would be an injection vector into the rendering and
+    // into the descriptions sent to the model.
     expect(validateAppearance({ ...DEFAULT_APPEARANCE, shirt: "#ff00ff" })).not.toBeNull();
     expect(
       validateAppearance({ ...DEFAULT_APPEARANCE, skin: "<script>alert(1)</script>" }),
     ).not.toBeNull();
   });
 
-  it("refuse une apparence absente ou mal formée", () => {
+  it("refuses a missing or malformed appearance", () => {
     expect(validateAppearance(null)).not.toBeNull();
-    expect(validateAppearance("rouge")).not.toBeNull();
+    expect(validateAppearance("red")).not.toBeNull();
     expect(validateAppearance({})).not.toBeNull();
   });
 });
 
-describe("stats — le budget est l'anti-triche de la création", () => {
-  it("laisse passer une répartition qui tient dans le budget", () => {
+describe("stats — the budget is the anti-cheat of creation", () => {
+  it("lets through a spread that fits the budget", () => {
     expect(validateStats(DEFAULT_STATS)).toBeNull();
     expect(validateStats({ vitality: 5, power: 1, speed: 5, sight: 1 })).toBeNull();
   });
 
-  it("REFUSE le maximum partout", () => {
-    // Le cas qui compte : un client modifié qui s'octroie 5 sur les quatre stats.
+  it("REFUSES the maximum everywhere", () => {
+    // The case that matters: a tampered client granting itself 5 on all four stats.
     const cheat: Stats = { vitality: 5, power: 5, speed: 5, sight: 5 };
     const rejection = validateStats(cheat);
     expect(rejection).not.toBeNull();
     expect(rejection!.reason).toContain(String(STAT_BUDGET));
   });
 
-  it("refuse une somme trop faible autant qu'une somme trop forte", () => {
+  it("refuses a total that is too low as well as one too high", () => {
     expect(validateStats({ vitality: 1, power: 1, speed: 1, sight: 1 })).not.toBeNull();
     expect(validateStats({ vitality: 4, power: 4, speed: 4, sight: 4 })).not.toBeNull();
   });
 
-  it("refuse une stat hors bornes, même si le total tombe juste", () => {
-    // 9 + 1 + 1 + 1 = 12 : le total est bon, mais 9 dépasse le maximum.
+  it("refuses an out-of-range stat, even when the total is right", () => {
+    // 9 + 1 + 1 + 1 = 12: the total is right, but 9 exceeds the maximum.
     expect(validateStats({ vitality: 9, power: 1, speed: 1, sight: 1 })).not.toBeNull();
     expect(validateStats({ vitality: 0, power: 5, speed: 5, sight: 2 })).not.toBeNull();
   });
 
-  it("refuse ce qui n'est pas un entier", () => {
+  it("refuses anything that is not a whole number", () => {
     expect(validateStats({ vitality: 3.5, power: 3, speed: 3, sight: 2.5 })).not.toBeNull();
     expect(validateStats({ vitality: "5", power: 3, speed: 2, sight: 2 })).not.toBeNull();
     expect(validateStats(null)).not.toBeNull();
   });
 
-  it("le budget par défaut est effectivement dépensé en entier", () => {
+  it("the default spread does spend the whole budget", () => {
     const total = STAT_KEYS.reduce((sum, k) => sum + DEFAULT_STATS[k], 0);
     expect(total).toBe(STAT_BUDGET);
   });
 });
 
-describe("effet d'une stat", () => {
-  it("3 est le point neutre", () => {
+describe("effect of a stat", () => {
+  it("3 is the neutral point", () => {
     expect(statMultiplier(3)).toBeCloseTo(1, 6);
   });
 
-  it("l'écart entre le minimum et le maximum est net mais borné", () => {
+  it("the gap between minimum and maximum is clear but bounded", () => {
     expect(statMultiplier(1)).toBeCloseTo(0.6, 6);
     expect(statMultiplier(STAT_MAX)).toBeCloseTo(1.4, 6);
-    // Un peu plus du double entre les extrêmes : visible, jamais écrasant.
+    // A little over twofold between the extremes: visible, never crushing.
     expect(statMultiplier(STAT_MAX) / statMultiplier(1)).toBeLessThan(2.5);
   });
 
-  it("borne les valeurs aberrantes au lieu de les propager", () => {
+  it("clamps absurd values instead of propagating them", () => {
     expect(statMultiplier(99)).toBe(statMultiplier(STAT_MAX));
     expect(statMultiplier(-4)).toBe(statMultiplier(1));
     expect(statMultiplier(Number.NaN)).toBe(statMultiplier(1));
@@ -108,40 +108,40 @@ describe("effet d'une stat", () => {
 });
 
 describe("signature", () => {
-  it("le même devot donne toujours la même signature", () => {
-    const a = signatureOf(DEFAULT_APPEARANCE, DEFAULT_STATS, ["curieux", "prudent"], "je doute");
-    const b = signatureOf(DEFAULT_APPEARANCE, DEFAULT_STATS, ["prudent", "curieux"], "je doute");
-    // L'ordre des traits ne compte pas : c'est le même être.
+  it("the same devot always yields the same signature", () => {
+    const a = signatureOf(DEFAULT_APPEARANCE, DEFAULT_STATS, ["curious", "cautious"], "I doubt");
+    const b = signatureOf(DEFAULT_APPEARANCE, DEFAULT_STATS, ["cautious", "curious"], "I doubt");
+    // Trait order does not matter: it is the same being.
     expect(a).toBe(b);
     expect(a).toMatch(/^DVT-[0-9A-Z]{3}-[0-9A-Z]{4}$/);
   });
 
-  it("un seul choix différent donne une signature franchement différente", () => {
-    const base = signatureOf(DEFAULT_APPEARANCE, DEFAULT_STATS, ["curieux"], "");
+  it("a single different choice yields a clearly different signature", () => {
+    const base = signatureOf(DEFAULT_APPEARANCE, DEFAULT_STATS, ["curious"], "");
     const hat = signatureOf(
-      { ...DEFAULT_APPEARANCE, hat: "couronne" },
+      { ...DEFAULT_APPEARANCE, hat: "crown" },
       DEFAULT_STATS,
-      ["curieux"],
+      ["curious"],
       "",
     );
     const shirt = signatureOf(
       { ...DEFAULT_APPEARANCE, shirt: SHIRT_COLORS[5]! },
       DEFAULT_STATS,
-      ["curieux"],
+      ["curious"],
       "",
     );
     const stats = signatureOf(
       DEFAULT_APPEARANCE,
       { vitality: 5, power: 1, speed: 3, sight: 3 },
-      ["curieux"],
+      ["curious"],
       "",
     );
     expect(new Set([base, hat, shirt, stats]).size).toBe(4);
   });
 
-  it("des combinaisons variées ne se télescopent pas", () => {
+  it("varied combinations do not collide", () => {
     const seen = new Set<string>();
-    for (const hat of ["aucun", "bonnet", "large", "casque", "couronne"] as const) {
+    for (const hat of ["none", "cap", "widebrim", "helmet", "crown"] as const) {
       for (const shirt of SHIRT_COLORS) {
         seen.add(signatureOf({ ...DEFAULT_APPEARANCE, hat, shirt }, DEFAULT_STATS, [], ""));
       }
@@ -150,18 +150,18 @@ describe("signature", () => {
   });
 });
 
-describe("persistance de l'identité", () => {
-  it("un aller-retour rend exactement la même identité", () => {
-    const identity = defaultIdentity(["curieux", "vorace"]);
+describe("identity persistence", () => {
+  it("a round trip returns exactly the same identity", () => {
+    const identity = defaultIdentity(["curious", "ravenous"]);
     const back = decodeIdentity(encodeIdentity(identity));
     expect(back).toEqual(identity);
   });
 
-  it("une identité illisible ou illégale est refusée, pas devinée", () => {
+  it("an unreadable or illegal identity is refused, not guessed", () => {
     expect(decodeIdentity(null)).toBeNull();
     expect(decodeIdentity("")).toBeNull();
-    expect(decodeIdentity("{pas du json")).toBeNull();
-    // Une identité dont les stats ont été trafiquées en base ne doit pas passer.
+    expect(decodeIdentity("{not json")).toBeNull();
+    // An identity whose stats were tampered with in the database must not pass.
     const tampered = JSON.stringify({
       ...defaultIdentity(),
       stats: { vitality: 5, power: 5, speed: 5, sight: 5 },

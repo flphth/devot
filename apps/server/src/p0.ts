@@ -34,7 +34,7 @@ async function main(): Promise<void> {
   // 1. Le dieu façonne son fondateur (gratuit via le stub).
   const godId = "god-demo";
   const receipt = await payments.chargeDevotCreation(godId);
-  log(`Paiement création fondateur : ${receipt.ref}`);
+  log(`Founder creation payment: ${receipt.ref}`);
 
   const founder: DevotEntity = {
     id: "devot-adam",
@@ -44,9 +44,9 @@ async function main(): Promise<void> {
     pos: { x: 0, y: 0, z: 0 },
     hp: DEMO_HP_MAX,
     hpMax: DEMO_HP_MAX,
-    state: "vivant",
+    state: "alive",
     profile: "frugal",
-    traits: ["curieux", "économe de ses pensées"],
+    traits: ["curious", "sparing with their thoughts"],
     identityJson: "",
     items: [],
     age: 0,
@@ -57,7 +57,7 @@ async function main(): Promise<void> {
   world.devots.set(founder.id, founder);
   repos.devots.insertFromEntity(founder);
   repos.events.record("birth", [founder.id], { founder: true });
-  log(`Naissance de ${founder.name} (${founder.hp} HP = ${(founder.hp / 1e6).toFixed(4)} $ de pensée)`);
+  log(`Birth of ${founder.name} (${founder.hp} HP = $${(founder.hp / 1e6).toFixed(4)} of thinking)`);
 
   // 2. L'esprit : abonnement Claude Code (défaut), API (clé), ou mock.
   const { kind, mind } = createMind();
@@ -66,8 +66,8 @@ async function main(): Promise<void> {
       kind === "claude"
         ? "abonnement Claude Code (Agent SDK)"
         : kind === "api"
-          ? "Claude Messages API (clé)"
-          : "MockMind (simulé)"
+          ? "Claude Messages API (key)"
+          : "MockMind (simulated)"
     }`,
   );
 
@@ -80,9 +80,9 @@ async function main(): Promise<void> {
       if (!d) return;
       applyDecision(d, decision, world);
       log(
-        `${d.name} a pensé → ${decision.action}` +
+        `${d.name} thought → ${decision.action}` +
           (decision.utterance ? ` « ${decision.utterance} »` : "") +
-          ` | coût ${hpLoss.toFixed(0)} HP | reste ${Math.max(0, d.hp).toFixed(0)}/${d.hpMax} HP`,
+          ` | cost ${hpLoss.toFixed(0)} HP | ${Math.max(0, d.hp).toFixed(0)}/${d.hpMax} HP left`,
       );
       if (decision.utterance) d.utterance = decision.utterance;
     },
@@ -132,7 +132,7 @@ async function main(): Promise<void> {
             kind: "idle_reflection",
             devotId: d.id,
             eventText:
-              "Rien de notable ne se passe. Tu peux méditer sur ta condition, agir, ou économiser ta vie.",
+              "Nothing notable is happening. You may meditate on your condition, act, or spare your life.",
             createdAt: Date.now(),
           });
         }
@@ -150,7 +150,7 @@ async function main(): Promise<void> {
         const ctxAfter = repos.devots.contextSize(devotId);
         log(`☠ ${d?.name ?? devotId} est mort (${cause}).`);
         log(
-          `  Contexte détruit : ${ctxBefore} messages → ${ctxAfter}. ` +
+          `  Context destroyed: ${ctxBefore} messages → ${ctxAfter}. ` +
             `Il ne reste que la pierre tombale et ce que le monde se souvient.`,
         );
       }
@@ -166,7 +166,7 @@ async function main(): Promise<void> {
 
   const row = repos.devots.get(founder.id);
   log(
-    `Fin de run : ${tickCount} ticks, état final de ${founder.name} : ` +
+    `End of run: ${tickCount} ticks, final state of ${founder.name}: ` +
       `${row?.state} (died_at=${row?.diedAt ?? "—"}), contexte=${repos.devots.contextSize(founder.id)} messages.`,
   );
 }

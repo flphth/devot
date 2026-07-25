@@ -8,7 +8,7 @@ export class World {
   constructor(public size = 50) {}
 
   aliveDevots(): DevotEntity[] {
-    return [...this.devots.values()].filter((d) => d.state !== "mort");
+    return [...this.devots.values()].filter((d) => d.state !== "dead");
   }
 
   nearestFood(pos: Vec3): FoodEntity | undefined {

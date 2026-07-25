@@ -189,7 +189,7 @@ export function useWorld(godName: string): WorldConnection {
         });
       })
       .catch((err) => {
-        console.error("[devot] connexion échouée", err);
+        console.error("[devot] connection failed", err);
         setStatus("error");
       });
 

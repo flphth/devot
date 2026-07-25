@@ -23,9 +23,9 @@ import {
 } from "../src/index.js";
 
 /**
- * T3 : les quatre stats choisies à la création doivent produire des effets
- * RÉELS. Un test par stat, plus la garantie que tout vient de l'identité
- * persistée et jamais d'une valeur affirmée par un client.
+ * T3: the four stats chosen at creation must produce REAL effects. One test per
+ * stat, plus the guarantee that everything comes from the persisted identity and
+ * never from a value a client asserts.
  */
 
 let seq = 0;
@@ -40,7 +40,7 @@ function makeDevot(stats: Partial<Stats>, overrides: Partial<DevotEntity> = {}):
     pos: { x: 0, y: 0, z: 0 },
     hp: 40_000,
     hpMax: HP_MAX_DEFAULT,
-    state: "vivant",
+    state: "alive",
     profile: "frugal",
     traits: [],
     identityJson: encodeIdentity(identity),
@@ -53,16 +53,16 @@ function makeDevot(stats: Partial<Stats>, overrides: Partial<DevotEntity> = {}):
   };
 }
 
-describe("les stats sortent de l'identité, jamais d'ailleurs", () => {
-  it("un devot sans identité retombe sur le profil neutre", () => {
+describe("stats come from the identity, never from anywhere else", () => {
+  it("a devot with no identity falls back to the neutral profile", () => {
     const devot = makeDevot({}, { identityJson: "" });
     expect(statsOf(devot)).toEqual({ vitality: 3, power: 3, speed: 3, sight: 3 });
     expect(hpMaxOf(devot)).toBe(HP_MAX_DEFAULT);
   });
 
-  it("une identité trafiquée est ignorée au profit du profil neutre", () => {
-    // Si quelqu'un écrivait 5 partout directement en base, la lecture doit le
-    // refuser : `decodeIdentity` revalide, et on retombe sur le neutre.
+  it("a tampered identity is ignored in favour of the neutral profile", () => {
+    // If someone wrote 5 everywhere straight into the database, the read must
+    // refuse it: `decodeIdentity` revalidates, and we fall back to neutral.
     const devot = makeDevot(
       {},
       {
@@ -76,75 +76,75 @@ describe("les stats sortent de l'identité, jamais d'ailleurs", () => {
   });
 });
 
-describe("vigueur — les PV, donc le temps de pensée", () => {
-  it("une forte vigueur donne plus de PV maximaux qu'une faible", () => {
-    const robuste = makeDevot({ vitality: 5, sight: 1 });
-    const frele = makeDevot({ vitality: 1, sight: 5 });
-    expect(hpMaxOf(robuste)).toBeGreaterThan(hpMaxOf(frele));
-    expect(hpMaxOf(robuste)).toBe(Math.round(HP_MAX_DEFAULT * statMultiplier(5)));
-    expect(hpMaxOf(frele)).toBe(Math.round(HP_MAX_DEFAULT * statMultiplier(1)));
+describe("vigour — the HP, and therefore the thinking time", () => {
+  it("high vigour grants more maximum HP than low vigour", () => {
+    const sturdy = makeDevot({ vitality: 5, sight: 1 });
+    const frail = makeDevot({ vitality: 1, sight: 5 });
+    expect(hpMaxOf(sturdy)).toBeGreaterThan(hpMaxOf(frail));
+    expect(hpMaxOf(sturdy)).toBe(Math.round(HP_MAX_DEFAULT * statMultiplier(5)));
+    expect(hpMaxOf(frail)).toBe(Math.round(HP_MAX_DEFAULT * statMultiplier(1)));
   });
 });
 
-describe("vivacité — la vitesse de déplacement", () => {
-  it("un devot vif parcourt plus de chemin qu'un devot lent, dans le même temps", () => {
+describe("swiftness — movement speed", () => {
+  it("a swift devot covers more ground than a slow one, in the same time", () => {
     const world = new World();
-    const vif = makeDevot({ speed: 5, sight: 1 }, { pos: { x: 0, y: 0, z: 0 } });
-    const lent = makeDevot({ speed: 1, sight: 5 }, { pos: { x: 0, y: 0, z: 0 } });
-    // Même but, exactement à l'opposé : seule la vitesse les sépare.
-    applyDecision(vif, { action: "move", direction: { x: 1, z: 0 } }, world);
-    applyDecision(lent, { action: "move", direction: { x: 1, z: 0 } }, world);
-    world.devots.set(vif.id, vif);
-    world.devots.set(lent.id, lent);
+    const swift = makeDevot({ speed: 5, sight: 1 }, { pos: { x: 0, y: 0, z: 0 } });
+    const slow = makeDevot({ speed: 1, sight: 5 }, { pos: { x: 0, y: 0, z: 0 } });
+    // Same goal, same direction: only speed separates them.
+    applyDecision(swift, { action: "move", direction: { x: 1, z: 0 } }, world);
+    applyDecision(slow, { action: "move", direction: { x: 1, z: 0 } }, world);
+    world.devots.set(swift.id, swift);
+    world.devots.set(slow.id, slow);
 
     for (let k = 0; k < 10; k++) tick(world);
-    expect(vif.pos.x).toBeGreaterThan(lent.pos.x);
-    expect(speedOf(vif)).toBeGreaterThan(speedOf(lent));
+    expect(swift.pos.x).toBeGreaterThan(slow.pos.x);
+    expect(speedOf(swift)).toBeGreaterThan(speedOf(slow));
     expect(speedOf(makeDevot({ speed: 3 }))).toBeCloseTo(DEVOT_SPEED, 6);
   });
 });
 
-describe("vue — ce qui entre dans le prompt", () => {
-  it("un devot perçant voit un voisin qu'un myope ne voit pas", () => {
+describe("sight — what enters the prompt", () => {
+  it("a sharp-eyed devot sees a neighbour a short-sighted one cannot", () => {
     const world = new World();
-    const percant = makeDevot({ sight: 5, vitality: 1 }, { pos: { x: 0, y: 0, z: 0 } });
-    const myope = makeDevot({ sight: 1, vitality: 5 }, { pos: { x: 0, y: 0, z: 0.2 } });
-    // Un tiers placé entre les deux portées : visible du perçant, pas du myope.
-    const distance = (sightOf(percant) + sightOf(myope)) / 2;
-    const cible = makeDevot({}, { godId: "g2", pos: { x: distance, y: 0, z: 0 } });
-    for (const d of [percant, myope, cible]) world.devots.set(d.id, d);
+    const sharpEyed = makeDevot({ sight: 5, vitality: 1 }, { pos: { x: 0, y: 0, z: 0 } });
+    const shortSighted = makeDevot({ sight: 1, vitality: 5 }, { pos: { x: 0, y: 0, z: 0.2 } });
+    // A third placed between the two ranges: visible to the sharp-eyed, not the short-sighted.
+    const distance = (sightOf(sharpEyed) + sightOf(shortSighted)) / 2;
+    const target = makeDevot({}, { godId: "g2", pos: { x: distance, y: 0, z: 0 } });
+    for (const d of [sharpEyed, shortSighted, target]) world.devots.set(d.id, d);
 
     const triggers = perceptionSystem(world);
-    const vuPar = (id: string) =>
-      triggers.some((t) => t.devotId === id && t.eventText.includes(cible.name));
+    const seenBy = (id: string) =>
+      triggers.some((t) => t.devotId === id && t.eventText.includes(target.name));
 
-    expect(sightOf(percant)).toBeGreaterThan(sightOf(myope));
-    expect(vuPar(percant.id), "le perçant doit le voir").toBe(true);
-    expect(vuPar(myope.id), "le myope ne doit pas le voir").toBe(false);
+    expect(sightOf(sharpEyed)).toBeGreaterThan(sightOf(shortSighted));
+    expect(seenBy(sharpEyed.id), "the sharp-eyed must see them").toBe(true);
+    expect(seenBy(shortSighted.id), "the short-sighted must not").toBe(false);
     expect(sightOf(makeDevot({ sight: 3 }))).toBeCloseTo(PERCEPTION_RADIUS, 6);
   });
 });
 
-describe("force — les PV volés", () => {
-  it("un devot fort draine plus vite qu'un devot faible", () => {
-    const fort = makeDevot({ power: 5, sight: 1 });
-    const faible = makeDevot({ power: 1, sight: 5 });
-    expect(drainOf(fort)).toBeGreaterThan(drainOf(faible));
+describe("power — the HP stolen", () => {
+  it("a strong devot drains faster than a weak one", () => {
+    const strong = makeDevot({ power: 5, sight: 1 });
+    const weak = makeDevot({ power: 1, sight: 5 });
+    expect(drainOf(strong)).toBeGreaterThan(drainOf(weak));
     expect(drainOf(makeDevot({ power: 3 }))).toBeCloseTo(ATTACK_DRAIN_PER_TICK, 6);
   });
 
-  it("et la victime perd exactement ce que la force de l'agresseur prélève", () => {
+  it("and the victim loses exactly what the attacker's power takes", () => {
     const world = new World();
-    const fort = makeDevot({ power: 5, sight: 1 }, { pos: { x: 0, y: 0, z: 0 } });
-    const victime = makeDevot({}, { godId: "g2", pos: { x: 0.5, y: 0, z: 0 } });
-    world.devots.set(fort.id, fort);
-    world.devots.set(victime.id, victime);
-    applyDecision(fort, { action: "attack", targetId: victime.id }, world);
+    const strong = makeDevot({ power: 5, sight: 1 }, { pos: { x: 0, y: 0, z: 0 } });
+    const victim = makeDevot({}, { godId: "g2", pos: { x: 0.5, y: 0, z: 0 } });
+    world.devots.set(strong.id, strong);
+    world.devots.set(victim.id, victim);
+    applyDecision(strong, { action: "attack", targetId: victim.id }, world);
 
-    const avant = victime.hp;
+    const before = victim.hp;
     tick(world);
-    // Le métabolisme prélève aussi sa part : on vérifie la morsure, pas le total.
-    const perdu = avant - victime.hp;
-    expect(perdu).toBeGreaterThan(drainOf(makeDevot({ power: 3 })));
+    // Metabolism also takes its share: we check the bite, not the total.
+    const lost = before - victim.hp;
+    expect(lost).toBeGreaterThan(drainOf(makeDevot({ power: 3 })));
   });
 });

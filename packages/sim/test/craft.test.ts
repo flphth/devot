@@ -13,9 +13,9 @@ import {
 import { applyDecision, drainOf, sightOf, speedOf, statsOf, World } from "../src/index.js";
 
 /**
- * T5 : forger coûte de la VIE, donc du temps de pensée. Ces tests vérifient les
- * deux choses qui comptent — que le prix est réellement prélevé, et qu'on ne
- * peut pas forger jusqu'au suicide.
+ * T5: forging costs LIFE, and therefore thinking time. These tests cover the two
+ * things that matter — that the price is really taken, and that one cannot forge
+ * oneself to death.
  */
 
 let seq = 0;
@@ -28,7 +28,7 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     pos: { x: 0, y: 0, z: 0 },
     hp: 40_000,
     hpMax: 50_000,
-    state: "vivant",
+    state: "alive",
     profile: "frugal",
     traits: [],
     identityJson: encodeIdentity(defaultIdentity()),
@@ -41,106 +41,106 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
   };
 }
 
-describe("forger — la pensée devient matière", () => {
-  it("prélève exactement le coût de la recette", () => {
+describe("forging — thought becomes matter", () => {
+  it("takes exactly the recipe cost", () => {
     const world = new World();
     const devot = makeDevot({ hp: 40_000 });
-    applyDecision(devot, { action: "craft", item: "lance" }, world);
+    applyDecision(devot, { action: "craft", item: "spear" }, world);
 
-    expect(devot.items).toEqual(["lance"]);
-    expect(devot.hp).toBe(40_000 - RECIPES.lance.cost);
+    expect(devot.items).toEqual(["spear"]);
+    expect(devot.hp).toBe(40_000 - RECIPES.spear.cost);
   });
 
-  it("l'objet renforce vraiment la stat annoncée", () => {
+  it("the item really strengthens the advertised stat", () => {
     const world = new World();
     const nu = makeDevot();
     const arme = makeDevot();
-    applyDecision(arme, { action: "craft", item: "lance" }, world);
+    applyDecision(arme, { action: "craft", item: "spear" }, world);
 
     expect(drainOf(arme)).toBeGreaterThan(drainOf(nu));
-    expect(statsOf(arme).power).toBe(statsOf(nu).power + RECIPES.lance.bonus);
+    expect(statsOf(arme).power).toBe(statsOf(nu).power + RECIPES.spear.bonus);
   });
 
-  it("chaque recette agit sur sa propre stat", () => {
+  it("each recipe acts on its own stat", () => {
     const world = new World();
     const rapide = makeDevot();
     const percant = makeDevot();
-    applyDecision(rapide, { action: "craft", item: "bottes" }, world);
-    applyDecision(percant, { action: "craft", item: "lunette" }, world);
+    applyDecision(rapide, { action: "craft", item: "boots" }, world);
+    applyDecision(percant, { action: "craft", item: "scope" }, world);
 
     expect(speedOf(rapide)).toBeGreaterThan(speedOf(makeDevot()));
     expect(sightOf(percant)).toBeGreaterThan(sightOf(makeDevot()));
   });
 });
 
-describe("forger a des limites, et le serveur les tient", () => {
-  it("on ne forge pas si l'on n'y survivrait pas", () => {
-    // Le cas important : un modèle qui ne comprend pas encore l'économie du
-    // monde forgerait jusqu'à l'épuisement. C'est un suicide déguisé.
-    const pauvre = makeDevot({ hp: CRAFT_HP_FLOOR + RECIPES.bouclier.cost - 1 });
-    const refus = canCraft("bouclier", pauvre.hp, pauvre.items);
+describe("forging has limits, and the server holds them", () => {
+  it("you cannot forge if you would not survive it", () => {
+    // The case that matters: a model that does not yet grasp this world's
+    // economy would forge itself to exhaustion. That is suicide in disguise.
+    const pauvre = makeDevot({ hp: CRAFT_HP_FLOOR + RECIPES.shield.cost - 1 });
+    const refus = canCraft("shield", pauvre.hp, pauvre.items);
     expect(refus).not.toBeNull();
-    expect(refus!.reason).toContain("vivre");
+    expect(refus!.reason).toContain("live on");
 
     const world = new World();
     const avant = pauvre.hp;
-    applyDecision(pauvre, { action: "craft", item: "bouclier" }, world);
-    expect(pauvre.items, "rien n'a été forgé").toEqual([]);
-    expect(pauvre.hp, "et rien n'a été prélevé").toBe(avant);
+    applyDecision(pauvre, { action: "craft", item: "shield" }, world);
+    expect(pauvre.items, "nothing was forged").toEqual([]);
+    expect(pauvre.hp, "and nothing was taken").toBe(avant);
   });
 
-  it("on ne porte pas plus de deux objets", () => {
+  it("you carry no more than two items", () => {
     const world = new World();
     const devot = makeDevot({ hp: 200_000 });
-    applyDecision(devot, { action: "craft", item: "lance" }, world);
-    applyDecision(devot, { action: "craft", item: "bouclier" }, world);
+    applyDecision(devot, { action: "craft", item: "spear" }, world);
+    applyDecision(devot, { action: "craft", item: "shield" }, world);
     const apresDeux = devot.hp;
-    applyDecision(devot, { action: "craft", item: "bottes" }, world);
+    applyDecision(devot, { action: "craft", item: "boots" }, world);
 
     expect(devot.items).toHaveLength(MAX_CARRIED);
-    expect(devot.hp, "le troisième n'a rien coûté puisqu'il est refusé").toBe(apresDeux);
+    expect(devot.hp, "the third cost nothing since it was refused").toBe(apresDeux);
   });
 
-  it("on ne forge pas deux fois le même objet", () => {
+  it("you cannot forge the same item twice", () => {
     const world = new World();
     const devot = makeDevot({ hp: 200_000 });
-    applyDecision(devot, { action: "craft", item: "lance" }, world);
+    applyDecision(devot, { action: "craft", item: "spear" }, world);
     const apres = devot.hp;
-    applyDecision(devot, { action: "craft", item: "lance" }, world);
-    expect(devot.items).toEqual(["lance"]);
+    applyDecision(devot, { action: "craft", item: "spear" }, world);
+    expect(devot.items).toEqual(["spear"]);
     expect(devot.hp).toBe(apres);
   });
 
-  it("un objet inventé est refusé", () => {
+  it("a made-up item is refused", () => {
     const world = new World();
     const devot = makeDevot();
     const avant = devot.hp;
-    applyDecision(devot, { action: "craft", item: "épée laser" as never }, world);
+    applyDecision(devot, { action: "craft", item: "lightsaber" as never }, world);
     expect(devot.items).toEqual([]);
     expect(devot.hp).toBe(avant);
-    expect(canCraft("épée laser", 40_000, [])).not.toBeNull();
+    expect(canCraft("lightsaber", 40_000, [])).not.toBeNull();
   });
 });
 
-describe("le marché est réel", () => {
-  it("porter deux objets coûte une part réelle, mais modeste, d'une vie", () => {
-    // Ce test dit la VÉRITÉ DU MOMENT, et c'est son intérêt : il se lit contre
-    // HP_MAX_DEFAULT, donc il change de sens dès qu'on touche à la réserve.
+describe("the bargain is real", () => {
+  it("carrying two items costs a real, but modest, share of a life", () => {
+    // This test states the TRUTH OF THE MOMENT, and that is the point: it reads
+    // against HP_MAX_DEFAULT, so it changes meaning the moment the pool changes.
     //
-    // Les coûts avaient été calibrés sur 50 000 PV (deux objets = 20 % d'une
-    // vie). La réserve a été triplée à 150 000 : la même paire ne pèse plus que
-    // 6,7 %. La puissance se paie toujours en durée, mais beaucoup moins cher.
-    const total = RECIPES.lance.cost + RECIPES.bouclier.cost;
+    // The costs were calibrated on 50,000 HP (two items = 20% of a life). The
+    // pool was tripled to 150,000: the same pair now weighs only 6.7%. Power is
+    // still paid for in lifespan, but far more cheaply.
+    const total = RECIPES.spear.cost + RECIPES.shield.cost;
     const part = total / HP_MAX_DEFAULT;
     expect(part).toBeGreaterThan(0.05);
-    expect(part, `deux objets coûtent ${(part * 100).toFixed(1)} % d'une vie`).toBeLessThan(0.1);
+    expect(part, `two items cost ${(part * 100).toFixed(1)}% of a life`).toBeLessThan(0.1);
   });
 
-  it("les stats avec objets ne modifient jamais le corps d'origine", () => {
+  it("stats with items never mutate the underlying body", () => {
     const base = defaultIdentity().stats;
-    const avec = statsWithItems(base, ["lance", "bottes"]);
+    const avec = statsWithItems(base, ["spear", "boots"]);
     expect(avec.power).toBe(base.power + 1);
     expect(avec.speed).toBe(base.speed + 1);
-    expect(base.power, "le corps d'origine reste intact").toBe(3);
+    expect(base.power, "the original body stays intact").toBe(3);
   });
 });

@@ -1,7 +1,7 @@
 import { UTTERANCE_MAX_CHARS } from "./constants.js";
 import type { Decision, DecisionAction } from "./types.js";
 
-/** Schéma JSON de la sortie structurée d'une pensée (output_config.format). */
+/** JSON schema for the structured output of a thought (output_config.format). */
 export const DECISION_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -10,32 +10,32 @@ export const DECISION_SCHEMA = {
     action: {
       type: "string",
       enum: ["idle", "move", "eat", "attack", "reproduce", "speak", "flee", "craft"],
-      description: "L'action choisie pour cette pensée.",
+      description: "The action chosen for this thought.",
     },
     thought: {
       type: "string",
       description:
-        "Ton monologue intérieur : une pensée intime à la première personne, une phrase, 140 caractères maximum. Elle aussi te coûte de la vie.",
+        "Your inner monologue: one intimate first-person sentence, 140 characters maximum. It costs you life too.",
     },
     targetId: {
       type: "string",
-      description: "Id du devot ou de la nourriture visé (eat/attack/reproduce).",
+      description: "Id of the targeted devot or food (eat/attack/reproduce).",
     },
     item: {
       type: "string",
-      enum: ["lance", "bouclier", "bottes", "lunette"],
-      description: "Objet à forger si action=craft. Le coût en PV est prélevé sur ta vie.",
+      enum: ["spear", "shield", "boots", "scope"],
+      description: "Item to forge if action=craft. Its HP cost is taken from your life.",
     },
     direction: {
       type: "object",
       additionalProperties: false,
       required: ["x", "z"],
       properties: { x: { type: "number" }, z: { type: "number" } },
-      description: "Direction de déplacement (move/flee), vecteur unitaire approximatif.",
+      description: "Movement direction (move/flee), roughly a unit vector.",
     },
     utterance: {
       type: "string",
-      description: `Parole prononcée si action=speak, ${UTTERANCE_MAX_CHARS} caractères max.`,
+      description: `Words spoken if action=speak, ${UTTERANCE_MAX_CHARS} characters max.`,
     },
     emotion: {
       type: "string",
@@ -55,7 +55,7 @@ const ACTIONS: DecisionAction[] = [
   "craft",
 ];
 
-/** Valide et normalise une décision brute (JSON parsé) ; jette si invalide. */
+/** Validates and normalises a raw decision (parsed JSON); throws if invalid. */
 export function parseDecision(raw: unknown): Decision {
   if (typeof raw !== "object" || raw === null) {
     throw new Error("decision: not an object");
@@ -65,8 +65,8 @@ export function parseDecision(raw: unknown): Decision {
     throw new Error(`decision: invalid action ${String(d.action)}`);
   }
   const decision: Decision = { action: d.action as DecisionAction };
-  // L'objet demandé n'est pas validé ici : c'est le SERVEUR qui décide si la
-  // forge est possible, en connaissant les PV et ce que le devot porte déjà.
+  // The requested item is not validated here: the SERVER decides whether the
+  // forge is possible, knowing the HP and what the devot already carries.
   if (typeof d.item === "string") decision.item = d.item as Decision["item"];
   if (typeof d.targetId === "string") decision.targetId = d.targetId;
   if (

@@ -20,7 +20,7 @@ export const devots = sqliteTable("devots", {
   x: real("x").notNull().default(0),
   y: real("y").notNull().default(0),
   z: real("z").notNull().default(0),
-  state: text("state").notNull().default("vivant"),
+  state: text("state").notNull().default("alive"),
   currentGoal: text("current_goal_json"),
   age: integer("age").notNull().default(0),
   traitsJson: text("traits_json").notNull().default("[]"),

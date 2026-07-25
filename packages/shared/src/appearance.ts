@@ -13,10 +13,10 @@
 
 // ── Emplacements d'apparence ────────────────────────────────────────────────
 
-export const HATS = ["aucun", "bonnet", "large", "casque", "couronne"] as const;
-export const CAPES = ["aucune", "courte", "longue"] as const;
-export const FACES = ["aucun", "lunettes", "masque", "bandeau"] as const;
-export const BUILDS = ["fluet", "normal", "massif"] as const;
+export const HATS = ["none", "cap", "widebrim", "helmet", "crown"] as const;
+export const CAPES = ["none", "short", "long"] as const;
+export const FACES = ["none", "glasses", "mask", "blindfold"] as const;
+export const BUILDS = ["slim", "average", "heavy"] as const;
 
 export type Hat = (typeof HATS)[number];
 export type Cape = (typeof CAPES)[number];
@@ -95,10 +95,10 @@ export const STAT_KEYS = ["vitality", "power", "speed", "sight"] as const;
 export type StatKey = (typeof STAT_KEYS)[number];
 
 export const STAT_LABELS: Record<StatKey, string> = {
-  vitality: "vigueur",
-  power: "force",
-  speed: "vivacité",
-  sight: "vue",
+  vitality: "vigour",
+  power: "power",
+  speed: "swiftness",
+  sight: "sight",
 };
 
 /**
@@ -124,13 +124,13 @@ function clampStat(v: number): number {
 export const DEFAULT_STATS: Stats = { vitality: 3, power: 3, speed: 3, sight: 3 };
 
 export const DEFAULT_APPEARANCE: Appearance = {
-  hat: "aucun",
+  hat: "none",
   shirt: SHIRT_COLORS[3]!,
   pants: PANTS_COLORS[0]!,
-  cape: "aucune",
-  face: "aucun",
+  cape: "none",
+  face: "none",
   skin: SKIN_COLORS[0]!,
-  build: "normal",
+  build: "average",
 };
 
 // ── Validation, côté serveur ────────────────────────────────────────────────
@@ -144,18 +144,18 @@ export interface Rejection {
  * Tout est vérifié : chaque emplacement doit appartenir à sa liste fermée.
  */
 export function validateAppearance(a: unknown): Rejection | null {
-  if (!a || typeof a !== "object") return { reason: "Apparence absente." };
+  if (!a || typeof a !== "object") return { reason: "Missing appearance." };
   const v = a as Record<string, unknown>;
   const inList = (value: unknown, list: readonly string[]): boolean =>
     typeof value === "string" && list.includes(value);
 
-  if (!inList(v.hat, HATS)) return { reason: "Chapeau inconnu." };
-  if (!inList(v.cape, CAPES)) return { reason: "Cape inconnue." };
-  if (!inList(v.face, FACES)) return { reason: "Accessoire de visage inconnu." };
-  if (!inList(v.build, BUILDS)) return { reason: "Corpulence inconnue." };
-  if (!inList(v.shirt, SHIRT_COLORS)) return { reason: "Couleur de t-shirt hors palette." };
-  if (!inList(v.pants, PANTS_COLORS)) return { reason: "Couleur de pantalon hors palette." };
-  if (!inList(v.skin, SKIN_COLORS)) return { reason: "Teinte de peau hors palette." };
+  if (!inList(v.hat, HATS)) return { reason: "Unknown hat." };
+  if (!inList(v.cape, CAPES)) return { reason: "Unknown cape." };
+  if (!inList(v.face, FACES)) return { reason: "Unknown face gear." };
+  if (!inList(v.build, BUILDS)) return { reason: "Unknown build." };
+  if (!inList(v.shirt, SHIRT_COLORS)) return { reason: "Shirt colour outside the palette." };
+  if (!inList(v.pants, PANTS_COLORS)) return { reason: "Trouser colour outside the palette." };
+  if (!inList(v.skin, SKIN_COLORS)) return { reason: "Skin tone outside the palette." };
   return null;
 }
 
@@ -165,23 +165,23 @@ export function validateAppearance(a: unknown): Rejection | null {
  * que la somme doit valoir exactement le budget.
  */
 export function validateStats(s: unknown): Rejection | null {
-  if (!s || typeof s !== "object") return { reason: "Stats absentes." };
+  if (!s || typeof s !== "object") return { reason: "Missing stats." };
   const v = s as Record<string, unknown>;
   let total = 0;
   for (const key of STAT_KEYS) {
     const raw = v[key];
     if (typeof raw !== "number" || !Number.isInteger(raw)) {
-      return { reason: `La stat « ${STAT_LABELS[key]} » doit être un entier.` };
+      return { reason: `Stat "${STAT_LABELS[key]}" must be a whole number.` };
     }
     if (raw < STAT_MIN || raw > STAT_MAX) {
       return {
-        reason: `« ${STAT_LABELS[key]} » doit être entre ${STAT_MIN} et ${STAT_MAX}.`,
+        reason: `"${STAT_LABELS[key]}" must be between ${STAT_MIN} and ${STAT_MAX}.`,
       };
     }
     total += raw;
   }
   if (total !== STAT_BUDGET) {
-    return { reason: `Le total des stats doit valoir exactement ${STAT_BUDGET} (reçu ${total}).` };
+    return { reason: `Stats must total exactly ${STAT_BUDGET} (received ${total}).` };
   }
   return null;
 }
@@ -355,24 +355,24 @@ export function normalizeToBudget(values: readonly number[]): Stats {
 
 /** Nom courant d'une couleur : « écarlate » parle au modèle, « #e0634c » non. */
 const COLOR_NAMES: Record<string, string> = {
-  "#e0634c": "écarlate",
-  "#e0b34c": "safran",
-  "#7dbc5e": "vert mousse",
-  "#4ca6e0": "bleu ciel",
+  "#e0634c": "scarlet",
+  "#e0b34c": "saffron",
+  "#7dbc5e": "moss green",
+  "#4ca6e0": "sky blue",
   "#9c4ce0": "violet",
-  "#e04c8f": "rose vif",
-  "#e8e4d8": "écru",
-  "#3a4150": "ardoise",
-  "#2f3542": "anthracite",
-  "#4a4f57": "gris fer",
-  "#6b5844": "brun",
-  "#3a5a40": "vert sombre",
-  "#5a3a4a": "prune",
-  "#8a8f98": "gris clair",
+  "#e04c8f": "bright pink",
+  "#e8e4d8": "ecru",
+  "#3a4150": "slate",
+  "#2f3542": "charcoal",
+  "#4a4f57": "iron grey",
+  "#6b5844": "brown",
+  "#3a5a40": "dark green",
+  "#5a3a4a": "plum",
+  "#8a8f98": "pale grey",
 };
 
 export function colorName(hex: string): string {
-  return COLOR_NAMES[hex] ?? "d'une teinte indéfinissable";
+  return COLOR_NAMES[hex] ?? "an indefinable shade";
 }
 
 /**
@@ -384,11 +384,11 @@ export function colorName(hex: string): string {
  * règle ne l'impose — mais encore faut-il qu'il puisse le voir.
  */
 export function describeAppearance(a: Appearance): string {
-  const parts: string[] = [`de corpulence ${a.build}`, `t-shirt ${colorName(a.shirt)}`];
-  if (a.hat !== "aucun") parts.push(`coiffé d'un chapeau ${a.hat}`);
-  if (a.cape !== "aucune") parts.push(`portant une cape ${a.cape}`);
-  if (a.face !== "aucun") {
-    parts.push(a.face === "lunettes" ? "des lunettes sur le nez" : `le visage barré d'un ${a.face}`);
+  const parts: string[] = [`${a.build} build`, `${colorName(a.shirt)} shirt`];
+  if (a.hat !== "none") parts.push(`wearing a ${a.hat}`);
+  if (a.cape !== "none") parts.push(`a ${a.cape} cape on their back`);
+  if (a.face !== "none") {
+    parts.push(a.face === "glasses" ? "glasses on their nose" : `a ${a.face} across their face`);
   }
   return parts.join(", ");
 }
@@ -396,5 +396,5 @@ export function describeAppearance(a: Appearance): string {
 /** Allure d'un devot dont on n'a que l'identité sérialisée. */
 export function describeIdentity(identityJson: string): string {
   const identity = decodeIdentity(identityJson);
-  return identity ? describeAppearance(identity.appearance) : "d'allure ordinaire";
+  return identity ? describeAppearance(identity.appearance) : "of unremarkable appearance";
 }

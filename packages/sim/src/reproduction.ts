@@ -38,19 +38,19 @@ export function resolveReproduction(
   partnerId: string | undefined,
   rng: () => number = Math.random,
 ): Birth | ReproFailure {
-  if (parent.state === "mort") return { reason: "mort" };
+  if (parent.state === "dead") return { reason: "dead" };
   if (parent.hp < REPRO_MIN_HP) {
-    return { reason: "trop faible pour procréer" };
+    return { reason: "too weak to procreate" };
   }
 
   const partner = partnerId ? world.devots.get(partnerId) : undefined;
 
   if (partner && partner.id !== parent.id) {
     // Reproduction sexuée — y compris entre lignées de dieux différents.
-    if (partner.state === "mort") return { reason: "partenaire mort" };
+    if (partner.state === "dead") return { reason: "partenaire mort" };
     if (partner.hp < REPRO_MIN_HP) return { reason: "partenaire trop faible" };
     if (dist2(parent.pos, partner.pos) > REPRO_RADIUS * REPRO_RADIUS) {
-      return { reason: "partenaire trop éloigné" };
+      return { reason: "partner too far away" };
     }
     const costA = parent.hp * REPRO_PAIR_COST_FRACTION;
     const costB = partner.hp * REPRO_PAIR_COST_FRACTION;
@@ -103,7 +103,7 @@ function makeChild(
     // Ses PV maximaux découlent de la vigueur héritée, pas de celle du parent
     // le mieux doté : un enfant frêle de parents robustes reste frêle.
     hpMax: Math.round(HP_MAX_DEFAULT * statMultiplier(identity.stats.vitality)),
-    state: "vivant",
+    state: "alive",
     profile: a.profile,
     traits,
     identityJson: encodeIdentity(identity),

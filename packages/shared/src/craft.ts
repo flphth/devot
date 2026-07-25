@@ -13,7 +13,7 @@ import type { StatKey, Stats } from "./appearance.js";
  * fondateur au lieu d'y greffer une économie parallèle.
  */
 
-export const ITEM_KINDS = ["lance", "bouclier", "bottes", "lunette"] as const;
+export const ITEM_KINDS = ["spear", "shield", "boots", "scope"] as const;
 export type ItemKind = (typeof ITEM_KINDS)[number];
 
 export interface Recipe {
@@ -41,33 +41,33 @@ export interface Recipe {
  * une décision courante plutôt qu'un sacrifice.
  */
 export const RECIPES: Record<ItemKind, Recipe> = {
-  lance: {
-    kind: "lance",
+  spear: {
+    kind: "spear",
     cost: 4_000,
     stat: "power",
     bonus: 1,
-    description: "une lance : tu frappes plus fort, mais tu as payé de ta vie pour la tailler",
+    description: "a spear: you strike harder, but you paid with your life to carve it",
   },
-  bouclier: {
-    kind: "bouclier",
+  shield: {
+    kind: "shield",
     cost: 6_000,
     stat: "vitality",
     bonus: 1,
-    description: "un bouclier : tu encaisses davantage, au prix d'une part de ton existence",
+    description: "a shield: you endure more, at the cost of part of your existence",
   },
-  bottes: {
-    kind: "bottes",
+  boots: {
+    kind: "boots",
     cost: 3_000,
     stat: "speed",
     bonus: 1,
-    description: "des bottes : tu vas plus vite, et tu as vendu du temps de pensée pour cela",
+    description: "boots: you move faster, and you sold thinking time for it",
   },
-  lunette: {
-    kind: "lunette",
+  scope: {
+    kind: "scope",
     cost: 3_500,
     stat: "sight",
     bonus: 1,
-    description: "une lunette : tu vois plus loin, donc tu as plus à penser — et moins pour le faire",
+    description: "a scope: you see further, so you have more to think about — and less life to do it",
   },
 };
 
@@ -105,16 +105,16 @@ export function canCraft(
   carried: readonly ItemKind[],
 ): CraftRejection | null {
   const recipe = recipeOf(kind);
-  if (!recipe) return { reason: "Cet objet n'existe pas." };
+  if (!recipe) return { reason: "No such item." };
   if (carried.length >= MAX_CARRIED) {
-    return { reason: `Tu portes déjà ${MAX_CARRIED} objets ; il faudrait en abandonner un.` };
+    return { reason: `You already carry ${MAX_CARRIED} items; you would have to drop one.` };
   }
   if (carried.includes(recipe.kind)) {
-    return { reason: `Tu portes déjà ${recipe.kind === "bottes" ? "des" : "un"} ${recipe.kind}.` };
+    return { reason: `You already carry a ${recipe.kind}.` };
   }
   if (hp - recipe.cost < CRAFT_HP_FLOOR) {
     return {
-      reason: `Forger ${recipe.kind} coûte ${recipe.cost} PV, et il t'en resterait trop peu pour vivre.`,
+      reason: `Forging a ${recipe.kind} costs ${recipe.cost} HP, and too little would remain to live on.`,
     };
   }
   return null;
@@ -133,20 +133,20 @@ export function statsWithItems(base: Stats, carried: readonly ItemKind[]): Stats
 
 /** Ce que le devot porte, en français, pour son prompt et pour les autres. */
 export function describeItems(carried: readonly ItemKind[]): string {
-  if (carried.length === 0) return "les mains nues";
-  return carried.join(" et ");
+  if (carried.length === 0) return "empty-handed";
+  return carried.join(" and ");
 }
 
 /** Les recettes telles qu'on les explique au modèle. Sans cela, il ne forgera jamais. */
 export function craftRulesForPrompt(): string {
   const lines = ITEM_KINDS.map((k) => {
     const r = RECIPES[k];
-    return `- ${r.kind} (${r.cost} PV) : ${r.description}`;
+    return `- ${r.kind} (${r.cost} HP): ${r.description}`;
   });
   return [
-    "Tu peux FORGER un objet avec l'action \"craft\". Il n'y a pas de matière première :",
-    "la matière, c'est ta vie. Forger prélève des PV, donc du temps de pensée.",
+    'You can FORGE an item with the "craft" action. There is no raw material in',
+    "this world: the material is your life. Forging takes HP, so it takes thinking time.",
     ...lines,
-    `Tu ne peux porter que ${MAX_CARRIED} objets, et tu dois rester au-dessus de ${CRAFT_HP_FLOOR} PV.`,
+    `You may carry only ${MAX_CARRIED} items, and you must stay above ${CRAFT_HP_FLOOR} HP.`,
   ].join("\n");
 }
