@@ -11,7 +11,7 @@ export interface Receipt {
 export interface PaymentProvider {
   /** Creation / re-creation of a founder devot. */
   chargeDevotCreation(godId: string): Promise<Receipt>;
-  /** Don de nourriture. */
+  /** Gift of food. */
   chargeFeed(godId: string): Promise<Receipt>;
 }
 
