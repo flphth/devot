@@ -25,7 +25,8 @@ import {
   VOID,
   WATER,
   WATER_EVAPORATION_CHANCE,
-  BIOMASS_SPAWN_CHANCE,
+  BIOMASS_SPAWN_CHANCE_DRY,
+  BIOMASS_SPAWN_CHANCE_WET,
 } from "./constants.js";
 import { hash32 } from "./rng.js";
 import { NEIGHBOR_DX, NEIGHBOR_DY, NEIGHBOR_DZ, VoxelWorld } from "./world.js";
@@ -57,6 +58,7 @@ export function passTerrain(w: VoxelWorld): void {
   const tick = w.tick;
   const seed = w.seed;
   const energyDelta = w.energyDelta;
+  const eatenTotal = w.eaten;
 
   // Au-dessus de la borne active il n'y a que du vide : un memset suffit,
   // au lieu de visiter des centaines de milliers de voxels d'air.
@@ -106,9 +108,10 @@ export function passTerrain(w: VoxelWorld): void {
             const taken = remaining < MOUTH_INTAKE_PER_TICK ? remaining : MOUTH_INTAKE_PER_TICK;
             remaining -= taken;
             // Somme d'entiers : indépendante de l'ordre (atomicAdd sur GPU).
-            energyDelta[eater] =
-              energyDelta[eater]! +
-              (((taken * MOUTH_EFFICIENCY_NUM) / MOUTH_EFFICIENCY_DEN) | 0);
+            const gained = ((taken * MOUTH_EFFICIENCY_NUM) / MOUTH_EFFICIENCY_DEN) | 0;
+            energyDelta[eater] = energyDelta[eater]! + gained;
+            // Mesure d'émergence : combien cet organisme a réellement ingéré.
+            eatenTotal[eater] = eatenTotal[eater]! + gained;
           }
           // Décomposition naturelle.
           remaining -= NUTRIENT_DECAY;
@@ -236,15 +239,18 @@ function nextForSupportedVoid(
     if (give >= 0 && LAT_OPPOSITE[give]! === pick) return WATER;
   }
 
-  // 2. La biomasse pousse sur roche ou biomasse, à portée d'eau.
+  // 2. La biomasse pousse sur roche ou biomasse. L'eau à proximité accélère
+  //    fortement la pousse, mais le sol sec reste fertile — sans quoi le monde
+  //    serait stérile partout sauf sur les rives.
   if (below !== ROCK && below !== BIOMASS) return VOID;
-  if ((hash32(i, tick, seed ^ 0x2) & 0xffff) >= BIOMASS_SPAWN_CHANCE) return VOID;
+  const roll = hash32(i, tick, seed ^ 0x2) & 0xffff;
+  if (roll >= BIOMASS_SPAWN_CHANCE_WET) return VOID; // écarte le cas fréquent d'abord
   for (let d = 0; d < 6; d++) {
     if (matAt(w, x + NEIGHBOR_DX[d]!, y + NEIGHBOR_DY[d]!, z + NEIGHBOR_DZ[d]!) === WATER) {
       return BIOMASS;
     }
   }
-  return VOID;
+  return roll < BIOMASS_SPAWN_CHANCE_DRY ? BIOMASS : VOID;
 }
 
 /** Première bouche adjacente, dans l'ordre de voisinage fixe (déterminisme). */
@@ -300,8 +306,9 @@ export function passGrowth(w: VoxelWorld): void {
     const id = w.aliveIds[a]!;
     if (w.energy[id]! - GROWTH_COST < GROWTH_ENERGY_FLOOR) continue;
 
-    const plan = w.plans[w.planId[id]!];
-    if (!plan) continue;
+    const genome = w.orgGenome[id];
+    if (!genome) continue;
+    const plan = genome.body;
     const cursor = w.growthCursor[id]!;
     const seedI = w.seedIdx[id]!;
     const sx = w.xOf(seedI);

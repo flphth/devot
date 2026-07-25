@@ -9,7 +9,9 @@
   },
   "scripts": {
     "bench": "tsx bench/bench.ts",
-    "demo": "tsx bench/demo.ts"
+    "demo": "tsx bench/demo.ts",
+    "evolve": "tsx bench/evolve.ts",
+    "evolve:multi": "tsx bench/evolve-multi.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.0"

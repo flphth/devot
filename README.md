@@ -7,13 +7,21 @@
 > le monde voxel prenne sa place.
 >
 > ```sh
-> pnpm sim:demo    # démo headless du noyau voxel (morphogenèse, mort, déterminisme)
-> pnpm sim:bench   # benchmark ms/tick — le chiffre qui pilote les décisions d'échelle
+> pnpm sim:demo          # démo headless : morphogenèse, amputation, mort, déterminisme
+> pnpm sim:bench         # benchmark ms/tick — le chiffre qui pilote les décisions d'échelle
+> pnpm sim:evolve        # un monde, N ticks : générations, ingestion, corps
+> pnpm sim:evolve:multi  # plusieurs mondes : la mesure d'évolution qui compte
 > ```
 >
-> Noyau P5.0 mesuré ici : **3,5 ms/tick** sur 128×32×128 (150 Mvoxels/s, ~288
-> ticks/s). Le monde commun n'a donc pas besoin de GPU ; le laboratoire, si —
-> c'est exactement le découpage prévu.
+> **Noyau (P5.0)** : ~4 ms/tick sur 128×32×128 (≈140 Mvoxels/s, ~250 ticks/s).
+> Le monde commun n'a donc pas besoin de GPU ; le laboratoire à ×1000, si —
+> exactement le découpage prévu.
+>
+> **Évolution (P5.1)** : sur 8 mondes indépendants de 8 000 ticks,
+> **7 mondes sur 8 s'améliorent**, écart moyen **+109 %** d'ingestion entre
+> générations basses et hautes (médiane +85 %). La dispersion d'un monde à
+> l'autre est forte — c'est la tendance agrégée qui fait preuve, jamais un run
+> isolé.
 
 > Un jeu où vous êtes un dieu, et vos fidèles sont de véritables agents Claude.
 > Penser leur coûte la vie. Voir [`PLAN.md`](./PLAN.md) (game design) et

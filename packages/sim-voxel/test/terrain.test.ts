@@ -133,10 +133,22 @@ describe("biomasse", () => {
     expect(countMaterial(w, BIOMASS)).toBeGreaterThan(0);
   });
 
-  it("ne pousse pas sans eau", () => {
-    const w = flatWorld();
-    stepN(w, 200);
-    expect(countMaterial(w, BIOMASS)).toBe(0);
+  it("pousse beaucoup plus vite près de l'eau que sur sol sec", () => {
+    // Le gradient de fertilité est ce qui crée la pression sélective : sans
+    // lui, la nourriture est partout et l'évolution choisit l'immobilité.
+    const dry = flatWorld();
+    stepN(dry, 200);
+    const dryCount = countMaterial(dry, BIOMASS);
+
+    const wet = flatWorld();
+    for (let x = 0; x < 128; x += 4) {
+      for (let z = 0; z < 128; z += 4) wet.setMaterial(wet.idx(x, 1, z), WATER);
+    }
+    stepN(wet, 200);
+    const wetCount = countMaterial(wet, BIOMASS) - countMaterial(wet, WATER) * 0;
+
+    expect(dryCount).toBeGreaterThan(0); // le sol sec n'est pas stérile
+    expect(wetCount).toBeGreaterThan(dryCount * 2); // mais les rives sont riches
   });
 
   it("se décompose seule et finit par disparaître", () => {

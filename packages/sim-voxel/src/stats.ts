@@ -1,4 +1,4 @@
-import { ALIVE, BIOMASS, MAX_ORGANISMS, VOXEL_COUNT, WATER } from "./constants.js";
+import { ALIVE, BIOMASS, EYE, MAX_ORGANISMS, VOXEL_COUNT, WATER } from "./constants.js";
 import { hash32 } from "./rng.js";
 import { VoxelWorld } from "./world.js";
 
@@ -28,9 +28,18 @@ export interface WorldStats {
   totalBodyVoxels: number;
   avgBodyVoxels: number;
   maxGeneration: number;
+  avgGeneration: number;
   biomassVoxels: number;
   biomassNutrient: number;
   waterVoxels: number;
+  /** Mesures d'émergence : aucune fitness n'est imposée, on observe. */
+  avgNeurons: number;
+  avgMouths: number;
+  avgMuscles: number;
+  avgEyes: number;
+  /** Énergie ingérée par tick de vie, moyennée sur les vivants. */
+  avgIntakeRate: number;
+  avgDistance: number;
 }
 
 export function collectStats(w: VoxelWorld): WorldStats {
@@ -38,13 +47,30 @@ export function collectStats(w: VoxelWorld): WorldStats {
   let totalEnergy = 0;
   let totalBody = 0;
   let maxGen = 0;
+  let sumGen = 0;
+  let sumNeurons = 0;
+  let sumMouths = 0;
+  let sumMuscles = 0;
+  let sumEyes = 0;
+  let sumIntakeRate = 0;
+  let sumDistance = 0;
   for (let id = 1; id < MAX_ORGANISMS; id++) {
     if (w.orgState[id] !== ALIVE) continue;
     population++;
     totalEnergy += w.energy[id]!;
     totalBody += w.bodyLen[id]!;
-    if (w.generation[id]! > maxGen) maxGen = w.generation[id]!;
+    const gen = w.generation[id]!;
+    sumGen += gen;
+    if (gen > maxGen) maxGen = gen;
+    sumNeurons += w.neuronCount[id]!;
+    sumMouths += w.mouthCount[id]!;
+    sumMuscles += w.muscleCount[id]!;
+    sumEyes += countEyes(w, id);
+    const age = w.tick - w.bornTick[id]!;
+    if (age > 0) sumIntakeRate += w.eaten[id]! / age;
+    sumDistance += w.distance[id]!;
   }
+  const per = (v: number): number => (population === 0 ? 0 : v / population);
 
   let biomassVoxels = 0;
   let biomassNutrient = 0;
@@ -64,8 +90,23 @@ export function collectStats(w: VoxelWorld): WorldStats {
     totalBodyVoxels: totalBody,
     avgBodyVoxels: population === 0 ? 0 : totalBody / population,
     maxGeneration: maxGen,
+    avgGeneration: per(sumGen),
     biomassVoxels,
     biomassNutrient,
     waterVoxels,
+    avgNeurons: per(sumNeurons),
+    avgMouths: per(sumMouths),
+    avgMuscles: per(sumMuscles),
+    avgEyes: per(sumEyes),
+    avgIntakeRate: per(sumIntakeRate),
+    avgDistance: per(sumDistance),
   };
+}
+
+function countEyes(w: VoxelWorld, id: number): number {
+  const base = w.bodySlot(id);
+  const len = w.bodyLen[id]!;
+  let n = 0;
+  for (let k = 0; k < len; k++) if (w.material[w.bodyList[base + k]!] === EYE) n++;
+  return n;
 }

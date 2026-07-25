@@ -64,8 +64,13 @@ UPKEEP[NEURON] = 8;
 
 /** Surcoût d'une contraction musculaire (P5.1 : piloté par le cerveau). */
 export const MUSCLE_CONTRACTION_COST = 30;
-/** Surcoût d'une pensée par voxel neurone (P5.1). */
-export const NEURON_THINKING_COST = 40;
+/**
+ * Surcoût d'une pensée par voxel neurone. Trois fois l'entretien d'un os :
+ * penser coûte cher, mais pas au point que l'évolution ne sélectionne JAMAIS
+ * de cerveau — sans quoi « la morphologie détermine l'intelligence » resterait
+ * un principe sans effet observable.
+ */
+export const NEURON_THINKING_COST = 12;
 
 /** Capacité énergétique : base + apport de chaque voxel réserve. */
 export const CAPACITY_BASE = 40_000;
@@ -77,18 +82,44 @@ export const MOUTH_EFFICIENCY_NUM = 4;
 export const MOUTH_EFFICIENCY_DEN = 5; // 80 % — le reste est dissipé
 
 /** Coût énergétique de faire pousser un voxel de tissu. */
-export const GROWTH_COST = 3_000;
-/** Un organisme ne pousse que s'il garde cette réserve après le coût. */
-export const GROWTH_ENERGY_FLOOR = 12_000;
+export const GROWTH_COST = 1_200;
+/**
+ * Un organisme ne pousse que s'il garde cette réserve après le coût.
+ * Doit rester BIEN en dessous de l'énergie héritée par un nouveau-né : le germe
+ * est un voxel d'os sans bouche, donc incapable de manger avant d'avoir poussé.
+ * Un plancher trop haut créait un blocage mortel — le nouveau-né ne pouvait ni
+ * grandir ni s'alimenter, et toute la descendance mourait.
+ */
+export const GROWTH_ENERGY_FLOOR = 2_500;
 
 /** À la mort, l'énergie restante + une part du corps deviennent de la biomasse. */
 export const CORPSE_NUTRIENT_PER_VOXEL = 12_000;
 
+/** Reproduction : coût fixe de l'acte, puis part transmise à l'enfant (‰). */
+export const REPRO_COST = 2_500;
+export const REPRO_CHILD_SHARE = 400; // 40 % de ce qui reste après le coût
+/**
+ * Dotation minimale d'un nouveau-né. En dessous, l'enfant ne peut pas pousser
+ * assez de tissu pour se nourrir et meurt sans descendance : se reproduire
+ * dans la misère condamnait toute la lignée. Un parent trop pauvre attend
+ * donc — c'est une pression sélective en faveur des bien nourris.
+ */
+export const MIN_CHILD_ENERGY = 9_000;
+
 // ── Terrain ─────────────────────────────────────────────────────────────────
 /** Hauteur du socle rocheux (y < GROUND_Y est de la roche). */
 export const GROUND_Y = 4;
-/** Probabilité (sur 2^16) qu'un voxel éligible fasse pousser de la biomasse. */
-export const BIOMASS_SPAWN_CHANCE = 900;
+/**
+ * Probabilité (sur 2^16) qu'une surface fasse pousser de la biomasse.
+ * Couverture d'équilibre ≈ p × durée de vie de la biomasse.
+ *
+ * L'écart entre les deux valeurs est ce qui crée une PRESSION SÉLECTIVE : les
+ * rives sont riches, l'intérieur presque stérile. Sans ce gradient, la
+ * nourriture est partout et l'évolution choisit l'immobilité — les muscles,
+ * les yeux et le cerveau ne servent alors à rien et disparaissent.
+ */
+export const BIOMASS_SPAWN_CHANCE_WET = 900;
+export const BIOMASS_SPAWN_CHANCE_DRY = 5;
 /** Probabilité (sur 2^16) qu'une flaque d'eau s'évapore. */
 export const WATER_EVAPORATION_CHANCE = 12;
 

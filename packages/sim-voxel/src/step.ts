@@ -1,4 +1,5 @@
 import { MAX_ORGANISMS } from "./constants.js";
+import { passBrain, passMove, passReproduce } from "./behaviour.js";
 import {
   applyEnergy,
   passConnectivity,
@@ -17,10 +18,12 @@ import { VoxelWorld } from "./world.js";
  * 2. remettre les deltas d'énergie à zéro
  * 3. passe terrain fusionnée (eau, biomasse, alimentation) → ping-pong
  * 4. métabolisme (coût d'entretien voxel par voxel)
- * 5. appliquer les deltas
- * 6. mort et décomposition
- * 7. connexité — les blessures se règlent AVANT la réparation
- * 8. morphogenèse (croissance ou cicatrisation)
+ * 5. perception et décision (le cerveau ; penser prélève son coût)
+ * 6. appliquer les deltas
+ * 7. mort et décomposition
+ * 8. connexité — les blessures se règlent AVANT la réparation
+ * 9. morphogenèse (croissance ou cicatrisation)
+ * 10. déplacement, puis reproduction
  *
  * L'ordre 7 avant 8 est essentiel : dans l'autre sens, la cicatrisation
  * repousserait le voxel détruit dans le même tick et un membre ne serait
@@ -34,10 +37,13 @@ export function step(w: VoxelWorld): void {
   w.swapBuffers();
 
   passMetabolism(w);
+  passBrain(w);
   applyEnergy(w);
   passDeath(w);
   passConnectivity(w);
   passGrowth(w);
+  passMove(w);
+  passReproduce(w);
 
   w.tick++;
 }

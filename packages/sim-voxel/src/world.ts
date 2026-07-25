@@ -10,6 +10,7 @@ import {
   DEAD,
   GROUND_Y,
   MAX_BODY_VOXELS,
+  MAX_NEURON_VOXELS,
   MAX_ORGANISMS,
   NEURON,
   NO_OWNER,
@@ -24,6 +25,7 @@ import {
   VOXEL_COUNT,
   WATER,
 } from "./constants.js";
+import { NUM_INPUTS, NUM_OUTPUTS, type Genome } from "./genome.js";
 import { SeededRng } from "./rng.js";
 
 /**
@@ -61,10 +63,25 @@ export class VoxelWorld {
   readonly orgState: Uint8Array;
   /** Rang du prochain voxel du plan de corps à faire pousser. */
   readonly growthCursor: Uint16Array;
-  /** Index du plan de corps dans le registre (voir `plans`). */
-  readonly planId: Uint16Array;
   /** Un voxel a été détruit → la connexité doit être revérifiée. */
   readonly damaged: Uint8Array;
+
+  // ── Génome et cerveau ─────────────────────────────────────────────────────
+  /**
+   * Génome de chaque organisme, indexé par id (donc borné : l'emplacement d'un
+   * mort est réécrit à la naissance suivante — pas de fuite sur 100 000
+   * générations).
+   */
+  readonly orgGenome: Array<Genome | undefined>;
+  /** Intentions issues du cerveau, consommées par les passes du même tick. */
+  readonly intentDir: Int8Array;
+  readonly intentRepro: Uint8Array;
+  readonly intentAttack: Uint8Array;
+
+  // ── Mesures par organisme (émergence, sans fitness imposée) ───────────────
+  readonly bornTick: Int32Array;
+  readonly eaten: Int32Array;
+  readonly distance: Int32Array;
 
   /**
    * Voxels de chaque organisme, en tranches de MAX_BODY_VOXELS.
@@ -85,8 +102,16 @@ export class VoxelWorld {
   /** Delta d'énergie par organisme : somme d'entiers, donc indépendante de l'ordre. */
   readonly energyDelta: Int32Array;
 
-  /** Registre des plans de corps (hors boucle chaude). */
-  readonly plans: BodyPlan[] = [];
+  /** Modèles réutilisables (populations de départ, semis du laboratoire). */
+  readonly templates: Genome[] = [];
+
+  // ── Tampons du cerveau, réutilisés à chaque évaluation ────────────────────
+  readonly senseBuf = new Int32Array(NUM_INPUTS);
+  readonly hiddenBuf = new Int32Array(MAX_NEURON_VOXELS);
+  readonly outBuf = new Int32Array(NUM_OUTPUTS);
+  /** Cibles d'une translation de corps (déplacement en deux temps). */
+  readonly moveTargets: Int32Array;
+  readonly moveMats: Uint8Array;
 
   tick = 0;
   readonly seed: number;
@@ -124,13 +149,21 @@ export class VoxelWorld {
     this.seedIdx = new Int32Array(MAX_ORGANISMS);
     this.orgState = new Uint8Array(MAX_ORGANISMS);
     this.growthCursor = new Uint16Array(MAX_ORGANISMS);
-    this.planId = new Uint16Array(MAX_ORGANISMS);
     this.damaged = new Uint8Array(MAX_ORGANISMS);
+    this.orgGenome = new Array<Genome | undefined>(MAX_ORGANISMS);
+    this.intentDir = new Int8Array(MAX_ORGANISMS);
+    this.intentRepro = new Uint8Array(MAX_ORGANISMS);
+    this.intentAttack = new Uint8Array(MAX_ORGANISMS);
+    this.bornTick = new Int32Array(MAX_ORGANISMS);
+    this.eaten = new Int32Array(MAX_ORGANISMS);
+    this.distance = new Int32Array(MAX_ORGANISMS);
 
     this.bodyList = new Int32Array(MAX_ORGANISMS * MAX_BODY_VOXELS);
     this.bodyLen = new Uint16Array(MAX_ORGANISMS);
     this.aliveIds = new Uint16Array(MAX_ORGANISMS);
 
+    this.moveTargets = new Int32Array(MAX_BODY_VOXELS);
+    this.moveMats = new Uint8Array(MAX_BODY_VOXELS);
     this.bfsQueue = new Int32Array(MAX_BODY_VOXELS);
     this.reached = new Uint8Array(VOXEL_COUNT);
     this.energyDelta = new Int32Array(MAX_ORGANISMS);

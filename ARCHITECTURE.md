@@ -69,8 +69,8 @@ devot/
 │  ├─ client/          # Vite + React + R3F : laboratoire ET vue du monde
 │  └─ server/          # Colyseus : monde commun autoritaire
 ├─ packages/
-│  ├─ sim-voxel/       # LE NOYAU — grille, métabolisme, morphogenèse, passes
-│  ├─ genome/          # génome : encodage, mutation, validation (P5.1)
+│  ├─ sim-voxel/       # LE NOYAU — grille, métabolisme, morphogenèse, passes,
+│  │                   #   ET le génome + le cerveau (voir §4.5)
 │  ├─ shared/          # types réseau, DTO, protocole dérivé
 │  ├─ agents/          # esprits Claude des éveillés (P5.5)
 │  ├─ db/              # Drizzle + SQLite
@@ -138,13 +138,19 @@ déterministe ni portable sur GPU.
 
 | Passe | Nature | Effet |
 | --- | --- | --- |
-| `passWater` | cellulaire | l'eau tombe, s'étale, s'accumule |
-| `passBiomass` | cellulaire | la biomasse pousse près de l'eau, se décompose seule |
-| `passMetabolism` | réduction par organisme | somme les coûts et gains voxel par voxel |
-| `passMouth` | cellulaire + réduction | les bouches convertissent la biomasse au contact |
-| `passGrowth` | par organisme | ajoute un voxel selon le plan de corps, si l'énergie suit |
-| `passConnectivity` | parcours depuis le germe | ampute ce qui est déconnecté → biomasse morte |
+| `passTerrain` | cellulaire (fusionnée) | eau, pousse et décomposition de la biomasse, alimentation des bouches — **une seule traversée** de la grille |
+| `passMetabolism` | réduction par organisme | somme l'entretien voxel par voxel |
+| `passBrain` | par organisme | perception, décision, et prélèvement du coût de la pensée |
 | `passDeath` | par organisme | énergie ≤ 0 → tout le corps devient biomasse riche |
+| `passConnectivity` | parcours depuis le germe | ampute ce qui est déconnecté → biomasse morte |
+| `passGrowth` | par organisme | croissance ou cicatrisation d'un voxel, si l'énergie suit |
+| `passMove` | par organisme | translation du corps entier, payée par les muscles |
+| `passReproduce` | par organisme | enfant au génome muté, doté d'une part de l'énergie |
+
+L'ordre compte et fait partie du contrat : `passConnectivity` **avant**
+`passGrowth`, sinon la cicatrisation réparerait la blessure dans le même tick et
+aucun membre ne serait jamais perdu. La passe terrain est fusionnée pour ne
+traverser la grille qu'une fois — c'est ce qui tient le tick à 4 ms.
 
 ### 4.4 Déterminisme
 
@@ -159,7 +165,26 @@ Non négociable, parce que c'est la condition de l'équivalence labo ↔ monde.
   détail d'implémentation.
 - Un **hachage d'état** (`worldHash`) permet de comparer deux runs en un nombre.
 
-### 4.5 Chunks
+### 4.5 Génome et cerveau — dans le noyau, pas à côté
+
+Le génome (plan de corps, poids du cerveau, paramètres) et l'évaluation du
+cerveau vivent **dans `sim-voxel`**, et non dans un package séparé comme prévu
+initialement. Raison : ce sont des **règles de simulation**. Si le laboratoire
+et le monde décodaient un génome ou évaluaient un cerveau différemment, la
+championne du laboratoire se comporterait autrement dans le monde — exactement
+le risque contre lequel tout ce découpage est construit. La validation d'un
+génome reçu d'un client est dans le même module, pour que serveur et client
+appliquent littéralement le même prédicat.
+
+Le **cerveau** est un petit réseau dont la couche cachée est dimensionnée par
+le nombre de voxels neurone. Entrées : énergie relative, gradients de
+nourriture et d'organismes dans les quatre directions latérales (nuls si le
+corps n'a pas d'œil), contact bouche ↔ biomasse. Sorties : quatre directions de
+déplacement, reproduction, attaque. Tout est en **virgule fixe entière** — même
+raison que l'énergie (§4.1). Perdre ses neurones rend bête, les faire repousser
+rend à nouveau intelligent : la capacité est relue à chaque tick depuis le corps.
+
+### 4.6 Chunks
 
 Le noyau travaille sur la grille à plat ; le découpage en **chunks 16³**
 (8×2×8 = 128 chunks) sert deux usages en aval : la version par chunk pour
