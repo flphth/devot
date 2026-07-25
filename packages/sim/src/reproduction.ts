@@ -1,5 +1,6 @@
 import type { DevotEntity } from "@devot/shared";
 import {
+  HP_MAX_DEFAULT,
   REPRO_MIN_HP,
   REPRO_PAIR_COST_FRACTION,
   REPRO_RADIUS,
@@ -10,6 +11,7 @@ import {
   defaultIdentity,
   encodeIdentity,
   inheritIdentity,
+  statMultiplier,
 } from "@devot/shared";
 import { dist2, World } from "./world.js";
 
@@ -76,6 +78,15 @@ function makeChild(
     b ? mixTraits(a.traits, b.traits, rng) : [...a.traits],
     rng,
   );
+  // L'enfant hérite de l'allure ET des stats de ses parents : on reconnaît une
+  // famille à l'écran, et une lignée finit par avoir un tempérament physique.
+  const identity = inheritIdentity(
+    decodeIdentity(a.identityJson) ?? defaultIdentity(a.traits),
+    b ? (decodeIdentity(b.identityJson) ?? defaultIdentity(b.traits)) : undefined,
+    traits,
+    rng,
+  );
+
   // Suzeraineté (question ouverte du design) : l'enfant naît sous le dieu
   // du parent initiateur — son allégeance réelle reste un ressort narratif.
   return {
@@ -89,20 +100,13 @@ function makeChild(
       z: a.pos.z + (rng() - 0.5) * 2,
     },
     hp,
-    hpMax: Math.max(a.hpMax, b?.hpMax ?? 0),
+    // Ses PV maximaux découlent de la vigueur héritée, pas de celle du parent
+    // le mieux doté : un enfant frêle de parents robustes reste frêle.
+    hpMax: Math.round(HP_MAX_DEFAULT * statMultiplier(identity.stats.vitality)),
     state: "vivant",
     profile: a.profile,
     traits,
-    // L'enfant hérite de l'allure de ses parents comme il hérite de leurs
-    // traits : on reconnaît une famille à l'écran.
-    identityJson: encodeIdentity(
-      inheritIdentity(
-        decodeIdentity(a.identityJson) ?? defaultIdentity(a.traits),
-        b ? (decodeIdentity(b.identityJson) ?? defaultIdentity(b.traits)) : undefined,
-        traits,
-        rng,
-      ),
-    ),
+    identityJson: encodeIdentity(identity),
     age: 0,
     thinking: false,
     utterance: "",

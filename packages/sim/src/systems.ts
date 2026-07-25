@@ -12,6 +12,7 @@ import {
   TICK_MS,
   describeIdentity,
 } from "@devot/shared";
+import { drainOf, sightOf, speedOf } from "./stats.js";
 import { clampToWorld, dist2, World } from "./world.js";
 
 export interface TickResult {
@@ -45,7 +46,7 @@ export function tick(world: World, now: number = Date.now()): TickResult {
 
 function movementSystem(devot: DevotEntity, world: World, dt: number): void {
   const goal = devot.currentGoal;
-  const step = DEVOT_SPEED * dt;
+  const step = speedOf(devot) * dt;
 
   switch (goal.kind) {
     case "idle":
@@ -111,7 +112,7 @@ function combatSystem(
   }
   if (dist2(devot.pos, victim.pos) > ATTACK_RADIUS * ATTACK_RADIUS) return;
 
-  const drained = Math.min(ATTACK_DRAIN_PER_TICK, victim.hp);
+  const drained = Math.min(drainOf(devot), victim.hp);
   victim.hp -= drained;
   devot.hp = Math.min(devot.hpMax, devot.hp + drained * ATTACK_EFFICIENCY);
   result.combats.push({ attackerId: devot.id, victimId: victim.id, drained });
@@ -201,11 +202,13 @@ function deathSystem(devot: DevotEntity, result: TickResult): void {
  */
 export function perceptionSystem(world: World, now: number = Date.now()): Trigger[] {
   const triggers: Trigger[] = [];
-  const r2 = PERCEPTION_RADIUS * PERCEPTION_RADIUS;
   const alive = world.aliveDevots();
 
   for (const devot of alive) {
     if (devot.thinking) continue;
+    // La portée de vue est PROPRE À CHAQUE DEVOT : c'est elle qui décide de ce
+    // qui entre dans son prompt, donc de ce sur quoi il peut réfléchir.
+    const r2 = sightOf(devot) ** 2;
 
     // Rencontre d'un autre devot (y compris d'une lignée rivale).
     for (const other of alive) {
@@ -271,7 +274,7 @@ export function applyDecision(devot: DevotEntity, decision: Decision, world: Wor
         const nearest = world.nearestFood(devot.pos);
         if (
           nearest &&
-          dist2(devot.pos, nearest.pos) <= PERCEPTION_RADIUS * PERCEPTION_RADIUS
+          dist2(devot.pos, nearest.pos) <= sightOf(devot) ** 2
         ) {
           devot.currentGoal = { kind: "seek_food", foodId: nearest.id };
         }

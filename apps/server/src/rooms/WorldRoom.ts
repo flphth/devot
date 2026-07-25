@@ -13,6 +13,7 @@ import {
   PERCEPTION_RADIUS,
   TICK_MS,
   SOUL_MAX_CHARS,
+  statMultiplier,
   TRAIT_POOL,
   defaultIdentity,
   encodeIdentity,
@@ -40,6 +41,11 @@ import { applyDecision, dist2, perceptionSystem, tick, World } from "@devot/sim"
 import { canRecreateFounder, processReproductions } from "../lifecycle.js";
 
 const GOD_COLORS = ["#e0b34c", "#4ca6e0", "#9c4ce0", "#4ce07a", "#e04c5f"];
+
+/** PV maximaux pour une vigueur donnée. Même formule partout (cf. sim/stats). */
+function hpMaxFor(vitality: number): number {
+  return Math.round(HP_MAX_DEFAULT * statMultiplier(vitality));
+}
 const FOOD_TARGET = 8;
 const FOOD_SPAWN_EVERY_TICKS = 16; // ~4 s
 
@@ -244,8 +250,11 @@ export class WorldRoom extends Room<WorldState> {
         y: 0,
         z: opts.z ?? (Math.random() - 0.5) * this.world.size,
       },
-      hp: HP_MAX_DEFAULT,
-      hpMax: HP_MAX_DEFAULT,
+      // Les PV maximaux découlent de la VIGUEUR choisie : c'est la stat qui
+      // pèse le plus, puisque les PV sont aussi le budget de pensée. Un devot
+      // vigoureux ne vit pas seulement plus longtemps, il pense plus longtemps.
+      hp: hpMaxFor(identity.stats.vitality),
+      hpMax: hpMaxFor(identity.stats.vitality),
       identityJson: encodeIdentity(identity),
       state: "vivant",
       profile: "frugal",
