@@ -65,10 +65,13 @@ async function main(): Promise<void> {
   const maxCycles = Number(process.env.MAX_CYCLES ?? String(SCENES.length));
   const lethality = process.env.LETHALITY ? Number(process.env.LETHALITY) : undefined;
 
-  const mind = selectMind(mindName);
-  console.log(`\n🕯️  Devot mortal-core — MIND=${mind.name}  model=${model}  dépôt=${deposit.toLocaleString("en-US")} µ$\n`);
+  const godWallet = process.env.GOD_WALLET ?? "0xG0d0000000000000000000000000000000000001";
 
-  const devot = createDevot({ id: "DVT-000-0001", godId: "god-1", model, deposit });
+  const mind = selectMind(mindName);
+  console.log(`\n🕯️  Devot mortal-core — MIND=${mind.name}  model=${model}  dépôt=${deposit.toLocaleString("en-US")} µ$`);
+  console.log(`   wallet du dieu (connecté à la création) : ${godWallet}\n`);
+
+  const devot = createDevot({ id: "DVT-000-0001", godId: "god-1", wallet: godWallet, model, deposit });
 
   for (let cycle = 0; cycle < maxCycles && devot.state !== "mort"; cycle++) {
     const scene = SCENES[cycle % SCENES.length]!;

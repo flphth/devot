@@ -9,3 +9,4 @@ build/
 *.sqlite-wal
 .DS_Store
 .turbo/
+_probe.mjs
