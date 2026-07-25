@@ -9,3 +9,5 @@ build/
 *.sqlite-wal
 .DS_Store
 .turbo/
+*.swp
+*.swo
