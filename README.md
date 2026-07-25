@@ -4,10 +4,27 @@
 > Penser leur coûte la vie. Voir [`PLAN.md`](./PLAN.md) (game design) et
 > [`ARCHITECTURE.md`](./ARCHITECTURE.md) (technique).
 
+## Démarrage rapide
+
+```sh
+pnpm install
+cp .env.example .env            # optionnel : renseigne ANTHROPIC_API_KEY pour de vrais esprits
+pnpm --filter @devot/server dev # terminal 1 — monde sur ws://localhost:2567
+pnpm --filter @devot/client dev # terminal 2 — http://localhost:5173?god=TonNom
+```
+
+Ouvre `http://localhost:5173?god=TonNom`, clique « Façonner ton devot fondateur »,
+sélectionne-le (clic sur son corps) pour lui parler (140 caractères / minute) ou le nourrir.
+Deux navigateurs avec des `?god=` différents = deux dieux dans le même monde.
+
+**Accès Claude** : sans clé, les esprits sont simulés (MockMind — jouable, 0 dépense).
+Pour de vrais agents Claude, il faut une **clé API Console** (platform.claude.com → API keys,
+pay-per-token) dans `.env`. L'abonnement Claude Code / Max **ne suffit pas** : la Messages
+API utilisée par les devots ne l'accepte pas.
+
 ## Prérequis
 
 - Node ≥ 22, pnpm ≥ 9
-- Optionnel : `ANTHROPIC_API_KEY` (sinon les esprits sont simulés — MockMind)
 
 ## Commandes
 
