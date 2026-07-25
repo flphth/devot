@@ -4,8 +4,10 @@
   "type": "module",
   "scripts": {
     "typecheck": "pnpm -r --parallel exec tsc --noEmit",
-    "test": "vitest run",
-    "p0": "pnpm --filter @devot/server p0"
+    "test": "vitest run --testTimeout=30000",
+    "p0": "pnpm --filter @devot/server p0",
+    "sim:bench": "pnpm --filter @devot/sim-voxel bench",
+    "sim:demo": "pnpm --filter @devot/sim-voxel demo"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

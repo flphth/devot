@@ -1,393 +1,298 @@
 # Devot — Architecture technique
 
-> Document technique compagnon de [`PLAN.md`](./PLAN.md) (game design).
-> Cible : un prototype **jouable en hackathon, mono-nœud**, avec un chemin de montée
-> en charge documenté. 100 % TypeScript.
+> Document compagnon de [`PLAN.md`](./PLAN.md) (game design).
+> Cible : un monde voxel évolutif, 100 % TypeScript, où **le même noyau de
+> simulation** tourne dans le laboratoire (navigateur, WebGPU) et dans le monde
+> commun (serveur, CPU, autoritaire).
+
+> ⚠️ Décrit le modèle voxel (P5+). L'architecture de la version LLM précédente
+> reste disponible au tag `v0.4-devot-llm`.
 
 ---
 
-## 1. Stack retenue
+## 1. Le découpage fondateur
+
+```
+   CHEZ LE JOUEUR (navigateur)              SUR LE SERVEUR
+   Laboratoire privé — WebGPU, x1→x1000     Monde commun — autoritaire, x1
+   • évolution sur des milliers de gén.     • organismes de TOUS les joueurs
+   • sélection artificielle                 • prédation, reproduction croisée
+   • coût : le GPU du joueur                • tourne 24/7 sans spectateur
+             │                                        ▲
+             └────── génome (quelques Ko) ────────────┘
+                     « relâcher dans le monde »
+```
+
+Quatre raisons, dans l'ordre d'importance :
+
+**Le coût de simulation est par monde, pas par joueur.** Un monde de quelques
+centaines d'organismes coûte la même chose que 1 ou 50 spectateurs s'y
+connectent. Si chaque client simulait le monde commun, on ferait 50 fois le même
+travail pour un seul résultat. Centraliser est *moins* cher que distribuer.
+
+**Le monde doit vivre sans spectateur.** C'est ce qui sépare un monde d'un
+économiseur d'écran. Un navigateur fermé ne simule rien.
+
+**Deux clients qui simulent divergent.** Des GPU différents ne produisent pas
+exactement les mêmes flottants ; au bout de quelques milliers de ticks il n'y a
+plus un monde commun mais des hallucinations parallèles.
+
+**WebGPU est mature dans le navigateur et fragile dans Node.** Node n'a pas de
+WebGPU natif ; il faut passer par des liaisons Dawn tierces. L'évolution lourde
+va donc là où le GPU est fiable : chez le joueur.
+
+**Conséquence** : le serveur n'a pas besoin de GPU. Il n'en aura besoin que si le
+monde commun sature en CPU — et ce sera alors un port mécanique, parce que le
+noyau est écrit en forme de kernel dès le départ.
+
+---
+
+## 2. Stack
 
 | Couche | Choix | Rôle |
 | --- | --- | --- |
-| **Frontend 3D** | React + **React Three Fiber** + drei | Rendu du monde, HUD dieu, bulles de pensée |
-| **Temps réel** | **Colyseus** (client + serveur) | Autorité du monde, rooms, synchro d'état delta |
-| **Backend** | **Node.js + TypeScript** | Serveur autoritaire, boucle de simulation, orchestration |
-| **Cognition** | `@anthropic-ai/sdk` (Messages API) | Esprit des devots, historique auto-géré, sortie structurée |
-| **Persistance** | **SQLite** (`better-sqlite3` + Drizzle) | Lignées, contextes, événements — migrable Postgres |
-| **Monorepo** | pnpm workspaces | `apps/*` + `packages/*`, types partagés |
-
-**Principe directeur : autorité serveur stricte.** Le client ne fait que *rendre* et
-*envoyer des intentions*. Toute règle (dégâts HP, cooldown 140c, combats, morts,
-paiements) est calculée et validée côté serveur.
+| **Noyau de simulation** | TypeScript, tableaux typés | `packages/sim-voxel` — partagé labo + monde |
+| **Accélération labo** | WebGPU / WGSL | passes portées, état résident sur GPU |
+| **Temps réel** | Colyseus | autorité du monde commun, rooms, entités |
+| **Frontend 3D** | React + React Three Fiber + drei | rendu voxel par chunks, HUD |
+| **Cognition (éveillés)** | Claude Agent SDK (`MIND=claude`) | abonnement, zéro facturation au token |
+| **Persistance** | SQLite (`better-sqlite3` + Drizzle) | génomes, lignées, événements, snapshots |
+| **Monorepo** | pnpm workspaces | `apps/*` + `packages/*` |
 
 ---
 
-## 2. Vue d'ensemble
-
-```
-┌──────────────────────────── Client (navigateur) ─────────────────────────────┐
-│  React + React Three Fiber + drei                                             │
-│  • Rendu 3D du monde (devots, nourriture, effets)                             │
-│  • HUD dieu : jauge vie/crédits, champ 140c (cooldown 60 s), sélection        │
-│  • colyseus.js : reçoit l'état (delta), interpole, envoie les actions         │
-└──────────────▲──────────────────────────────────────────────┬────────────────┘
-   state sync  │ (WS, delta @ patchRate)         god actions   │ (WS)
-               │                                                ▼
-┌──────────────┴───────────────────── Serveur Node/TS (autorité) ───────────────┐
-│  Colyseus · WorldRoom                                                         │
-│   • @colyseus/schema : état autoritaire (devots, food, gods)                  │
-│   • simulation tick 250 ms  →  Couche réactive (déterministe, 0 token)        │
-│   • valide les actions du dieu (cooldown 60 s, ownership, ≤140c)              │
-│                                                                               │
-│  Orchestrateur cognitif (asynchrone, découplé du tick)                        │
-│   • File d'inférences priorisée + limiteur débit / budget tokens              │
-│   • system prompt (règles+persona, caché) + historique + événement            │
-│   • Messages API → sortie structurée (action) + usage                         │
-│   • Palier de modèles Haiku/Sonnet/Opus · usage → dégâts HP                   │
-│                                                                               │
-│  Persistance (SQLite/Drizzle)            Onchain (interface, différé)         │
-│   gods · devots · messages · events       PaymentProvider (stub gratuit)      │
-│   · food · divine_msgs                     (stub gratuit aujourd'hui)          │
-└──────────────┬───────────────────────────────────────────────┬───────────────┘
-       ┌───────▼────────┐                              ┌─────────▼──────────┐
-       │ SQLite (proto) │                              │   API Claude Agent SDK      │
-       │  → Postgres    │                              │ Haiku/Sonnet/Opus  │
-       └────────────────┘                              └────────────────────┘
-```
-
----
-
-## 3. Structure du monorepo
+## 3. Structure
 
 ```
 devot/
 ├─ apps/
-│  ├─ client/          # Vite + React + R3F + colyseus.js
-│  └─ server/          # Node + Colyseus (WorldRoom) + orchestrateur
+│  ├─ client/          # Vite + React + R3F : laboratoire ET vue du monde
+│  └─ server/          # Colyseus : monde commun autoritaire
 ├─ packages/
-│  ├─ shared/          # types, DTO d'actions, constantes, schémas Colyseus
-│  ├─ sim/             # couche réactive : systèmes déterministes (ECS-lite)
-│  ├─ agents/          # orchestrateur LLM, prompts, palier de modèles, coût→HP
-│  ├─ db/              # schéma Drizzle + accès SQLite (repositories)
-│  └─ onchain/         # PaymentProvider (stub gratuit ; payant plus tard)
-├─ pnpm-workspace.yaml
-└─ turbo.json          # (optionnel) pipeline build/dev
+│  ├─ sim-voxel/       # LE NOYAU — grille, métabolisme, morphogenèse, passes
+│  ├─ genome/          # génome : encodage, mutation, validation (P5.1)
+│  ├─ shared/          # types réseau, DTO, protocole dérivé
+│  ├─ agents/          # esprits Claude des éveillés (P5.5)
+│  ├─ db/              # Drizzle + SQLite
+│  └─ onchain/         # PaymentProvider (stub gratuit)
 ```
 
-- **`packages/shared`** est la source de vérité des types (état, actions, événements),
-  importée par le client **et** le serveur → pas de dérive de contrat.
-- **`packages/sim`** et **`packages/agents`** sont consommés par `apps/server`.
-  Séparés en packages pour pouvoir, plus tard, sortir l'orchestrateur dans son propre
-  service (voir §12, montée en charge).
+**`packages/sim-voxel` n'importe rien d'autre.** Ni Colyseus, ni React, ni la
+base : c'est la condition pour qu'il tourne à l'identique dans un worker
+navigateur et dans le serveur.
 
 ---
 
-## 4. Temps réel & autorité du monde (Colyseus)
+## 4. Le noyau de simulation
 
-### 4.1 Room & état
+### 4.1 Disposition mémoire (SoA)
 
-Une **`WorldRoom`** unique héberge le monde partagé (tous les dieux, tous les devots).
-L'état est décrit avec `@colyseus/schema` (synchro binaire delta automatique) :
+Aucun objet par voxel. Des tableaux typés parallèles, indexés à plat :
 
 ```ts
-class DevotState extends Schema {
-  @type("string") id: string;
-  @type("string") godId: string;
-  @type("number") x = 0; @type("number") y = 0; @type("number") z = 0;
-  @type("number") hp = 0;        // crédits d'inférence restants
-  @type("number") hpMax = 0;
-  @type("string") state = "vivant";      // vivant | affamé | agonisant | mort
-  @type("string") modelTier = "frugal";  // frugal | equilibre | prophete
-  @type("boolean") thinking = false;      // une inférence est en cours
-  @type("string") utterance = "";         // dernière parole (bulle)
-}
+// Dimensions : SX=128, SY=32, SZ=128 → 524 288 voxels
+// Index : idx = (y * SZ + z) * SX + x   → x contigu (localité de cache)
 
-class WorldState extends Schema {
-  @type({ map: DevotState }) devots = new MapSchema<DevotState>();
-  @type({ map: FoodState })  food   = new MapSchema<FoodState>();
-  @type({ map: GodState })   gods   = new MapSchema<GodState>();
-}
+material : Uint8Array   // type de voxel (voir §4.2)
+nutrient : Uint16Array  // richesse nutritive de la biomasse (virgule fixe)
+owner    : Uint16Array  // id d'organisme propriétaire du tissu, 0 = aucun
 ```
 
-- **`patchRate`** (réseau) ≈ 50 ms (20 Hz) pour un rendu fluide.
-- **`setSimulationInterval(dt)`** (logique) = **250 ms** = la cadence d'action des devots.
-- Le client interpole les positions entre deux patches (drei/leva).
+Les organismes sont eux aussi en SoA, indexés par id :
 
-### 4.2 Actions du dieu (client → serveur)
+```ts
+energy    : Int32Array   // énergie courante (virgule fixe, µ-unités)
+capacity  : Int32Array   // maximum, croît avec les voxels réserve
+voxelCount: Uint16Array
+generation: Uint16Array
+seedIdx   : Int32Array   // voxel germe : racine de la connexité
+state     : Uint8Array   // vivant | mort
+```
 
-Le client n'émet que des **intentions**, validées côté serveur :
+**Écart assumé par rapport au brief** : l'énergie est stockée en **entiers en
+virgule fixe** (`Int32Array`, µ-unités) plutôt qu'en `Float32Array`. Raison : en
+JavaScript, un calcul intermédiaire sur un `Float32Array` se fait en float64 puis
+est arrondi au stockage, alors qu'en WGSL il se fait en float32 — les deux
+divergent, ce qui rendrait le test de conformité CPU↔GPU impossible à tenir.
+L'arithmétique entière est exacte et identique des deux côtés, et se prête à
+`atomicAdd` sur GPU (donc à des réductions indépendantes de l'ordre). Le brief
+demandait la conformité comme condition ; c'est elle qui tranche.
 
-| Message | Payload | Validation serveur |
+### 4.2 Types de voxels
+
+```
+0 VIDE     3 BIOMASSE   6 RÉSERVE   9 NEURONE
+1 EAU      4 OS         7 BOUCHE
+2 ROCHE    5 MUSCLE     8 ŒIL
+```
+
+`material >= 4` ⇔ tissu vivant. Le seuil est un test unique, sans table.
+
+### 4.3 Passes de forme kernel
+
+Une passe = une fonction pure de l'état précédent vers l'état suivant. Pas
+d'allocation, pas de fermeture, pas d'objet intermédiaire, indexation à plat.
+Les passes cellulaires lisent le tampon A et écrivent le tampon B
+(**ping-pong**), parce qu'une lecture de voisinage en place n'est ni
+déterministe ni portable sur GPU.
+
+| Passe | Nature | Effet |
 | --- | --- | --- |
-| `createFounder` | `{}` | le dieu n'a **aucun** devot vivant ; débit `PaymentProvider` |
-| `speak` | `{ devotId, text }` | ownership · `text.length ≤ 140` · `now - god.lastSpeakAt ≥ 60 s` |
-| `feed` | `{ devotId?, x, z }` | débit `PaymentProvider` · fait apparaître de la nourriture « don » |
-| `select` | `{ devotId }` | lecture seule (caméra/HUD) |
+| `passWater` | cellulaire | l'eau tombe, s'étale, s'accumule |
+| `passBiomass` | cellulaire | la biomasse pousse près de l'eau, se décompose seule |
+| `passMetabolism` | réduction par organisme | somme les coûts et gains voxel par voxel |
+| `passMouth` | cellulaire + réduction | les bouches convertissent la biomasse au contact |
+| `passGrowth` | par organisme | ajoute un voxel selon le plan de corps, si l'énergie suit |
+| `passConnectivity` | parcours depuis le germe | ampute ce qui est déconnecté → biomasse morte |
+| `passDeath` | par organisme | énergie ≤ 0 → tout le corps devient biomasse riche |
 
-Le cooldown 140c est **autoritaire** : `god.lastSpeakAt` vit dans l'état serveur, jamais
-dans le client (qui ne fait qu'afficher le minuteur).
+### 4.4 Déterminisme
 
----
+Non négociable, parce que c'est la condition de l'équivalence labo ↔ monde.
 
-## 5. Cadence & découplage : le corps (250 ms) vs l'esprit (async)
+- **Aucun `Math.random()`** dans le noyau. À la place, un **hachage sans état** :
+  `hash32(idx, tick, seed)`. Chaque voxel tire son aléa de sa position et du
+  tick — pas d'état de générateur partagé, donc parallélisable tel quel sur GPU
+  et indépendant de l'ordre de parcours.
+- **Arithmétique entière** partout où c'est possible (§4.1).
+- **Pas d'itération sur des `Map`/`Set`** dans les passes : l'ordre y est un
+  détail d'implémentation.
+- Un **hachage d'état** (`worldHash`) permet de comparer deux runs en un nombre.
 
-Le paradoxe à résoudre : **le devot agit toutes les 250 ms**, mais **une inférence LLM
-prend des secondes**. Solution → deux boucles découplées :
+### 4.5 Chunks
 
-```
-   Corps (déterministe, chaque 250 ms)        Esprit (LLM, asynchrone, coûteux)
-   ───────────────────────────────────        ─────────────────────────────────
-   • se déplacer vers un but                   déclenché par un TRIGGER :
-   • percevoir nourriture / devots      ──────►  • message divin reçu
-   • manger au contact                          • rencontre significative
-   • fuir / avancer                             • HP bas (survie)
-   • résoudre les combats en cours              • opportunité de reproduction
-   • détecter les déclencheurs ───────┘         • provocation / parole reçue
-        (0 token — gratuit)                    → produit une DÉCISION (nouveau but,
-                                                 parole, attaque, reproduction)
-                                                 → applique HP-, ~secondes plus tard
-```
-
-- Le **corps** (couche réactive) tourne à chaque tick, **sans coûter de tokens** :
-  il fait vivre le devot (mouvement, faim, contact nourriture) en continu.
-- L'**esprit** (LLM) n'est sollicité que sur **déclencheur**, en tâche de fond. Pendant
-  qu'il « pense » (`thinking = true`, bulle « … »), le corps continue de bouger.
-- Quand la décision revient, on l'applique : nouveau but, parole, attaque, enfant — et
-  on **déduit les HP** correspondant aux tokens réellement consommés.
-
-C'est aussi ce qui protège le budget : **la majorité des ticks ne coûtent rien**.
+Le noyau travaille sur la grille à plat ; le découpage en **chunks 16³**
+(8×2×8 = 128 chunks) sert deux usages en aval : la version par chunk pour
+n'envoyer que ce qui change, et le remaillage partiel côté client.
+Chaque passe qui modifie un voxel incrémente la version de son chunk.
 
 ---
 
-## 6. Couche réactive (`packages/sim`)
+## 5. Le laboratoire (P5.2)
 
-Un **ECS-lite** : l'état des devots (dans la room) + des *systèmes* déterministes
-exécutés à chaque tick. Aucun appel LLM ici.
+Le même `sim-voxel` tourne dans un worker du navigateur. **Le chemin CPU est
+obligatoire** : le laboratoire doit rester utilisable si WebGPU est absent ou
+échoue. WebGPU est un accélérateur, pas une dépendance.
 
-| Système | Rôle | Émet un déclencheur ? |
+En mode accéléré, l'état reste résident sur GPU et on ne relit que des
+**agrégats** (population, générations, énergie totale, taille moyenne) — jamais
+les voxels. C'est ce qui rend le x1000 possible.
+
+**Test de conformité obligatoire** : même graine, même nombre de ticks, l'état
+final CPU et GPU doivent coïncider (comparaison par `worldHash`) ou différer d'un
+écart explicitement borné et documenté. Sans ce test, le port GPU n'est pas
+considéré comme terminé.
+
+---
+
+## 6. Le monde commun (P5.3)
+
+### 6.1 Autorité et continuité
+
+Une `WorldRoom` héberge le monde unique, simulé en CPU via `sim-voxel`. Elle
+tourne en continu, avec snapshot périodique en SQLite et reprise au démarrage.
+Le client ne calcule jamais l'état : il rend et il envoie des intentions.
+
+### 6.2 Protocole dérivé — le client ne reçoit jamais « le monde »
+
+C'est le point qui décide de la viabilité du réseau. Envoyer les voxels bruts à
+20 Hz représenterait des dizaines de mégaoctets par seconde. On envoie donc une
+**description dérivée** :
+
+| Donnée | Quand | Comment |
 | --- | --- | --- |
-| `PerceptionSystem` | Voisinage (nourriture, devots, menaces) | oui (rencontre, menace) |
-| `MovementSystem` | Avance vers `currentGoal` | non |
-| `FeedingSystem` | Mange au contact → `hp += food.hpValue` | non |
-| `HungerSystem` | Passe en `affamé`/`agonisant` selon HP | oui (HP bas) |
-| `CombatSystem` | Résout une attaque en cours → transfert de HP | non |
-| `ReproductionSystem` | Concrétise une décision de reproduction | non |
-| `DeathSystem` | `hp ≤ 0` → mort + **suppression du contexte** | oui (événement monde) |
+| **Terrain** | chunk modifié **et** visible | palette + RLE, message binaire brut, versionné |
+| **Corps d'un organisme** | **une seule fois** : entrée dans le champ de vision, ou morphologie changée | masque 3D compact dans sa boîte englobante + palette de types (quelques centaines d'octets) — le client **remaille** localement |
+| **Dynamique** | chaque tick réseau | ~10 octets par organisme : position, énergie, phase musculaire |
+| **Agrégats** | périodiquement | population, générations, énergie totale (courbes) |
 
-Les déclencheurs alimentent la file de l'orchestrateur cognitif (§7). Un but par défaut
-(errance, ou « chercher la nourriture la plus proche » si affamé) garantit qu'un devot
-**sans esprit disponible reste vivant et crédible** en attendant sa prochaine pensée.
+Les entités passent par `@colyseus/schema` ; les chunks par des messages
+binaires (`ArrayBuffer`), parce que le schéma synchronisé est inadapté aux
+tableaux volumineux. Budget cible : **dizaines de Ko/s**, pas des Mo/s.
 
----
+Le corps d'un organisme n'a pas besoin d'être transmis en entier : il est
+**dérivable de son génome et de son stade de croissance**. C'est de là que vient
+le gain.
 
-## 7. Cognition des devots (`packages/agents`)
+### 6.3 Relâcher un génome
 
-### 7.1 Un esprit = notre historique + un appel Claude
+Le client envoie un génome ; le serveur **valide** : taille de corps maximale,
+nombre de neurones maximal, connexité du plan, types légaux, format. Puis il
+débite le `PaymentProvider` (stub gratuit aujourd'hui).
 
-Chaque devot possède un **historique de messages** stocké **dans notre base** (table
-`messages`). « Penser » = appeler la Messages API avec :
+**Il n'est pas nécessaire de prouver qu'un génome a réellement été évolué.** Un
+joueur peut le fabriquer à la main — dans le monde, sa créature paiera le coût
+métabolique de son corps comme les autres. La puissance est bornée par le coût,
+pas par l'honnêteté du joueur. C'est ce qui rend le système robuste sans
+cryptographie.
 
-1. un **system prompt** = `RÈGLES_DU_MONDE` (partagées, **mises en cache**) + la
-   **persona** propre du devot (tempérament, valeurs, conscience de la mort) ;
-2. l'**historique** du devot (pensées et événements passés, éventuellement résumés) ;
-3. l'**événement courant** en dernier tour utilisateur.
+### 6.4 Brouillard de guerre côté serveur
 
-La réponse est **structurée** (schéma d'action) pour être appliquée de façon fiable, et
-l'`usage` renvoyé donne le coût réel → dégâts de HP.
-
-```ts
-const DECISION_SCHEMA = {
-  type: "object", additionalProperties: false,
-  required: ["action"],
-  properties: {
-    action: { type: "string",
-      enum: ["idle","move","eat","attack","reproduce","speak","flee"] },
-    targetId:  { type: "string" },              // devot ou nourriture visé
-    direction: { type: "object", properties: { x:{type:"number"}, z:{type:"number"} },
-                 required:["x","z"], additionalProperties:false },
-    utterance: { type: "string" },              // ≤ N caractères si action="speak"
-    emotion:   { type: "string" },
-  },
-};
-
-const res = await claude.messages.create({
-  model: profile.model,                         // haiku / sonnet / opus selon le devot
-  max_tokens: 512,
-  ...profile.thinking,                          // adaptive + effort, ou rien (Haiku)
-  system: buildSystem(devot),                   // règles cachées + persona
-  messages: [...history, { role: "user", content: eventBlock }],
-  output_config: { format: { type: "json_schema", schema: DECISION_SCHEMA } },
-});
-
-const decision = JSON.parse(textOf(res));
-const hpLoss = hpCost(res.usage, profile.model); // cf. §7.4
-```
-
-> La sortie structurée est compatible avec la pensée adaptative : le devot peut
-> *réfléchir* (thinking) **et** renvoyer une action propre à parser.
-
-### 7.2 Palier de modèles = tempérament × endurance
-
-| Profil | Modèle | Pensée | Effort | Emploi |
-| --- | --- | --- | --- | --- |
-| **Frugal** | `claude-haiku-4-5` | omise | — *(effort non supporté sur Haiku 4.5)* | la masse des devots |
-| **Équilibré** | `claude-sonnet-4-6` | `adaptive` | `low`/`medium` | devots établis |
-| **Prophète** | `claude-opus-4-8` | `adaptive` | `medium`/`high` | rares élus/anciens |
-
-> Cohérent avec le thème : la **pensée adaptative** génère des tokens (facturés comme
-> de la sortie), donc **un prophète qui réfléchit fort saigne plus vite**. L'`effort`
-> est le curseur intelligence ⇄ longévité.
-
-### 7.3 Prompt caching & vieillissement
-
-- **Cache du prompt** : `RÈGLES_DU_MONDE` est un **préfixe identique pour tous les
-  devots** → placé en tête du system avec `cache_control: { type: "ephemeral" }`, il se
-  lit ensuite à ~0,1× (cache partagé entre devots). La persona (variable) vient après.
-  *Note honnête :* le cache ne se déclenche qu'au-delà d'un préfixe minimal (~4096 tokens
-  sur Haiku/Opus, ~2048 sur Sonnet) — dimensionner les règles en conséquence, sinon
-  accepter l'absence de cache en proto.
-- **Vieillir, c'est oublier** : quand l'historique d'un devot dépasse un seuil de tokens,
-  un **« chroniqueur »** (appel Haiku bon marché) le **résume** et remplace les vieux
-  tours par un souvenir condensé → coût d'entrée maîtrisé à chaque pensée future.
-  *(Alternative : compaction serveur Anthropic, bêta `compact-2026-01-12`.)*
-
-### 7.4 Coût → HP (le cœur de l'économie)
-
-```ts
-// Prix par 1M tokens (in / out)
-const PRICE = {
-  "claude-haiku-4-5":  { in: 1,  out: 5  },
-  "claude-sonnet-4-6": { in: 3,  out: 15 },
-  "claude-opus-4-8":   { in: 5,  out: 25 },
-};
-
-function hpCost(usage, model) {
-  const p = PRICE[model];
-  const usd = (usage.input_tokens/1e6)*p.in + (usage.output_tokens/1e6)*p.out;
-  return usd * LETHALITY;   // HP exprimés en « micro-dollars de pensée »
-}
-```
-
-On exprime les HP en **µ$ d'inférence** : `hp_max` est un budget (ex. 50 000 = 0,05 $ de
-pensée), la nourriture le recharge, chaque pensée le grignote selon son coût réel. Le
-`thinking` étant facturé en sortie, il est **compté dedans**.
-
-### 7.5 Sécurité prompt-injection
-
-Le **message divin (140c)** et les **paroles d'autres devots** sont du **contenu non
-fiable** : injectés dans le **tour utilisateur** (jamais dans le system), encadrés
-explicitement (« Une voix venue du ciel te dit : “…” »). Les règles du monde et
-l'inviolabilité de la mécanique restent dans le system prompt figé.
+Le filtrage de visibilité est appliqué **avant l'envoi** : les entités et les
+chunks hors de portée des organismes du joueur ne sont pas transmis. Le
+brouillard devient un mécanisme anti-triche réel, et accessoirement le principal
+optimiseur de bande passante.
 
 ---
 
-## 8. Orchestrateur & garde-fous budget (`packages/agents`)
+## 7. L'éveil (P5.5)
 
-L'esprit tourne dans une **file d'inférences** découplée du tick réseau :
+Un organisme éveillé reçoit un esprit Claude via **`MIND=claude`** (Agent SDK sur
+l'abonnement Claude Code — **jamais de clé API facturée au token**). Seul le
+serveur détient les identifiants : un client ne peut pas piloter un esprit.
 
-- **Concurrence bornée** : au plus *N* inférences simultanées (limiteur type `p-limit`),
-  aligné sur les limites de débit de l'API.
-- **Une seule pensée en vol par devot** : on ne relance pas un devot déjà `thinking`.
-- **Priorisation** : message divin > combat/menace > survie (HP bas) > rencontre >
-  réflexion oisive ; à priorité égale, les devots **proches d'un dieu connecté** passent
-  d'abord (ce qu'on voit compte plus).
-- **Budget** : (a) pré-check `devot.hp > COÛT_PLANCHER` avant d'appeler ; (b) **token
-  bucket global** (tokens/minute) pour plafonner la dépense serveur ; (c) sous pression,
-  les devots non prioritaires **s'endorment** (le corps continue, l'esprit patiente).
-
-Un devot **ne peut jamais dépenser plus que sa vie** : c'est la double vertu du modèle
-« coût réel » (narrativement juste **et** budget-safe).
+L'usage réel de tokens est converti en dépense d'énergie, exactement comme le
+métabolisme d'un muscle. Un éveillé pense mieux et vit moins longtemps. Le verbe
+divin (140 caractères, une fois par minute) et la foudre s'appliquent à lui.
+Peu d'éveillés simultanés : c'est un coût de quota et une latence de plusieurs
+secondes. `MIND=mock` reste le mode de développement.
 
 ---
 
-## 9. Persistance (`packages/db`, SQLite → Postgres)
-
-`better-sqlite3` (synchrone, rapide, parfait pour un serveur de jeu mono-nœud) + **Drizzle**
-(schéma typé, migrations, driver échangeable vers Postgres).
+## 8. Persistance
 
 ```
-gods         (id, name, founder_devot_id, color, last_speak_at, created_at)
-devots       (id, god_id, is_founder, hp, hp_max, model_tier, cognition_profile,
-              x, y, z, state, current_goal, last_action_at, age,
-              traits_json, parent_a, parent_b, born_at, died_at)
-messages     (id, devot_id → CASCADE, role, content_json,
-              tokens_in, tokens_out, created_at)   -- l'historique LLM du devot
-world_events (id, type, actor_ids_json, payload_json, created_at)  -- mémoire du monde
-food         (id, x, y, z, type, hp_value, source, spawned_at, consumed_by)
-divine_msgs  (id, god_id, devot_id, text, sent_at)
+worlds        (id, seed, tick, created_at)                     -- monde commun
+world_chunks  (world_id, chunk_idx, version, blob)             -- snapshot
+genomes       (id, god_id, hash, blob, generation, created_at) -- registre
+organisms     (id, world_id, genome_id, god_id, born_at, died_at, cause)
+lineages      (child_id, parent_a, parent_b)                   -- ascendances
+world_events  (id, type, actor_ids_json, payload_json, created_at)
 ```
 
-- **Mort = destruction du contexte** : `DELETE FROM messages WHERE devot_id = …`
-  (CASCADE). On conserve une **pierre tombale** (`devots.died_at`, `world_events`) — ce
-  que « les autres se souviennent » du mort, sans son esprit.
-- **État chaud** (positions, HP) : vit dans la room Colyseus en mémoire ; persistance
-  périodique / sur événement en SQLite (snapshot), pas à chaque tick.
+L'état chaud (grille, énergies) vit en mémoire ; les snapshots sont périodiques,
+pas à chaque tick. SQLite en proto, driver Drizzle échangeable vers Postgres.
 
 ---
 
-## 10. Onchain (`packages/onchain`, différé — non détaillé)
+## 9. Montée en charge
 
-Le volet blockchain est **repoussé** : on **ne tranche ni la chaîne ni les détails**
-pour l'instant. On se contente d'**isoler** le point d'accroche derrière une interface,
-pour que le passage au payant plus tard **ne touche pas le reste du jeu** :
-
-```ts
-interface PaymentProvider {
-  chargeDevotCreation(godId: string): Promise<Receipt>;   // création / recréation
-  chargeFeed(godId: string): Promise<Receipt>;            // don de nourriture
-}
-```
-
-- **Aujourd'hui** : `FreeStubProvider` — tout passe, aucun coût. C'est le seul provider
-  implémenté ; on développe toute la boucle de jeu sans friction.
-- **Plus tard** : un autre provider implémentera cette interface. **Chaîne, nature du
-  paiement et identité seront définis en temps voulu — hors de ce document.**
-
----
-
-## 11. Flux de bout en bout — « le dieu parle »
-
-```
-1. Client  ── room.send("speak", { devotId, text }) ──►  (et grise l'input 60 s)
-2. Serveur : ownership ? text ≤140 ? now - god.lastSpeakAt ≥ 60 s ?  → sinon rejet
-3. Serveur : lastSpeakAt = now ; persiste divine_msg ; émet TRIGGER{divine_message, HIGH}
-4. Orchestrateur : construit la requête (historique + « Une voix du ciel te dit… »)
-                   → appel Claude (profil du devot) → décision + usage
-5. Serveur : hp -= hpCost(usage) ; applique l'action (utterance / nouveau but / …)
-             ; append à l'historique ; persiste
-6. WorldRoom : patch d'état → tous les clients
-7. Client  : bulle de parole au-dessus du devot + jauge HP mise à jour
-```
-
----
-
-## 12. Montée en charge (chemin documenté, hors proto)
-
-| Aujourd'hui (proto) | Demain (scale) |
+| Aujourd'hui | Demain |
 | --- | --- |
-| SQLite mono-nœud | Postgres (swap driver Drizzle) |
-| État room en mémoire | Redis + `@colyseus/redis-driver` (rooms multi-process) |
-| Orchestrateur in-process | Service worker dédié + file réelle (BullMQ/Redis) |
-| 1 `WorldRoom` | Sharding spatial (plusieurs rooms/régions) + presence |
-| Client servi par Vite | Build statique sur CDN |
-
-Le découpage en `packages/*` (sim / agents / db / onchain) rend ces extractions
-mécaniques : on sort `agents` en service sans toucher au reste.
+| Monde commun en CPU | passes portées en WGSL/Metal côté serveur (mécanique) |
+| SQLite mono-nœud | Postgres (swap driver) |
+| Un monde unique | sharding spatial, plusieurs régions |
+| Client servi par Vite | build statique sur CDN |
 
 ---
 
-## 13. Jalons de construction (hackathon)
+## 10. Jalons
 
 | Phase | Objectif | Livrable |
 | --- | --- | --- |
-| **P0 — Cœur mortel** | 1 devot headless, tick 250 ms, **une inférence structurée**, jauge HP qui descend selon `usage`, mort + suppression du contexte | prouve la mécanique centrale, sans 3D |
-| **P1 — Monde & 3D** | Colyseus `WorldRoom` + R3F, nourriture aléatoire, le devot cherche/mange, HUD dieu (parler 140c/60 s, nourrir) | premier jeu jouable |
-| **P2 — Vie sociale** | Reproduction (fondateur → lignée), héritage de contexte (chroniqueur), combat/prédation | émergence |
-| **P3 — Multi-dieux** | Plusieurs dieux, PvP inter-lignées, recréation du fondateur | monde partagé |
+| **P5.0** | Noyau `sim-voxel` : grille, métabolisme, morphogenèse, mort, déterminisme | run headless déterministe + **benchmark ms/tick** (point de décision) |
+| **P5.1** | Génome, cerveau borné par les voxels neurone, sélection naturelle | run de N générations, amélioration mesurable, 2 graines rejouables |
+| **P5.2** | Laboratoire navigateur, CPU puis WebGPU | test de conformité CPU↔GPU, UI x1→x1000 |
+| **P5.3** | Monde commun autoritaire, protocole dérivé, relâcher | app lancée, deux joueurs, budget réseau mesuré |
+| **P5.4** | Vie sociale entre lignées, pouvoirs divins | prédation et reproduction croisée observables |
+| **P5.5** | Éveil (Claude) | un éveillé pense, ses tokens coûtent de l'énergie |
+
 ---
 
-## 14. Récap des choix & hypothèses ouvertes
+## 11. Récap des choix
 
-**Choix actés :** TypeScript de bout en bout · Colyseus (autorité + sync) · Messages API
-auto-gérée + prompt caching + palier de modèles + couche réactive 250 ms · SQLite (proto).
+TypeScript de bout en bout · **un seul noyau de simulation** partagé labo/monde ·
+déterminisme strict par hachage sans état et virgule fixe · disposition SoA en
+forme de kernel · autorité serveur pour le monde commun · protocole dérivé
+(jamais de voxels bruts sur le réseau) · évolution chez le joueur, monde chez le
+serveur · `MIND=claude` sans facturation au token · SQLite en proto.

@@ -82,11 +82,22 @@ async function main(): Promise<void> {
     rejections.length > before && rejections[rejections.length - 1]!.includes("reposer"),
   );
 
-  // 4. Nourrir : la nourriture "don" apparaît près du devot
-  const foodBefore = state().food.size;
-  room.send("feed", { devotId });
+  // 4. Nourrir. On dépose à des coordonnées explicites LOIN des devots :
+  // déposée près d'un devot, la nourriture peut être mangée avant qu'on
+  // l'observe (le rayon de repas est plus petit que la dispersion du don),
+  // ce qui rendrait le test instable.
+  const godFood = () =>
+    [...state().food.values()].filter((f: any) => f.source === "god").length;
+  const godFoodBefore = godFood();
+  room.send("feed", { x: -27, z: 27 });
   await sleep(600);
-  check("feed fait apparaître une nourriture 'god'", state().food.size > foodBefore);
+  check("feed dépose une nourriture de source 'god'", godFood() > godFoodBefore);
+
+  // Et la variante « près de mon devot » ne doit pas être rejetée.
+  const rejectionsBeforeFeed = rejections.length;
+  room.send("feed", { devotId });
+  await sleep(400);
+  check("feed ciblant un devot est accepté", rejections.length === rejectionsBeforeFeed);
 
   // 5. Le devot pense (MockMind) : thinking repasse à false et l'état vit
   await sleep(2000);

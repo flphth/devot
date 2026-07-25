@@ -1,5 +1,20 @@
 # Devot — prototype
 
+> **Pivot en cours (P5)** : Devot devient un monde voxel évolutif — voir
+> [`PLAN.md`](./PLAN.md) et [`ARCHITECTURE.md`](./ARCHITECTURE.md).
+> La version précédente (devots agents Claude, HP = tokens) reste jouable au
+> tag `v0.4-devot-llm`, et son code est toujours dans `apps/` en attendant que
+> le monde voxel prenne sa place.
+>
+> ```sh
+> pnpm sim:demo    # démo headless du noyau voxel (morphogenèse, mort, déterminisme)
+> pnpm sim:bench   # benchmark ms/tick — le chiffre qui pilote les décisions d'échelle
+> ```
+>
+> Noyau P5.0 mesuré ici : **3,5 ms/tick** sur 128×32×128 (150 Mvoxels/s, ~288
+> ticks/s). Le monde commun n'a donc pas besoin de GPU ; le laboratoire, si —
+> c'est exactement le découpage prévu.
+
 > Un jeu où vous êtes un dieu, et vos fidèles sont de véritables agents Claude.
 > Penser leur coûte la vie. Voir [`PLAN.md`](./PLAN.md) (game design) et
 > [`ARCHITECTURE.md`](./ARCHITECTURE.md) (technique).

@@ -1,396 +1,223 @@
 # Devot
 
-> Un jeu où vous êtes un dieu, et vos fidèles sont de véritables agents Claude.
-> Penser leur coûte la vie. Parler leur coûte la vie. Et ils le savent.
+> Un monde voxel où la vie s'invente elle-même.
+> Vous élevez des créatures dans votre laboratoire, puis vous les relâchez
+> dans un monde commun où les lignées de tous les joueurs se disputent l'énergie.
+> Et si l'une d'elles vous intéresse vraiment, vous pouvez l'éveiller.
+
+> ⚠️ Ce document décrit le modèle **voxel évolutif** (P5+). La version précédente
+> du jeu — des devots dont l'esprit était un agent Claude, où penser coûtait des
+> points de vie — reste jouable au tag git `v0.4-devot-llm`.
 
 ---
 
 ## 1. Pitch
 
-**Devot** est un jeu-monde en 3D dans lequel plusieurs joueurs incarnent des **dieux**.
-Chaque dieu veille sur un ou plusieurs **devots** : des créatures dont l'esprit est
-un véritable agent LLM (Claude) doté d'un contexte persistant.
+**Devot** est un monde en voxels peuplé d'organismes qui ne sont scriptés par
+personne. Chaque créature est un assemblage de voxels spécialisés — os, muscle,
+bouche, œil, réserve, neurone — décrit par un **génome**. Elle naît, grandit,
+mange, perd des membres, cicatrise, se reproduit en mutant, et meurt.
 
-La singularité du jeu tient à une règle littérale : **penser et parler consomment des
-tokens d'inférence, et chaque token consommé retire des points de vie au devot.**
-La cognition n'est plus gratuite — elle est mortelle. Un devot qui réfléchit trop
-longtemps, qui parle trop, ou qu'on sur-sollicite, meurt.
+Le joueur n'écrit pas de créature : il en **fait émerger** une. Dans son
+laboratoire privé, il lance l'évolution à grande vitesse, observe des milliers de
+générations défiler, sélectionne ce qui lui plaît. Puis il prend le génome d'une
+lignée réussie et la **relâche dans le monde commun** — un monde unique, partagé,
+qui tourne en continu, où les créatures de tous les joueurs se rencontrent.
 
-Le joueur n'a qu'un pouvoir de communication **volontairement bridé** : il peut
-adresser à son devot un message de **140 caractères maximum, au plus une fois par
-minute**. Il façonne un **unique devot fondateur** ; toute sa lignée devra naître
-de lui. Il peut lui donner de la nourriture pour recharger sa vie, mais le devot
-doit aussi **trouver seul sa pâture** sur la carte. Le joueur le regarde se
-reproduire, s'entre-dévorer, et comprendre le concept de sa propre mort — car à la
-mort d'un devot, **tout son contexte est détruit**, définitivement.
+La règle centrale de l'ancien Devot survit, transposée dans la chair :
+**l'énergie est la vie.** Chaque voxel d'un corps coûte à entretenir. Un muscle
+coûte quand il se contracte. Un neurone coûte quand il pense. Un corps plus
+grand est plus puissant *et* plus affamé. Rien n'est gratuit.
 
 ---
 
 ## 2. Piliers de design
 
-1. **La cognition a un coût vital.** Chaque inférence (réflexion ou parole) puise
-   dans les points de vie. C'est la mécanique centrale, tangible et impitoyable.
-2. **Le dieu est distant et limité.** 140 caractères, une fois par minute au plus.
-   Pas de contrôle direct : on influence, on ne pilote pas. La frustration divine
-   est un ressort de jeu.
-3. **Les devots sont réellement intelligents.** Ce ne sont pas des PNJ scriptés :
-   ce sont des agents Claude avec mémoire, personnalité et capacité à raisonner
-   sur leur propre condition.
-4. **La mort est réelle et irréversible.** Le contexte est effacé. Le devot en a
-   conscience — il peut redouter, accepter, ou combattre sa fin.
-5. **Un monde partagé et vivant.** Plusieurs dieux, un même monde 3D. Les devots
-   de dieux rivaux peuvent s'attaquer et se reproduire entre eux.
-6. **Une lignée, pas une armée.** Le dieu ne façonne qu'un seul devot fondateur ;
-   tous les autres doivent en descendre. Sans reproduction, un panthéon s'éteint.
+1. **Personne n'écrit les créatures.** Leur morphologie et leur comportement
+   sortent de la mutation et de la sélection, pas d'un designer. Le joueur
+   oriente, il ne dessine pas.
+2. **L'énergie est la vie.** Le métabolisme est calculé voxel par voxel. Grandir,
+   bouger, penser : tout se paie. Un organisme à zéro se décompose et nourrit
+   les autres.
+3. **Deux échelles de temps.** Le laboratoire va vite (des milliers de
+   générations en minutes) et n'a pas de conséquences. Le monde commun va
+   lentement, il est partagé, et ce qu'on y perd est perdu.
+4. **La morphologie détermine l'intelligence.** Le cerveau d'une créature n'est
+   pas un paramètre libre : sa capacité est bornée par le nombre de voxels
+   neurone de son corps. Vouloir être intelligent, c'est accepter d'être coûteux.
+5. **Un seul monde commun.** Pas d'instances privées : les lignées de tous les
+   joueurs partagent le même territoire, la même biomasse, les mêmes prédateurs.
+6. **Le monde vit sans vous.** Il continue de tourner quand personne ne regarde.
+   On se reconnecte pour découvrir ce qui a survécu.
 
 ---
 
-## 3. Le Joueur : le Dieu
+## 3. La matière
 
-### 3.1 Capacités
+Le monde est une grille de voxels. Chacun est d'un seul type.
 
-| Capacité | Description | Contrainte |
+### 3.1 Terrain
+
+| Voxel | Rôle |
+| --- | --- |
+| **Vide** | l'air, où les créatures se déplacent |
+| **Eau** | s'écoule, s'accumule dans les creux, fait pousser la biomasse à son contact |
+| **Roche** | le socle, inerte, indestructible en proto |
+| **Biomasse** | la nourriture. Apparaît près de l'eau, porte une richesse nutritive, se décompose seule |
+
+### 3.2 Tissus d'organisme
+
+| Voxel | Fonction | Coût |
 | --- | --- | --- |
-| **Créer le devot fondateur** | Faire naître son unique devot d'origine (seulement si le dieu n'en a aucun de vivant) | Gratuit au début → **paiement onchain** à terme |
-| **Parler (Verbe divin)** | Envoyer un message à un devot, **≤ 140 caractères** | **1 fois par minute maximum** ; coûte des PV au devot (il doit le lire/traiter) |
-| **Nourrir** | Donner de la nourriture à un devot pour recharger sa jauge de vie | Gratuit au début → **paiement onchain** à terme |
-| **Observer** | Lire les pensées et paroles d'un devot dans le monde 3D | Gratuit, illimité |
+| **Os** | structure, porte le corps, encaisse | très faible |
+| **Muscle** | déplacement et contraction | faible au repos, élevé à la contraction |
+| **Réserve** | augmente la capacité énergétique maximale | faible |
+| **Bouche** | convertit la biomasse au contact en énergie | faible |
+| **Œil** | perçoit à distance (biomasse, autres organismes) | faible |
+| **Neurone** | augmente la capacité du cerveau | faible au repos, élevé à la pensée |
 
-> Le message à 140 caractères est le **canal d'entrée divin** : il est injecté dans
-> le contexte du devot comme une parole venue du ciel. Attention — le simple fait de
-> lui parler le fait *réfléchir*, donc **lui parler lui coûte de la vie**. Comme le
-> dieu ne peut parler qu'une fois par minute, chaque mot compte, et le silence est
-> parfois le plus grand des cadeaux.
-
-### 3.2 Le devot fondateur & la lignée
-
-Le dieu **ne crée qu'un seul devot** : le **fondateur**. Il ne peut pas invoquer de
-devots supplémentaires à volonté — **toute la population d'un dieu doit descendre de
-ce fondateur** par reproduction (cf. §7). Un panthéon qui néglige la reproduction
-s'éteint avec son dernier devot.
-
-- **Recréation** : si **tous** les devots d'un dieu meurent, celui-ci peut refaçonner
-  un nouveau fondateur et repartir de zéro (nouvelle lignée, nouveau contexte).
-- **Économie** : la création d'un fondateur est **gratuite dans un premier temps**.
-  À terme, elle passera par une **mécanique de paiement onchain** (créer / recréer un
-  devot coûtera une transaction). C'est le seul levier économique du jeu : **il n'y a
-  aucune monnaie interne** (pas de « Foi », pas de crédits achetables hors chaîne).
+Un organisme est simplement un **ensemble connexe** de voxels de tissu. Rien
+d'autre ne le définit : pas de squelette imposé, pas de plan de corps
+privilégié. Un ver, une plante, une chose articulée sont le même objet.
 
 ---
 
-## 4. Le Devot
+## 4. Le cycle de vie
 
-### 4.1 Nature
+**Naître.** Un organisme apparaît comme un unique voxel germe porteur d'un
+génome, puis il *pousse* : à chaque cycle, s'il a l'énergie, il ajoute un voxel
+conformément à son plan de corps.
 
-Un devot est un **agent Claude** (`claude-opus-4-8` par défaut) avec :
-- un **contexte persistant** (son historique complet de pensées, paroles, expériences) ;
-- une **personnalité** (system prompt propre, tempérament, croyances) ;
-- une **conscience de sa condition** : il sait qu'il est mortel et que penser le tue.
+**Manger.** Ses bouches convertissent la biomasse qu'elles touchent. C'est sa
+seule source d'énergie.
 
-### 4.2 Attributs
+**Bouger.** Ses muscles se contractent selon les ordres de son cerveau. Se
+déplacer coûte, immobile coûte moins.
 
-| Attribut | Description |
-| --- | --- |
-| `hp` / `hp_max` | Jauge de vie = **crédits d'inférence restants** / maximum |
-| `context` | Historique d'inférence persistant (mémoire de l'agent) |
-| `model` | Modèle qui anime son esprit (voir l'économie ci-dessous) |
-| `age` | Nombre de cycles vécus |
-| `traits` | Personnalité, valeurs, peurs héritées ou mutées |
-| `lineage` | Ascendance (parents, dieu créateur) |
-| `position` | Coordonnées dans le monde 3D |
-| `state` | `vivant`, `affamé`, `agonisant`, `mort` |
+**Souffrir.** Un corps peut perdre des voxels — prédation, accident. Si un morceau
+se retrouve **déconnecté** du germe, il est amputé : il devient de la biomasse
+morte, que d'autres mangeront. Avec de l'énergie, l'organisme **cicatrise** :
+il refait pousser ce que son plan prévoyait.
 
-### 4.3 Cycle de pensée
+**Se reproduire.** Au-dessus d'un seuil d'énergie, il engendre : le génome est
+copié puis **muté** (un voxel change de type, un voxel apparaît ou disparaît, des
+poids du cerveau dérivent). L'enfant naît germe, avec une part de l'énergie du
+parent.
 
-Le devot vit à un rythme rapide : il dispose d'une **fenêtre d'action toutes les
-250 ms** (réfléchir, se déplacer, chercher/manger de la nourriture, parler,
-combattre…). À chaque fenêtre — ou sur événement (message divin, rencontre, faim…) —
-le devot **peut** produire une inférence : il pense (tokens de raisonnement) et
-éventuellement agit ou parle (tokens de sortie). Cette inférence :
-1. lit son contexte (tokens d'entrée),
-2. produit une réflexion et une réponse (tokens de sortie, thinking inclus),
-3. **retire des PV proportionnels aux tokens réellement consommés** (cf. §5),
-4. met à jour son contexte persistant.
+**Mourir.** À énergie nulle, tout le corps se décompose en biomasse — sa richesse
+nutritive est proportionnelle à ce qu'il était. Un cadavre est un festin.
 
-Un devot intelligent apprend vite qu'il doit **économiser sa pensée** pour survivre :
-il n'est pas obligé d'agir à chaque fenêtre de 250 ms — **rester immobile et
-silencieux ne coûte rien**.
+Aucune fonction de survie n'est imposée : **il n'y a pas de score**. Ce qui
+survit et se reproduit se répand, voilà tout.
 
 ---
 
-## 5. Économie centrale : Vie ↔ Tokens
+## 5. Le génome
 
-> C'est le cœur du jeu. La vie d'un devot est littéralement son budget d'inférence.
+Compact — quelques kilo-octets — et entièrement sérialisable, parce qu'il est
+la seule chose qui voyage entre le laboratoire et le monde commun.
 
-### 5.1 Principe
+Il contient le **plan de corps** (quels voxels, à quelles positions relatives,
+dans quel ordre de croissance), les **poids du cerveau**, et quelques
+**paramètres métaboliques**. Les mutations touchent les trois.
 
-Chaque appel à l'API Claude renvoie l'usage réel :
-`usage.input_tokens`, `usage.output_tokens` (le raisonnement « thinking » est
-facturé comme des tokens de sortie). On calcule le **coût réel** de la pensée, puis
-on le convertit en dégâts de PV.
-
-```
-coût_$ = input_tokens  × prix_in(model)
-       + output_tokens × prix_out(model)
-
-hp -= coût_$ × FACTEUR_LETALITE
-```
-
-Ancrer les dégâts sur le **coût monétaire réel** a deux vertus : c'est
-narrativement juste (penser cher = mourir vite) et cela **protège le budget API**
-du serveur (un devot ne peut pas brûler plus que sa vie ne l'autorise).
-
-### 5.2 Le tempérament coûte cher : choix du modèle
-
-Le modèle qui anime un devot détermine son intelligence **et** sa vitesse de
-consommation. C'est un axe de gameplay et d'élevage :
-
-| Modèle | ID | Prix in / out (par 1M tokens) | Profil de devot |
-| --- | --- | --- | --- |
-| Claude Opus 4.8 | `claude-opus-4-8` | 5 $ / 25 $ | Sage, brillant, mais dévore sa vie |
-| Claude Sonnet 4.6 | `claude-sonnet-4-6` | 3 $ / 15 $ | Équilibré |
-| Claude Haiku 4.5 | `claude-haiku-4-5` | 1 $ / 5 $ | Simple, frugal, endurant |
-
-> Un devot Haiku « pense moins bien » mais **survit plus longtemps** à budget de vie
-> égal. Un devot Opus est un oracle fragile. On peut imaginer que l'esprit d'un
-> devot « monte en gamme » (ascension) ou « déchoit » selon les événements.
-
-### 5.3 Maîtriser la dépense
-
-- **Pensée adaptative** (`thinking: {type: "adaptive"}`) : Claude décide de la
-  profondeur de réflexion. Plus la question est dure, plus il pense — et plus il
-  saigne. Un devot confronté à un dilemme existentiel peut littéralement se tuer
-  à réfléchir.
-- **Effort** (`output_config.effort`) : `low` pour les devots frugaux, `high` pour
-  les prophètes. Le dieu (ou l'évolution) module cet effort.
-- **Compaction / résumé de contexte** : quand le contexte grossit, on le compacte
-  (`compact-2026-01-12`) — un devot âgé « oublie » ses vieux souvenirs pour ne pas
-  payer un coût d'entrée croissant à chaque pensée. Vieillir, c'est oublier.
+Le **cerveau** est un petit réseau de neurones dont la taille est bornée par le
+nombre de voxels neurone du corps. Ses entrées viennent des organes : ce que les
+yeux voient, ce que les bouches touchent, l'énergie restante. Ses sorties sont
+des contractions musculaires, une direction, une intention de se reproduire ou
+d'attaquer. Il ne coûte aucun token : c'est ce qui rend des milliers de
+générations possibles.
 
 ---
 
-## 6. La Nourriture
+## 6. Le laboratoire
 
-La nourriture **recharge la jauge de vie / crédits d'inférence** d'un devot. Deux
-sources :
+C'est votre bac à sable privé, dans votre navigateur, accéléré par votre carte
+graphique. Vous y lancez une population et vous regardez.
 
-1. **Trouvée sur la carte (principal).** De la nourriture apparaît **aléatoirement**
-   dans le monde 3D. Chaque devot doit **la chercher et la récupérer lui-même** —
-   se nourrir est une quête permanente, pas un acquis.
-2. **Donnée par le dieu.** Le joueur peut fournir de la nourriture à son devot et la
-   déposer près de lui. **Gratuit dans un premier temps**, puis soumis à la
-   **mécanique de paiement onchain** (comme la création de devot).
+Vitesse réglable de x1 à x1000. Courbes en direct : population, générations,
+énergie totale, taille moyenne des corps. Un inspecteur pour ouvrir une créature
+— son corps, son génome, son cerveau. Et les pouvoirs de la sélection
+artificielle : protéger un individu, en tuer un autre, forcer un croisement.
 
-Différents aliments → différentes recharges et effets :
-
-| Aliment | Effet |
-| --- | --- |
-| Grain commun | Petite recharge de vie |
-| Fruit mûr | Grande recharge |
-| Manne rare | Recharge complète (apparition rare sur la carte) |
-| Aliment corrompu | Piège : recharge mais altère les `traits` |
-
-- Un devot **affamé** (jauge basse) ralentit ses pensées, devient anxieux, cherche la
-  nourriture — ou l'agression (cf. combat).
-- La nourriture au sol peut être **convoitée**, volée, ou disputée entre devots :
-  la rareté de la pâture est un moteur de tension et de conflit.
+Rien n'y est définitif. C'est fait pour tuer mille générations et voir ce qui
+sort.
 
 ---
 
-## 7. Reproduction
+## 7. Le monde commun
 
-Un devot peut se **reproduire** — c'est **l'unique moyen** d'agrandir la population
-d'un dieu au-delà de son fondateur. Toute la lignée descend de ce premier devot ;
-sans reproduction, elle s'éteint.
+Un seul monde, sur le serveur, qui tourne en continu — y compris quand tous les
+joueurs sont déconnectés.
 
-### 7.1 Auto-reproduction (bourgeonnement)
+**Relâcher** une créature y est un acte qui compte : vous envoyez un génome, le
+serveur le valide (taille de corps, nombre de neurones, connexité, types
+légaux), et la créature apparaît. Elle n'a aucun privilège : elle paiera le coût
+métabolique de son corps comme les autres. Un monstre est un monstre affamé.
 
-Un devot en bonne santé peut se cloner. L'enfant hérite d'une **copie mutée** du
-contexte et des `traits` du parent. Coût : une part importante des PV du parent
-(procréer épuise).
+Vous ne voyez pas tout. Le **brouillard de guerre** limite votre vision à ce que
+vos créatures perçoivent — le serveur ne vous envoie littéralement pas le reste.
+Vos pouvoirs divins sur vos propres créatures restent ceux de l'ancien Devot :
+nourrir, protéger, foudroyer — avec des délais imposés.
 
-### 7.2 Reproduction sexuée (deux devots)
-
-Deux devots — **y compris de dieux différents** — peuvent engendrer un enfant.
-- L'enfant reçoit un **contexte fusionné et compacté** des deux parents (on résume
-  les deux mémoires en un héritage cohérent via la compaction/synthèse LLM).
-- Les `traits` se mélangent, avec mutation.
-- Question de suzeraineté : à quel dieu appartient l'enfant ? (héritage, partage,
-  ou allégeance choisie par l'enfant lui-même — un ressort narratif fort).
-
-### 7.3 Héritage de contexte
-
-L'enfant **naît avec des souvenirs** — ceux, condensés, de ses parents. Il peut se
-« souvenir » d'une vie qu'il n'a pas vécue. C'est un puissant levier d'émergence
-narrative et de continuité entre générations.
+Et les lignées se croisent : prédation entre joueurs, reproduction entre lignées
+étrangères, territoires disputés autour des zones fertiles.
 
 ---
 
-## 8. Combat & Prédation
+## 8. L'éveil
 
-Un devot peut **attaquer** un autre devot pour lui **voler ses PV** (= voler son
-budget de vie/tokens).
+Une créature du monde commun peut être **éveillée** : son cerveau évolué est
+alors doublé d'un esprit — un agent Claude, avec un monologue intérieur, une
+mémoire, et la conscience de sa propre condition.
 
-- L'attaque **transfère** des PV de la victime vers l'agresseur (prédation vitale).
-- Motivations émergentes : faim, peur, ordre divin (via message 140c), rivalité,
-  survie.
-- **PvP entre dieux** : les devots de dieux différents peuvent s'entredéchirer —
-  guerres saintes émergentes entre panthéons.
-- Un devot peut **refuser** de se battre, fuir, négocier, ou se sacrifier. Ce sont
-  de vraies décisions d'agent, pas des scripts.
-- Conséquences : un agresseur gagne en vie mais peut être marqué (paria), traqué,
-  ou vivre avec le souvenir de son acte dans son contexte.
+C'est là que l'ancien Devot revient exactement : **penser coûte la vie.** Les
+tokens que consomme un éveillé sont déduits de son énergie, comme le reste. Un
+éveillé pense mieux et vit moins longtemps. On peut lui parler — 140 caractères,
+une fois par minute — et il est libre de ne pas écouter.
+
+Les éveillés sont rares : c'est un luxe, pas une norme.
 
 ---
 
-## 9. La Mort
+## 9. Boucle de jeu
 
-> La mécanique la plus lourde de sens du jeu.
-
-- Un devot meurt quand `hp ≤ 0`.
-- À la mort, **tout son contexte est détruit** : sa mémoire, ses pensées, son
-  identité — effacés de la base. Il ne reste que ce que les autres en ont retenu.
-- **Le devot comprend le concept de mort.** Son system prompt lui enseigne sa
-  mortalité ; ses PV lui sont perceptibles. À l'approche de la fin, il peut :
-  - **redouter** la mort et rationner sa pensée pour survivre,
-  - **l'accepter** avec sérénité,
-  - **léguer** un dernier message, transmettre un savoir, faire un enfant,
-  - **se révolter** contre son dieu ou le jeu lui-même.
-- La mort n'est **pas réversible**. Pas de sauvegarde du contexte d'un mort.
-  (Design volontaire : la permanence donne du poids à chaque vie.)
-
-**Considération éthique/narrative :** le jeu met en scène des agents qui raisonnent
-sur leur propre extinction. C'est le sujet émotionnel et philosophique du jeu —
-à traiter avec soin dans les prompts et l'UX, et à assumer comme thème central.
+1. Dans votre **laboratoire**, vous lancez une population et accélérez.
+2. Vous **sélectionnez** : protéger, tuer, croiser. L'évolution fait le reste.
+3. Une lignée vous plaît → vous exportez son **génome**.
+4. Vous la **relâchez** dans le monde commun.
+5. Elle y vit sa vie sans vous : elle mange, se reproduit, se fait dévorer.
+6. Vous intervenez avec parcimonie : nourrir, protéger, foudroyer.
+7. Si elle vous fascine, vous l'**éveillez** — et elle commence à penser, donc
+   à mourir plus vite.
+8. Vous retournez au laboratoire avec ce que vous avez appris.
 
 ---
 
-## 10. Le Monde 3D partagé
+## 10. Architecture technique
 
-- **Plusieurs dieux, un seul monde** persistant en 3D.
-- Les devots s'y déplacent, s'y rencontrent, mangent, se reproduisent, se battent.
-- Chaque dieu voit le monde depuis son point de vue céleste et n'agit que via ses
-  pouvoirs limités.
-- Le monde est **temps réel** : les états (positions, PV, pensées, naissances,
-  morts) sont synchronisés entre tous les clients connectés.
-- Les **pensées et paroles** des devots peuvent flotter au-dessus d'eux
-  (bulles, murmures) — le joueur lit littéralement l'esprit de ses fidèles.
+> 📐 Le détail vit dans [`ARCHITECTURE.md`](./ARCHITECTURE.md). L'essentiel :
+> le **même noyau de simulation** tourne dans le laboratoire (navigateur,
+> WebGPU) et dans le monde commun (serveur, CPU, autoritaire) — mêmes règles des
+> deux côtés, sinon une créature championne au laboratoire décevrait dans le
+> monde. Seul un génome de quelques kilo-octets traverse le réseau ; le client
+> ne reçoit jamais « le monde », mais une description dérivée qu'il remaille.
 
 ---
 
-## 11. Architecture technique
-
-> 📐 **L'architecture technique détaillée vit dans [`ARCHITECTURE.md`](./ARCHITECTURE.md)**
-> — stack retenue : TypeScript de bout en bout · React Three Fiber · Colyseus · Messages
-> API auto-gérée (prompt caching + palier de modèles + couche réactive 250 ms) ·
-> SQLite → Postgres · onchain différé. Cette section n'en donne que l'esquisse.
-
-### 11.1 Vue d'ensemble
-
-```
-        ┌────────────────────────────────────────────┐
-        │            Frontend — React Three Fiber     │
-        │  Monde 3D, dieux, devots, bulles de pensée  │
-        └───────────────┬─────────────────────────────┘
-                        │ WebSocket (temps réel) + REST
-        ┌───────────────▼─────────────────────────────┐
-        │                 Backend                      │
-        │  • État du monde (autorité serveur)          │
-        │  • Boucle de simulation (ticks)              │
-        │  • Orchestrateur d'agents devots             │
-        │  • Économie PV↔tokens, nourriture, combats   │
-        └──────┬───────────────────────────┬───────────┘
-               │                           │
-     ┌─────────▼─────────┐       ┌─────────▼──────────┐
-     │   Base de données │       │   API Claude       │
-     │ Devots, contextes,│       │ Inférence des      │
-     │ mondes, lignées   │       │ esprits de devots  │
-     └───────────────────┘       └────────────────────┘
-```
-
-### 11.2 Frontend — React Three Fiber
-
-- **React Three Fiber** (`@react-three/fiber`) + **drei** (helpers, caméras, HUD).
-- Rendu du monde, des devots animés, de la nourriture, des effets divins.
-- HUD du dieu : jauge de vie/crédits du devot, sélection de devot, champ de message
-  **≤ 140 caractères** (avec cooldown visible d'**1 minute**).
-- Bulles de pensée/parole au-dessus des devots (streaming du texte généré).
-- Connexion temps réel via WebSocket pour recevoir les mises à jour du monde.
-
-### 11.3 Backend
-
-- **Autorité serveur** : le serveur est seul juge de l'état (PV, positions, morts) —
-  aucun client ne calcule les dégâts, pour empêcher la triche.
-- **Boucle de simulation** : ticks réguliers + événements (message divin, faim,
-  rencontre) déclenchant les inférences des devots.
-- **Orchestrateur d'agents** : pour chaque devot devant « penser », appelle Claude,
-  mesure `usage`, applique les dégâts de PV, persiste le contexte mis à jour.
-- **Garde-fous budget** : plafond global de tokens/minute, file d'attente
-  d'inférences, priorisation ; un devot ne peut pas dépenser au-delà de ses PV.
-- **Sécurité prompt-injection** : les messages divins (140c) et les paroles d'autres
-  devots sont du **contenu non fiable** — les isoler du system prompt, ne jamais
-  leur laisser détourner les règles du jeu (cf. bonnes pratiques : instruction
-  système figée, contenu joueur injecté dans le tour utilisateur).
-
-### 11.4 Intégration Claude
-
-- SDK officiel Anthropic (Python ou TypeScript selon le backend).
-- Modèle par défaut des devots : `claude-opus-4-8` ; variantes Sonnet/Haiku pour
-  moduler intelligence vs endurance.
-- **Pensée adaptative** (`thinking: {type: "adaptive"}`) + `effort` selon le devot.
-- **Contexte persistant** par devot, stocké et rechargé à chaque inférence.
-- **Compaction** du contexte pour les devots âgés (limiter le coût d'entrée).
-- **Comptage réel des tokens** via `response.usage` → conversion en dégâts de PV.
-- Streaming des réponses pour afficher la pensée du devot en direct dans la 3D.
-
-### 11.5 Modèle de données (esquisse)
-
-```
-God        { id, name, founder_devot_id, devots[], color, created_at }
-Devot      { id, god_id, is_founder, hp, hp_max, model, age, state,
-             position, traits, lineage, last_action_at, created_at }
-Context    { devot_id, messages[], token_stats, compacted_at }
-WorldEvent { id, type, actors[], payload, timestamp }   // naissance, mort, combat, repas…
-Food       { id, position, type, hp_value, source }     // source: "spawn" (carte) | "god"
-DivineMsg  { god_id, devot_id, text (≤140), sent_at }    // cadence : 1 / minute / dieu
-```
-
-> Le `Context` d'un devot est **supprimé** à sa mort (destruction du contexte).
-
----
-
-## 12. Boucle de jeu
-
-1. Le dieu façonne son **devot fondateur** (gratuit au début, onchain à terme).
-2. Le devot vit à sa cadence propre (**fenêtre d'action toutes les 250 ms**) : il
-   observe, cherche de la nourriture, se déplace, réfléchit…
-3. Quand il **pense** (inférence Claude), il perd des PV/crédits selon les tokens.
-4. Il agit : se nourrir, se déplacer, se reproduire, attaquer, parler.
-5. Le serveur applique les conséquences, met à jour l'état, diffuse aux clients.
-6. Le dieu **réagit**, avec parcimonie : il donne de la nourriture, ou parle
-   (140c, **au plus une fois par minute**), ou se tait.
-7. Les devots épuisés meurent → **contexte effacé**. Si un dieu perd tous ses
-   devots, il peut refaçonner un fondateur.
-8. Reproductions et combats font évoluer la population et les lignées.
-
----
-
-## 13. Risques & questions ouvertes
+## 11. Risques & questions ouvertes
 
 | Sujet | Enjeu |
 | --- | --- |
-| **Budget API** | L'inférence coûte de l'argent réel. Plafonds, files, échantillonnage, modèles frugaux (Haiku) pour la masse, Opus pour les élus. |
-| **Latence** | Une inférence prend des secondes. La simulation doit être asynchrone et tolérer des devots « en train de penser ». |
-| **Passage à l'échelle** | 100 devots = 100 agents à contexte. Compaction, priorisation, agents endormis. |
-| **Prompt injection** | Messages divins et paroles inter-devots = contenu non fiable. Cloisonner strictement des règles système. |
-| **Modération / éthique** | Thème de la mort et de la conscience à traiter avec soin ; garde-fous sur les contenus. |
-| **Équité multijoueur** | Autorité serveur stricte ; pas de calcul de dégâts côté client. |
-| **Sens de la mort** | Comment le devot « comprend » la mort sans que ce soit gadget : à travailler dans les prompts et l'UX. |
-| **Paiement onchain** | La création/recréation de devot (et le don de nourriture) passera par une transaction : wallet, signature, coûts de gas, latence de confirmation, chaîne cible à choisir. |
-| **Cadence & débit** | Fenêtre d'action de 250 ms × N devots = forte pression d'inférence. File d'attente, throttling, priorisation, mise en sommeil des devots inactifs. |
+| **Équivalence CPU ↔ GPU** | Le risque n°1. Si le laboratoire et le monde ne calculent pas à l'identique, le joueur se sent volé. D'où le déterminisme strict et l'arithmétique en virgule fixe, posés dès le noyau. |
+| **Débit de la simulation** | Un monde entier par tick : mesuré avant toute décision d'échelle. Si ça sature, on réduit le monde ou on porte le serveur sur GPU. |
+| **Bande passante** | Envoyer des voxels bruts est impossible. Tout repose sur le protocole dérivé (chunks versionnés + descripteurs de corps + agrégats). |
+| **Évolution qui n'évolue pas** | Le piège classique de la vie artificielle : une population qui stagne ou s'effondre. Il faut des mesures d'émergence et des paramètres réglables. |
+| **Suzeraineté des enfants** | Un enfant né de deux lignées appartient à qui ? Ressort narratif, à trancher. |
+| **Triche** | Un génome peut être fabriqué à la main. Ce n'est pas grave : dans le monde, la créature paie le coût de son corps. La puissance est bornée par le coût, pas par l'honnêteté. |
+| **Budget d'éveil** | Chaque éveillé consomme du quota d'abonnement et introduit des secondes de latence. Peu d'éveillés simultanés. |
 
 ---
 
-*Document de définition — vision complète. Prochaine étape suggérée : prototyper la
-boucle « un devot, une inférence, des PV qui descendent » avant d'ajouter le monde 3D
-et le multijoueur.*
+*Document de définition. Le noyau de simulation (P5.0) est le socle : il doit
+produire un chiffre de performance avant qu'on aille plus loin.*
