@@ -10,6 +10,7 @@
  * Nothing coming from a client is taken on trust. `validateAppearance` is called
  * server-side before any birth.
  */
+import { PERCEPTION_RADIUS } from "./constants.js";
 
 // ── Appearance slots ────────────────────────────────────────────────────────
 
@@ -398,4 +399,17 @@ export function describeAppearance(a: Appearance): string {
 export function describeIdentity(identityJson: string): string {
   const identity = decodeIdentity(identityJson);
   return identity ? describeAppearance(identity.appearance) : "of unremarkable appearance";
+}
+
+/**
+ * How far a devot sees, from its stats alone.
+ *
+ * Shared deliberately: the simulation uses it to decide what enters a devot's
+ * prompt, and the client uses it to draw the fog of war. A single formula, so
+ * the circle the player watches is exactly the circle the mind is told about —
+ * a fog drawn at a fixed radius would quietly lie about what a sharp-eyed or
+ * short-sighted devot actually perceives.
+ */
+export function sightRadiusFromStats(stats: Stats): number {
+  return PERCEPTION_RADIUS * statMultiplier(stats.sight);
 }

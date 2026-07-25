@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import {
   DEFAULT_APPEARANCE,
-  PERCEPTION_RADIUS,
+  DEFAULT_STATS,
+  sightRadiusFromStats,
   decodeIdentity,
   type ItemKind,
 } from "@devot/shared";
@@ -29,15 +30,21 @@ const FOOD_COLORS: Record<string, string> = {
   corrompu: "#9c4ce0",
 };
 
-type VisionCircle = { x: number; z: number };
+/**
+ * One devot's field of view. The radius is PER DEVOT, from its sight stat, and
+ * comes from the same formula the simulation uses to decide what enters that
+ * devot's prompt. A fixed radius here would draw a circle that lies: a
+ * sharp-eyed devot would perceive things the player sees as dark, and a
+ * short-sighted one would appear to see what it cannot.
+ */
+type VisionCircle = { x: number; z: number; r: number };
 
 function isVisible(x: number, z: number, vision: VisionCircle[], godMode: boolean): boolean {
   if (godMode) return true;
-  const r2 = PERCEPTION_RADIUS * PERCEPTION_RADIUS;
   return vision.some((v) => {
     const dx = x - v.x;
     const dz = z - v.z;
-    return dx * dx + dz * dz <= r2;
+    return dx * dx + dz * dz <= v.r * v.r;
   });
 }
 
@@ -62,9 +69,9 @@ function PrairieGround({
     () =>
       new THREE.ShaderMaterial({
         uniforms: {
-          uVision: { value: Array.from({ length: MAX_VISION }, () => new THREE.Vector2()) },
+          // xy = centre, z = that devot's own sight radius.
+          uVision: { value: Array.from({ length: MAX_VISION }, () => new THREE.Vector3()) },
           uCount: { value: 0 },
-          uRadius: { value: PERCEPTION_RADIUS },
           uAllLit: { value: 0 },
           uLit: { value: GRASS_LIT },
           uDark: { value: GRASS_DARK },
@@ -78,9 +85,8 @@ function PrairieGround({
           }
         `,
         fragmentShader: /* glsl */ `
-          uniform vec2 uVision[${MAX_VISION}];
+          uniform vec3 uVision[${MAX_VISION}];
           uniform int uCount;
-          uniform float uRadius;
           uniform float uAllLit;
           uniform vec3 uLit;
           uniform vec3 uDark;
@@ -98,8 +104,9 @@ function PrairieGround({
             float vis = uAllLit;
             for (int i = 0; i < ${MAX_VISION}; i++) {
               if (i >= uCount) break;
-              float d = distance(vWorld, uVision[i]);
-              vis = max(vis, 1.0 - smoothstep(uRadius - 1.5, uRadius + 3.5, d));
+              float r = uVision[i].z;
+              float d = distance(vWorld, uVision[i].xy);
+              vis = max(vis, 1.0 - smoothstep(r - 1.5, r + 3.5, d));
             }
             gl_FragColor = vec4(mix(uDark, grass, clamp(vis, 0.0, 1.0)), 1.0);
           }
@@ -109,10 +116,10 @@ function PrairieGround({
   );
 
   useFrame(() => {
-    const arr = material.uniforms.uVision!.value as THREE.Vector2[];
+    const arr = material.uniforms.uVision!.value as THREE.Vector3[];
     for (let i = 0; i < MAX_VISION; i++) {
       const v = vision[i];
-      if (v) arr[i]!.set(v.x, v.z);
+      if (v) arr[i]!.set(v.x, v.z, v.r);
     }
     material.uniforms.uCount!.value = Math.min(vision.length, MAX_VISION);
     material.uniforms.uAllLit!.value = godMode ? 1 : 0;
@@ -536,10 +543,15 @@ export function Scene({
   const godColor = (id: string): string =>
     snapshot.gods.find((g) => g.id === id)?.color ?? "#cccccc";
 
-  // Brouillard de guerre : le monde n'est net qu'autour de mes devots vivants.
+  // Fog of war: the world is only clear around my own living devots, each one
+  // seeing exactly as far as its sight stat allows.
   const vision: VisionCircle[] = snapshot.devots
     .filter((d) => d.godId === godId && d.state !== "dead")
-    .map((d) => ({ x: d.x, z: d.z }));
+    .map((d) => ({
+      x: d.x,
+      z: d.z,
+      r: sightRadiusFromStats(decodeIdentity(d.identity)?.stats ?? DEFAULT_STATS),
+    }));
 
   const visibleDevots = snapshot.devots.filter(
     (d) => d.godId === godId || isVisible(d.x, d.z, vision, godMode),

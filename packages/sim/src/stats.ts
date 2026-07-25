@@ -3,8 +3,8 @@ import {
   DEFAULT_STATS,
   DEVOT_SPEED,
   HP_MAX_DEFAULT,
-  PERCEPTION_RADIUS,
   decodeIdentity,
+  sightRadiusFromStats,
   statMultiplier,
   type DevotEntity,
   statsWithItems,
@@ -65,7 +65,7 @@ export function speedOf(devot: DevotEntity): number {
 
 /** Perception radius: what this devot sees, hence what enters its head. */
 export function sightOf(devot: DevotEntity): number {
-  return PERCEPTION_RADIUS * statMultiplier(statsOf(devot).sight);
+  return sightRadiusFromStats(statsOf(devot));
 }
 
 /** HP drained per tick when this devot attacks. */

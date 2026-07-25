@@ -12,6 +12,7 @@ import {
   TICK_MS,
   canCraft,
   describeIdentity,
+  describeItems,
   recipeOf,
 } from "@devot/shared";
 import { drainOf, sightOf, speedOf } from "./stats.js";
@@ -245,6 +246,68 @@ export function perceptionSystem(world: World, now: number = Date.now()): Trigge
     }
   }
   return triggers;
+}
+
+/**
+ * WHAT A DEVOT CAN SEE, RIGHT NOW.
+ *
+ * Perception used to fire once per novelty: a devot met was never mentioned
+ * again, so a mind could be deciding while blind to a rival that had walked up
+ * beside it. This builds the current picture instead, and it is appended to
+ * every thought — so a devot always decides on what is actually around it.
+ *
+ * Bounded by that devot's own sight, which is the same radius the client draws
+ * as fog of war: what the player sees lit is exactly what the mind is told.
+ *
+ * Capped on purpose. A sharp-eyed devot in a crowd would otherwise pour a long
+ * list into its own prompt, and pay for every token of it with its life.
+ */
+const SEEN_DEVOTS_MAX = 6;
+const SEEN_FOOD_MAX = 4;
+
+export function describeSurroundings(devot: DevotEntity, world: World): string {
+  const r2 = sightOf(devot) ** 2;
+  const lines: string[] = [];
+
+  const others = world
+    .aliveDevots()
+    .filter((o) => o.id !== devot.id && dist2(devot.pos, o.pos) <= r2)
+    .sort((a, b) => dist2(devot.pos, a.pos) - dist2(devot.pos, b.pos));
+
+  for (const o of others.slice(0, SEEN_DEVOTS_MAX)) {
+    const d = Math.sqrt(dist2(devot.pos, o.pos));
+    const line = o.godId === devot.godId ? "your own line" : "a rival line";
+    const condition =
+      o.state === "dying" ? ", dying" : o.state === "starving" ? ", starving" : "";
+    // Who is attacking whom is the single most decision-changing fact in view.
+    const fighting =
+      o.currentGoal.kind === "attack"
+        ? o.currentGoal.targetId === devot.id
+          ? " — ATTACKING YOU"
+          : " — attacking someone else"
+        : "";
+    lines.push(
+      `- ${o.name} (id "${o.id}"), of ${line}, ${d.toFixed(1)} away at x=${o.pos.x.toFixed(1)}, z=${o.pos.z.toFixed(1)}${condition}, ${describeItems(o.items)}${fighting}`,
+    );
+  }
+  if (others.length > SEEN_DEVOTS_MAX) {
+    lines.push(`- and ${others.length - SEEN_DEVOTS_MAX} more devots, further off`);
+  }
+
+  const foods = [...world.food.values()]
+    .filter((f) => dist2(devot.pos, f.pos) <= r2)
+    .sort((a, b) => dist2(devot.pos, a.pos) - dist2(devot.pos, b.pos));
+  for (const f of foods.slice(0, SEEN_FOOD_MAX)) {
+    const d = Math.sqrt(dist2(devot.pos, f.pos));
+    lines.push(
+      `- food (${f.type}, id "${f.id}"), ${d.toFixed(1)} away at x=${f.pos.x.toFixed(1)}, z=${f.pos.z.toFixed(1)}`,
+    );
+  }
+
+  if (lines.length === 0) {
+    return "Around you, as far as you can see: nothing and no one.";
+  }
+  return `Around you, as far as you can see (beyond this you know nothing):\n${lines.join("\n")}`;
 }
 
 /** Applies a mind's decision to the body (new goal, utterance, …). */

@@ -37,8 +37,16 @@ import {
   type JournalRequestMsg,
   type SmiteMsg,
   type SpeakMsg,
+  type Trigger,
 } from "@devot/shared";
-import { applyDecision, dist2, perceptionSystem, tick, World } from "@devot/sim";
+import {
+  applyDecision,
+  describeSurroundings,
+  dist2,
+  perceptionSystem,
+  tick,
+  World,
+} from "@devot/sim";
 import { canRecreateFounder, processReproductions } from "../lifecycle.js";
 
 const GOD_COLORS = ["#e0b34c", "#4ca6e0", "#9c4ce0", "#4ce07a", "#e04c5f"];
@@ -217,7 +225,7 @@ export class WorldRoom extends Room<WorldState> {
     });
     this.repos.events.record("birth", [devot.id], { founder: true, godId });
 
-    this.orchestrator.enqueue({
+    this.wake({
       kind: "idle_reflection",
       devotId: devot.id,
       eventText:
@@ -382,7 +390,7 @@ export class WorldRoom extends Room<WorldState> {
     this.repos.divineMsgs.record(godId, devot.id, msg.text);
 
     // Untrusted content: fenced, injected into the user turn only.
-    this.orchestrator.enqueue({
+    this.wake({
       kind: "divine_message",
       devotId: devot.id,
       eventText: `A voice from the sky tells you: "${msg.text}"`,
@@ -412,6 +420,23 @@ export class WorldRoom extends Room<WorldState> {
     this.spawnFood("god", { x, z }, "fruit", 4000);
   }
 
+  /**
+   * Wakes a mind, with everything that devot can currently see attached.
+   *
+   * Triggers say what just happened; they do not say what is standing next to
+   * you. A devot woken by hunger while a rival closes in was deciding blind.
+   * Appending the surroundings to every thought fixes that without buying more
+   * thoughts — the picture rides along with the one we were already paying for.
+   */
+  private wake(trigger: Trigger): void {
+    const devot = this.world.devots.get(trigger.devotId);
+    if (!devot) return;
+    this.orchestrator.enqueue({
+      ...trigger,
+      eventText: `${trigger.eventText}\n\n${describeSurroundings(devot, this.world)}`,
+    });
+  }
+
   // ── Simulation ───────────────────────────────────────────────────────────
 
   private simulate(): void {
@@ -423,16 +448,16 @@ export class WorldRoom extends Room<WorldState> {
     }
 
     for (const t of [...result.triggers, ...perceptionSystem(this.world)]) {
-      this.orchestrator.enqueue(t);
+      this.wake(t);
     }
 
     for (const { attackerId, victimId, drained } of result.combats) {
       if (this.tickCount % 8 === 0) {
         this.repos.events.record("combat", [attackerId, victimId], { drained });
       }
-      // Le combat se voit : on diffuse le transfert pour que le client trace le
-      // trait, fasse monter les chiffres et fasse clignoter la victime. Sans
-      // that, life theft — the heart of the game — stays invisible.
+      // Combat must be seen: we broadcast the transfer so the client draws the
+      // beam, floats the numbers and flashes the victim. Without that, life
+      // theft — the heart of the game — stays invisible.
       const victim = this.world.devots.get(victimId);
       this.broadcast("combat", {
         attackerId,
@@ -451,7 +476,7 @@ export class WorldRoom extends Room<WorldState> {
         console.log(
           `[world] ✚ naissance de ${birth.child.name} (${birth.mode}, dieu ${birth.child.godId})`,
         );
-        this.orchestrator.enqueue({
+        this.wake({
           kind: "idle_reflection",
           devotId: birth.child.id,
           eventText:
@@ -490,10 +515,10 @@ export class WorldRoom extends Room<WorldState> {
     for (const other of this.world.aliveDevots()) {
       if (other.id === speaker.id) continue;
       if (dist2(other.pos, speaker.pos) <= PERCEPTION_RADIUS * PERCEPTION_RADIUS) {
-        this.orchestrator.enqueue({
+        this.wake({
           kind: "utterance_heard",
           devotId: other.id,
-          eventText: `${speaker.name}, un devot proche de toi, dit : « ${utterance} »`,
+          eventText: `${speaker.name}, a devot near you, says: "${utterance}"`,
           createdAt: now,
         });
       }
