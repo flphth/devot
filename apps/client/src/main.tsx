@@ -2,19 +2,25 @@ import { createRoot } from "react-dom/client";
 import { useEffect, useState } from "react";
 import App from "./App.js";
 import Lab from "./lab/Lab.js";
+import VoxelWorldView from "./world/VoxelWorldView.js";
 
 /**
- * Deux vues, deux natures :
- * - le LABORATOIRE (P5.2) : monde privé, accéléré, où l'on fait évoluer ses
- *   lignées et d'où l'on exporte un génome ;
- * - le MONDE (jeu Devot LLM actuel ; sera remplacé par le monde commun voxel
- *   en P5.3, où le serveur reste autoritaire).
+ * Deux natures, et c'est tout le pivot :
+ * - le LABORATOIRE (P5.2) : votre monde privé, accéléré jusqu'à ×1000, où vous
+ *   faites évoluer vos lignées et d'où vous n'exportez qu'un génome ;
+ * - le MONDE COMMUN (P5.3) : l'unique monde autoritaire du serveur, simulé en
+ *   continu pour tout le monde à la fois, où les lignées de chacun se dévorent
+ *   et se reproduisent. Le client n'y simule rien.
+ *
+ * L'ancien jeu LLM (P0→P4) reste accessible par `?view=llm` ; le tag
+ * v0.4-devot-llm en garde la version complète.
  */
-type View = "lab" | "world";
+type View = "lab" | "world" | "llm";
 
 function initialView(): View {
   const q = new URLSearchParams(location.search).get("view");
   if (q === "world") return "world";
+  if (q === "llm") return "llm";
   if (q === "lab") return "lab";
   return "lab";
 }
@@ -36,7 +42,7 @@ function Root() {
 
   return (
     <div style={{ height: "100%", position: "relative" }}>
-      {view === "lab" ? <Lab /> : <App />}
+      {view === "lab" ? <Lab /> : view === "world" ? <VoxelWorldView /> : <App />}
       <div
         style={{
           position: "absolute",
@@ -55,7 +61,7 @@ function Root() {
         {(
           [
             ["lab", "🧪 Laboratoire"],
-            ["world", "🌍 Monde"],
+            ["world", "🌍 Monde commun"],
           ] as const
         ).map(([v, label]) => (
           <button

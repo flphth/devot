@@ -66,6 +66,9 @@ importers:
       '@colyseus/core':
         specifier: ^0.16.0
         version: 0.16.24(@colyseus/schema@3.0.76)(@pm2/io@6.1.0)
+      '@colyseus/schema':
+        specifier: ^3.0.0
+        version: 3.0.76
       '@colyseus/ws-transport':
         specifier: ^0.16.0
         version: 0.16.5(@colyseus/core@0.16.24(@colyseus/schema@3.0.76)(@pm2/io@6.1.0))
@@ -84,6 +87,9 @@ importers:
       '@devot/sim':
         specifier: workspace:*
         version: link:../../packages/sim
+      '@devot/sim-voxel':
+        specifier: workspace:*
+        version: link:../../packages/sim-voxel
     devDependencies:
       colyseus.js:
         specifier: ^0.16.22

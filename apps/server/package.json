@@ -6,16 +6,18 @@
   "scripts": {
     "p0": "tsx --env-file-if-exists=../../.env src/p0.ts",
     "dev": "tsx --env-file-if-exists=../../.env src/index.ts",
-    "smoke": "tsx test/worldroom.smoke.ts && tsx test/worldroom-p2.smoke.ts && tsx test/worldroom-p3.smoke.ts"
+    "smoke": "tsx test/worldroom.smoke.ts && tsx test/worldroom-p2.smoke.ts && tsx test/worldroom-p3.smoke.ts && tsx test/voxelworld.smoke.ts"
   },
   "dependencies": {
     "@colyseus/core": "^0.16.0",
+    "@colyseus/schema": "^3.0.0",
     "@colyseus/ws-transport": "^0.16.0",
     "@devot/agents": "workspace:*",
     "@devot/db": "workspace:*",
     "@devot/onchain": "workspace:*",
     "@devot/shared": "workspace:*",
-    "@devot/sim": "workspace:*"
+    "@devot/sim": "workspace:*",
+    "@devot/sim-voxel": "workspace:*"
   },
   "devDependencies": {
     "colyseus.js": "^0.16.22",

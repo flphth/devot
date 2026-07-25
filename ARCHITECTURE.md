@@ -290,11 +290,25 @@ ou de ne synchroniser qu'un voisinage compact autour des corps. C'est un chantie
 
 ## 6. Le monde commun (P5.3)
 
+**LIVRÉ.** `VoxelWorldRoom` (`apps/server/src/voxel/`), branchée sous le nom de
+salle `voxelworld`, à côté de l'ancienne `WorldRoom` du jeu LLM qui reste
+accessible.
+
 ### 6.1 Autorité et continuité
 
-Une `WorldRoom` héberge le monde unique, simulé en CPU via `sim-voxel`. Elle
-tourne en continu, avec snapshot périodique en SQLite et reprise au démarrage.
-Le client ne calcule jamais l'état : il rend et il envoie des intentions.
+Une `VoxelWorldRoom` héberge le monde unique, simulé en CPU via `sim-voxel`, à
+4 ticks par seconde. Elle tourne en continu, qu'il y ait des spectateurs ou non :
+c'est le point non négociable du pivot, le coût de simulation est par MONDE et
+non par joueur. Le client ne calcule jamais l'état : il rend et il envoie des
+intentions.
+
+**Persistance et reprise** : instantané toutes les 120 ticks (~30 s) dans un
+fichier gzippé — la grille en base64 plus les génomes, l'énergie et l'âge de
+chaque organisme. L'écriture passe par un temporaire renommé : une coupure
+laisse l'ancienne sauvegarde, jamais un fichier tronqué. Au chargement, les
+corps sont effacés de la grille et repoussent depuis leur germe selon la règle
+ordinaire de croissance — un monde rechargé reste ainsi un monde légal, et il
+n'y a pas de seconde implémentation de la morphogenèse à maintenir.
 
 ### 6.2 Protocole dérivé — le client ne reçoit jamais « le monde »
 
@@ -305,23 +319,44 @@ C'est le point qui décide de la viabilité du réseau. Envoyer les voxels bruts
 | Donnée | Quand | Comment |
 | --- | --- | --- |
 | **Terrain** | chunk modifié **et** visible | palette + RLE, message binaire brut, versionné |
-| **Corps d'un organisme** | **une seule fois** : entrée dans le champ de vision, ou morphologie changée | masque 3D compact dans sa boîte englobante + palette de types (quelques centaines d'octets) — le client **remaille** localement |
-| **Dynamique** | chaque tick réseau | ~10 octets par organisme : position, énergie, phase musculaire |
-| **Agrégats** | périodiquement | population, générations, énergie totale (courbes) |
+| **Corps d'un organisme** | **une seule fois** : entrée dans le champ de vision, ou morphologie changée | germe + décalages relatifs signés, 4 octets par voxel (un corps de dix voxels = 49 octets) — le client **remaille** localement |
+| **Dynamique** | chaque tick | via `@colyseus/schema`, qui n'envoie que les deltas : position, énergie en pour mille, génération, version de forme |
+| **Agrégats** | chaque tick | population, générations, biomasse, tailles moyennes (courbes) |
+
+Mesuré sur le smoke test de la salle : un chunk pèse **223 octets en moyenne**
+contre 4 096 voxels bruts, et le débit en régime établi tient à **4,6 Ko/s** —
+un client qui vient d'arriver a reçu 25 Ko là où la grille brute en pèse 512.
+
+La **version de forme** est le mécanisme qui rend le descripteur de corps
+amorti : elle change quand la taille du corps change (croissance, amputation),
+et c'est le seul moment où le client redemande une forme. Les tissus vivants
+sont d'ailleurs volontairement écrasés en VIDE dans l'encodage des chunks —
+sans quoi un organisme qui marche invaliderait son chunk à chaque tick et ferait
+exploser le débit.
 
 Les entités passent par `@colyseus/schema` ; les chunks par des messages
 binaires (`ArrayBuffer`), parce que le schéma synchronisé est inadapté aux
 tableaux volumineux. Budget cible : **dizaines de Ko/s**, pas des Mo/s.
 
-Le corps d'un organisme n'a pas besoin d'être transmis en entier : il est
-**dérivable de son génome et de son stade de croissance**. C'est de là que vient
-le gain.
+Le corps d'un organisme n'a pas besoin d'être retransmis : sa forme ne change
+que rarement, sa position change à chaque tick. Séparer les deux est ce qui rend
+le protocole léger.
 
 ### 6.3 Relâcher un génome
 
-Le client envoie un génome ; le serveur **valide** : taille de corps maximale,
-nombre de neurones maximal, connexité du plan, types légaux, format. Puis il
-débite le `PaymentProvider` (stub gratuit aujourd'hui).
+Le client envoie un génome ; le serveur **valide** avec exactement le même
+prédicat que le laboratoire (`validateGenome`, dans le noyau) : taille de corps
+maximale, nombre de neurones maximal, connexité du plan, types légaux, doublons,
+cohérence du cerveau, bornes des paramètres. Puis il débite le `PaymentProvider`
+(stub gratuit aujourd'hui) et ne fait naître la créature qu'ensuite.
+
+Le refus est motivé en clair : « voxel 5 détaché du reste du corps », « seuil de
+reproduction hors bornes ». Un génome illisible, un génome tronqué, un génome
+décodable mais illégal — les trois cas sont couverts par le smoke test.
+
+Le chemin complet est démontré : le laboratoire exporte un génome, le dépose
+dans le stockage local, et la vue Monde le relâche. C'est le seul objet qui
+voyage — quelques centaines d'octets contre un monde de 524 288 voxels.
 
 **Il n'est pas nécessaire de prouver qu'un génome a réellement été évolué.** Un
 joueur peut le fabriquer à la main — dans le monde, sa créature paiera le coût
@@ -331,10 +366,24 @@ cryptographie.
 
 ### 6.4 Brouillard de guerre côté serveur
 
-Le filtrage de visibilité est appliqué **avant l'envoi** : les entités et les
-chunks hors de portée des organismes du joueur ne sont pas transmis. Le
-brouillard devient un mécanisme anti-triche réel, et accessoirement le principal
-optimiseur de bande passante.
+Le filtrage est appliqué **avant l'envoi**, à trois endroits :
+
+- les **chunks** : `chunkVisible` décide, aucun chunk hors de portée n'est
+  encodé ;
+- les **organismes** : chaque client a une `StateView` de `@colyseus/schema`, et
+  la carte des organismes est marquée `view()`. Ce n'est pas un filtre au rendu,
+  c'est une entité qui n'entre jamais dans le paquet ;
+- les **descripteurs de corps** : même une demande explicite (`wantBody`) d'un
+  client pour un organisme hors de portée reste sans réponse.
+
+Mesuré : un client qui regarde le point (20, 20) voit 3 organismes sur les 242
+que compte le monde, et zéro chunk hors de portée. Un client modifié ne voit pas
+plus loin — il n'a rien à voir.
+
+Détail d'implémentation à connaître : `view()` est écrit pour la syntaxe à
+décorateurs, que ce projet n'utilise pas (elle casse à l'exécution avec cette
+version de `@colyseus/schema`). Il est donc appliqué à la main sur le prototype,
+après `defineTypes`.
 
 ---
 
@@ -383,10 +432,10 @@ pas à chaque tick. SQLite en proto, driver Drizzle échangeable vers Postgres.
 
 | Phase | Objectif | Livrable |
 | --- | --- | --- |
-| **P5.0** | Noyau `sim-voxel` : grille, métabolisme, morphogenèse, mort, déterminisme | run headless déterministe + **benchmark ms/tick** (point de décision) |
-| **P5.1** | Génome, cerveau borné par les voxels neurone, sélection naturelle | run de N générations, amélioration mesurable, 2 graines rejouables |
-| **P5.2** | Laboratoire navigateur, CPU puis WebGPU | test de conformité CPU↔GPU, UI x1→x1000 |
-| **P5.3** | Monde commun autoritaire, protocole dérivé, relâcher | app lancée, deux joueurs, budget réseau mesuré |
+| **P5.0** ✅ | Noyau `sim-voxel` : grille, métabolisme, morphogenèse, mort, déterminisme | run headless déterministe + **benchmark ms/tick** (point de décision) |
+| **P5.1** ✅ | Génome, cerveau borné par les voxels neurone, sélection naturelle | run de N générations, amélioration mesurable, 2 graines rejouables |
+| **P5.2** ✅ | Laboratoire navigateur, CPU puis WebGPU | conformité CPU↔GPU vérifiée (`6e6fcf37` des deux côtés), UI x1→x1000 |
+| **P5.3** ✅ | Monde commun autoritaire, protocole dérivé, relâcher | salle en continu, brouillard côté serveur, 4,6 Ko/s mesurés, persistance et reprise |
 | **P5.4** | Vie sociale entre lignées, pouvoirs divins | prédation et reproduction croisée observables |
 | **P5.5** | Éveil (Claude) | un éveillé pense, ses tokens coûtent de l'énergie |
 

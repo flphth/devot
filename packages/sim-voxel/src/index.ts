@@ -9,3 +9,4 @@ export * from "./passes.js";
 export * from "./spawn.js";
 export * from "./step.js";
 export * from "./stats.js";
+export * from "./wire.js";

@@ -39,6 +39,30 @@ export interface LabState {
   actions: LabActions;
 }
 
+/** Clé du champion en attente de lâcher, partagée avec la vue Monde. */
+export const CHAMPION_KEY = "devot.champion";
+
+export interface StoredChampion {
+  organismId: number;
+  genome: string; // base64
+  savedAt: number;
+}
+
+function storeChampion(bytes: Uint8Array, organismId: number): void {
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  const payload: StoredChampion = {
+    organismId,
+    genome: btoa(binary),
+    savedAt: Date.now(),
+  };
+  try {
+    localStorage.setItem(CHAMPION_KEY, JSON.stringify(payload));
+  } catch {
+    // Navigation privée, quota plein : le laboratoire reste utilisable.
+  }
+}
+
 const MAX_HISTORY = 220;
 
 export function useLab(initialSeed = 20260725, founders = 160): LabState {
@@ -97,6 +121,11 @@ export function useLab(initialSeed = 20260725, founders = 160): LabState {
             bytes: msg.bytes.byteLength,
             valid: msg.valid,
           });
+          // Le génome exporté est LA seule chose qui voyage du laboratoire vers
+          // le monde commun. On le dépose ici, pour que la vue Monde puisse le
+          // relâcher — quelques centaines d'octets, contre un monde de 524 288
+          // voxels qui, lui, ne bouge pas d'ici.
+          if (msg.valid) storeChampion(msg.bytes, msg.organismId);
           break;
         case "conformity":
           setConformity(msg.result);
