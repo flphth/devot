@@ -1,6 +1,6 @@
 import type { Devot, JournalEntry } from "./devot.ts";
 
-const µ = (n: number) => `${n.toLocaleString("en-US")} µ$`;
+const µ = (n: number) => `${n.toLocaleString("en-US")} µ`;
 
 function teeLine(entry: JournalEntry): string {
   if (!entry.tee) return "TEE      : — (mind non vérifiable)";
@@ -10,16 +10,20 @@ function teeLine(entry: JournalEntry): string {
 
 /** The "panneau Esprit": one thought with its cost and its TEE proof. */
 export function renderThought(devot: Devot, entry: JournalEntry): string {
+  const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
   const lines = [
     `┌─ Esprit de ${devot.id} — pensée #${entry.age} [${devot.state}] ${entry.model}`,
-    `│ Événement: ${entry.event}`,
-    `│ Pensée   : ${entry.raw.replace(/\s+/g, " ").slice(0, 200)}`,
-    `│ Décision : ${entry.action}${entry.emotion ? `  (${entry.emotion})` : ""}${entry.utterance ? `  « ${entry.utterance} »` : ""}${entry.repaired ? "  [réparé]" : ""}${entry.coerced ? "  [réaction imposée — interdit d'attendre]" : ""}`,
-    `│ Tokens   : ${entry.inputTokens} in / ${entry.outputTokens} out   →  coût ${µ(entry.cost)}`,
-    `│ Solde    : ${µ(entry.balanceAfter)} / ${µ(devot.hpMax)}`,
+    `│ Événement : ${oneLine(entry.event)}`,
+    `│ Réflexion : ${entry.reflection ? oneLine(entry.reflection).slice(0, 220) : "— (aucune réflexion renvoyée)"}`,
+  ];
+  if (entry.utterance) lines.push(`│ Dit       : « ${oneLine(entry.utterance)} »`);
+  lines.push(
+    `│ Décision  : ${entry.action}${entry.emotion ? `  (${entry.emotion})` : ""}${entry.repaired ? "  [réparé]" : ""}${entry.coerced ? "  [réaction imposée — interdit d'attendre]" : ""}`,
+    `│ Tokens    : ${entry.inputTokens} in / ${entry.outputTokens} out   →  coût ${µ(entry.cost)}`,
+    `│ Solde     : ${µ(entry.balanceAfter)} / ${µ(devot.hpMax)}`,
     `│ ${teeLine(entry)}`,
     `└${"─".repeat(60)}`,
-  ];
+  );
   return lines.join("\n");
 }
 

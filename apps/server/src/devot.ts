@@ -1,4 +1,4 @@
-import type { Decision, MicroUsd } from "@devot/shared";
+import type { Decision, Micro } from "@devot/shared";
 import { hpCost, type MindMessage, type ThinkResult } from "@devot/agents";
 import { type Residue, dropResidue, residueValue } from "@devot/sim";
 
@@ -12,12 +12,15 @@ export interface JournalEntry {
   model: string;
   raw: string;
   action: string;
+  /** The devot's inner monologue — what it thought this instant. */
+  reflection?: string;
   emotion?: string;
+  /** What the devot said aloud (a reply to the god or another devot). */
   utterance?: string;
   inputTokens: number;
   outputTokens: number;
-  cost: MicroUsd;
-  balanceAfter: MicroUsd;
+  cost: Micro;
+  balanceAfter: Micro;
   repaired: boolean;
   /** True when the devot tried to wait but the server forced a reaction. */
   coerced: boolean;
@@ -32,9 +35,9 @@ export interface Devot {
   wallet: string;
   model: string;
   /** Deposited life, in µ$ of inference (G2/G3 make this an on-chain balance). */
-  balance: MicroUsd;
+  balance: Micro;
   /** Initial deposit; a reference point, not a hard ceiling once residue is eaten. */
-  hpMax: MicroUsd;
+  hpMax: Micro;
   age: number;
   state: DevotState;
   history: MindMessage[];
@@ -52,7 +55,7 @@ export function createDevot(opts: {
   godId: string;
   wallet: string;
   model: string;
-  deposit: MicroUsd;
+  deposit: Micro;
 }): Devot {
   if (!opts.wallet) throw new Error("createDevot: a connected wallet is required");
   if (opts.deposit <= 0) throw new Error("createDevot: deposit must be > 0");
@@ -70,7 +73,7 @@ export function createDevot(opts: {
   };
 }
 
-function stateFor(balance: MicroUsd, hpMax: MicroUsd): DevotState {
+function stateFor(balance: Micro, hpMax: Micro): DevotState {
   if (balance <= 0) return "mort";
   const frac = balance / hpMax;
   if (frac < 0.1) return "agonisant";
@@ -110,6 +113,7 @@ export function applyThought(
     model: result.model,
     raw: result.raw,
     action: decision.action,
+    reflection: decision.reflection,
     emotion: decision.emotion,
     utterance: decision.utterance,
     inputTokens: result.usage.inputTokens,
@@ -142,7 +146,7 @@ export function killDevot(devot: Devot, residueId: string): Residue | null {
  * residue's whole value transfers to the devot's balance — closed economy, zero
  * creation. Returns the amount gained.
  */
-export function consumeResidue(devot: Devot, residue: Residue): MicroUsd {
+export function consumeResidue(devot: Devot, residue: Residue): Micro {
   if (devot.state === "mort") throw new Error("consumeResidue: a dead devot cannot eat");
   const gained = residueValue(residue);
   devot.balance += gained;

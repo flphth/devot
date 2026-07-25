@@ -24,11 +24,13 @@ export const DEVOT_ACTIONS: readonly DevotAction[] = [
 
 export interface Decision {
   action: DevotAction;
+  /** The devot's brief inner monologue this instant — its visible "esprit". */
+  reflection?: string;
   /** Devot or food targeted (for move/eat/attack/reproduce). */
   targetId?: string;
   /** Movement direction when action === "move". */
   direction?: { x: number; z: number };
-  /** What the devot says when action === "speak". */
+  /** What the devot says aloud (a reply to the god, or to another devot). */
   utterance?: string;
   /** A one-word felt emotion, surfaced in the Esprit panel. */
   emotion?: string;
@@ -46,6 +48,7 @@ export const DECISION_SCHEMA = {
   required: ["action"],
   properties: {
     action: { type: "string", enum: DEVOT_ACTIONS },
+    reflection: { type: "string" },
     targetId: { type: "string" },
     direction: {
       type: "object",

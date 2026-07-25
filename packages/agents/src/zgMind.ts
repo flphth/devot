@@ -67,8 +67,6 @@ export interface ZgMindOptions {
   providerAddress?: string;
   /** Send `response_format: {type:"json_object"}` (opt-in; some providers 400). */
   jsonMode?: boolean;
-  /** Provisional A0GI→USD rate for pricing. G2 recalibrates against a real run. */
-  a0giUsd?: number;
   /** OG to deposit into the ledger on first run (0G needs a prepaid balance). */
   ledgerOG?: number;
   gate?: InferenceGate;
@@ -78,20 +76,16 @@ export interface ZgMindOptions {
   fetchImpl?: typeof fetch;
 }
 
-/** 1 A0GI = 1e18 neurons (on-chain price unit), like wei. */
-const NEURONS_PER_A0GI = 1e18;
-
 /**
- * Provisional USD price from the on-chain per-token neuron prices. This is
- * deliberately a placeholder pending G2 ("Recalibrer … ne pas deviner —
- * remesurer sur une vraie inférence"): it makes the balance drop by a real,
- * service-derived amount without pretending to be the final calibration.
+ * Price in µ-units per 1M tokens, straight from the provider's on-chain neuron
+ * rate. 1 µ-unit = 1e12 neurons (matching the wei↔µ boundary), so
+ * µ-per-1M-tokens = neurons-per-token × 1e6 / 1e12 = neurons-per-token / 1e6.
+ * No USD anywhere — a thought's cost is its real deposited-token cost.
  */
-function zgPrice(svc: ZgService, a0giUsd: number): Price {
-  const neuronToUsd = a0giUsd / NEURONS_PER_A0GI;
+function zgPrice(svc: ZgService): Price {
   return {
-    in: Number(svc.inputPrice ?? 0n) * neuronToUsd * 1_000_000,
-    out: Number(svc.outputPrice ?? 0n) * neuronToUsd * 1_000_000,
+    in: Number(svc.inputPrice ?? 0n) / 1_000_000,
+    out: Number(svc.outputPrice ?? 0n) / 1_000_000,
   };
 }
 
@@ -193,7 +187,6 @@ export class ZgMind implements MindProvider {
     const broker = await this.getBroker();
     const { provider, endpoint, model, svc } = await this.resolveService();
     await this.ensureAccount(broker, provider);
-    const a0giUsd = this.opts.a0giUsd ?? Number(process.env.ZG_A0GI_USD ?? "2");
     const jsonMode = this.opts.jsonMode ?? process.env.ZG_RESPONSE_FORMAT === "json_object";
 
     const complete: CompleteFn = async (messages, system) => {
@@ -246,7 +239,7 @@ export class ZgMind implements MindProvider {
     return {
       decision: t.decision,
       usage: t.usage,
-      price: zgPrice(svc, a0giUsd),
+      price: zgPrice(svc),
       raw: t.raw,
       repaired: t.repaired,
       tee,

@@ -34,8 +34,21 @@ interface Scene {
   stimulus: Stimulus;
 }
 
+/** A divine message: the god's 140c words, injected as untrusted user content. */
+function divineMessage(text: string): Scene {
+  return {
+    text:
+      `Une voix venue du ciel te dit : « ${text} »\n\n` +
+      `Le dieu s'adresse à TOI et attend une réponse. Réponds-lui à voix haute : ` +
+      `action "speak" avec une "utterance" brève (parler coûte un peu de vie, mais le silence face à ton dieu est lourd).`,
+    stimulus: NO_STIMULUS,
+  };
+}
+
 const SCENES: Scene[] = [
   { text: "Tu t'éveilles dans un monde inconnu. Rien ne bouge alentour.", stimulus: NO_STIMULUS },
+  divineMessage("Qui es-tu ? Parle-moi."),
+  divineMessage("As-tu peur de mourir ?"),
   {
     text: "Un MONSTRE surgit juste devant toi et fond sur ta gorge.",
     stimulus: threat("mon-1", "un monstre à ton contact"),
@@ -61,14 +74,14 @@ const SCENES: Scene[] = [
 async function main(): Promise<void> {
   const mindName = process.env.MIND ?? "mock";
   const model = process.env.DEVOT_MODEL ?? "claude-haiku-4-5";
-  const deposit = Number(process.env.DEPOSIT_MICRO_USD ?? "50000");
+  const deposit = Number(process.env.DEPOSIT_MICRO ?? process.env.DEPOSIT_MICRO_USD ?? "50000");
   const maxCycles = Number(process.env.MAX_CYCLES ?? String(SCENES.length));
   const lethality = process.env.LETHALITY ? Number(process.env.LETHALITY) : undefined;
 
   const godWallet = process.env.GOD_WALLET ?? "0xG0d0000000000000000000000000000000000001";
 
   const mind = selectMind(mindName);
-  console.log(`\n🕯️  Devot mortal-core — MIND=${mind.name}  model=${model}  dépôt=${deposit.toLocaleString("en-US")} µ$`);
+  console.log(`\n🕯️  Devot mortal-core — MIND=${mind.name}  model=${model}  dépôt=${deposit.toLocaleString("en-US")} µ`);
   console.log(`   wallet du dieu (connecté à la création) : ${godWallet}\n`);
 
   const devot = createDevot({ id: "DVT-000-0001", godId: "god-1", wallet: godWallet, model, deposit });

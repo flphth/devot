@@ -77,6 +77,21 @@ describe("parseDecision", () => {
     const r = parseDecision('{"action":"idle","mood":"???","extra":1}');
     expect(r.ok).toBe(true);
   });
+
+  it("captures the reflection (inner monologue) and a spoken reply", () => {
+    const r = parseDecision(
+      '{"action":"speak","reflection":"Un dieu me parle, je dois répondre.","utterance":"Je suis vivant."}',
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.decision.reflection).toBe("Un dieu me parle, je dois répondre.");
+      expect(r.decision.utterance).toBe("Je suis vivant.");
+    }
+  });
+
+  it("rejects a non-string reflection", () => {
+    expect(parseDecision('{"action":"idle","reflection":42}').ok).toBe(false);
+  });
 });
 
 describe("buildSchemaInstruction", () => {
@@ -86,5 +101,12 @@ describe("buildSchemaInstruction", () => {
     for (const a of ["idle", "move", "eat", "attack", "reproduce", "speak", "flee"]) {
       expect(s).toContain(`"${a}"`);
     }
+  });
+
+  it("always asks for a reflection and to speak when addressed by the god", () => {
+    const s = buildSchemaInstruction();
+    expect(s).toContain("reflection");
+    expect(s.toLowerCase()).toContain("voice from the sky");
+    expect(s).toContain("speak");
   });
 });

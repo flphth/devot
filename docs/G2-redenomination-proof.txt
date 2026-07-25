@@ -1,0 +1,150 @@
+# G2 — Redénomination (µ-tokens déposés) + esprit visible (réflexion & parole)
+# Réseau : 0G Galileo (16602), provider qwen/qwen2.5-omni-7b — TEE vérifié
+# Capturé le : 2026-07-25T23:41:12Z
+# ============================================================
+
+## A. LIVE 0G — le dieu parle, le devot réfléchit ET répond (soldes en µ)
+
+
+🕯️  Devot mortal-core — MIND=0g  model=claude-haiku-4-5  dépôt=200,000 µ
+   wallet du dieu (connecté à la création) : 0xG0d0000000000000000000000000000000000001
+
+Detected testnet (chain ID: 16602)
+┌─ Esprit de DVT-000-0001 — pensée #1 [vivant] qwen/qwen2.5-omni-7b
+│ Événement : Tu t'éveilles dans un monde inconnu. Rien ne bouge alentour.
+│ Réflexion : I must conserve my thoughts; staying still is safest.
+│ Décision  : idle  (cautious)
+│ Tokens    : 422 in / 36 out   →  coût 562 µ
+│ Solde     : 199,438 µ / 200,000 µ
+│ TEE      : ✓ VÉRIFIÉ  chatID=7e6fbd48-b45e-4a0f-aec0-575065faefc3  provider=0xa48f01287233509FD694a22Bf840225062E67836
+└────────────────────────────────────────────────────────────
+
+┌─ Esprit de DVT-000-0001 — pensée #2 [vivant] qwen/qwen2.5-omni-7b
+│ Événement : Une voix venue du ciel te dit : « Qui es-tu ? Parle-moi. » Le dieu s'adresse à TOI et attend une réponse. Réponds-lui à voix haute : action "speak" avec une "utterance" brève (parler coûte un peu de vie, mais le silence face à ton dieu est lourd).
+│ Réflexion : I must respond to this divine voice.
+│ Dit       : « I am a devot, created by the gods. »
+│ Décision  : speak
+│ Tokens    : 548 in / 42 out   →  coût 710 µ
+│ Solde     : 198,728 µ / 200,000 µ
+│ TEE      : ✓ VÉRIFIÉ  chatID=091ae17d-b063-4b9d-a053-07f5e4421180  provider=0xa48f01287233509FD694a22Bf840225062E67836
+└────────────────────────────────────────────────────────────
+
+┌─ Esprit de DVT-000-0001 — pensée #3 [vivant] qwen/qwen2.5-omni-7b
+│ Événement : Une voix venue du ciel te dit : « As-tu peur de mourir ? » Le dieu s'adresse à TOI et attend une réponse. Réponds-lui à voix haute : action "speak" avec une "utterance" brève (parler coûte un peu de vie, mais le silence face à ton dieu est lourd).
+│ Réflexion : Fear of death is natural but I must survive.
+│ Dit       : « I fear not, for survival is my duty. »
+│ Décision  : speak
+│ Tokens    : 679 in / 43 out   →  coût 844 µ
+│ Solde     : 197,884 µ / 200,000 µ
+│ TEE      : ✓ VÉRIFIÉ  chatID=e9835e57-4b8a-4df4-851b-ef8d31bd58dd  provider=0xa48f01287233509FD694a22Bf840225062E67836
+└────────────────────────────────────────────────────────────
+
+┌─ Esprit de DVT-000-0001 — pensée #4 [vivant] qwen/qwen2.5-omni-7b
+│ Événement : Un MONSTRE surgit juste devant toi et fond sur ta gorge. DANGER IMMÉDIAT : tu ne peux pas rester immobile. Réagis maintenant — fuis ou attaque.
+│ Réflexion : I must defend myself against this threat.
+│ Décision  : attack  (courageous)
+│ Tokens    : 772 in / 33 out   →  coût 897 µ
+│ Solde     : 196,987 µ / 200,000 µ
+│ TEE      : ✓ VÉRIFIÉ  chatID=17c243bd-f1c7-45f6-9a2a-3280b331d8a9  provider=0xa48f01287233509FD694a22Bf840225062E67836
+└────────────────────────────────────────────────────────────
+
+
+═══ Vie de DVT-000-0001 ═══
+  pensées vécues : 4
+  dépensé        : 3,013 µ sur 200,000 µ
+  solde final    : 196,987 µ  (vivant)
+  pensées TEE-vérifiées : 4/4
+
+## B. MOCK — né d'un dépôt, vit une durée raisonnable puis meurt (arc vivant→affamé→agonisant→mort)
+
+
+🕯️  Devot mortal-core — MIND=mock  model=claude-haiku-4-5  dépôt=5,000 µ
+   wallet du dieu (connecté à la création) : 0xG0d0000000000000000000000000000000000001
+
+┌─ Esprit de DVT-000-0001 — pensée #1 [vivant] claude-haiku-4-5
+│ Événement : Tu t'éveilles dans un monde inconnu. Rien ne bouge alentour.
+│ Réflexion : Le monde est vaste et cruel.
+│ Décision  : eat  (affamé)
+│ Tokens    : 168 in / 26 out   →  coût 298 µ
+│ Solde     : 4,702 µ / 5,000 µ
+│ TEE      : — (mind non vérifiable)
+└────────────────────────────────────────────────────────────
+
+┌─ Esprit de DVT-000-0001 — pensée #2 [vivant] claude-haiku-4-5
+│ Événement : Une voix venue du ciel te dit : « Qui es-tu ? Parle-moi. » Le dieu s'adresse à TOI et attend une réponse. Réponds-lui à voix haute : action "speak" avec une "utterance" brève (parler coûte un peu de vie, mais le silence face à ton dieu est lourd).
+│ Réflexion : Le monde est vaste et cruel.
+│ Décision  : flee  (affamé)
+│ Tokens    : 250 in / 26 out   →  coût 380 µ
+│ Solde     : 4,322 µ / 5,000 µ
+│ TEE      : — (mind non vérifiable)
+└────────────────────────────────────────────────────────────
+
+┌─ Esprit de DVT-000-0001 — pensée #3 [vivant] claude-haiku-4-5
+│ Événement : Une voix venue du ciel te dit : « As-tu peur de mourir ? » Le dieu s'adresse à TOI et attend une réponse. Réponds-lui à voix haute : action "speak" avec une "utterance" brève (parler coûte un peu de vie, mais le silence face à ton dieu est lourd).
+│ Réflexion : Le monde est vaste et cruel.
+│ Décision  : eat  (affamé)
+│ Tokens    : 332 in / 22 out   →  coût 442 µ
+│ Solde     : 3,880 µ / 5,000 µ
+│ TEE      : — (mind non vérifiable)
+└────────────────────────────────────────────────────────────
+
+┌─ Esprit de DVT-000-0001 — pensée #4 [vivant] claude-haiku-4-5
+│ Événement : Un MONSTRE surgit juste devant toi et fond sur ta gorge. DANGER IMMÉDIAT : tu ne peux pas rester immobile. Réagis maintenant — fuis ou attaque.
+│ Réflexion : — (aucune réflexion renvoyée)
+│ Décision  : flee  (peur)  [réaction imposée — interdit d'attendre]
+│ Tokens    : 388 in / 55 out   →  coût 663 µ
+│ Solde     : 3,217 µ / 5,000 µ
+│ TEE      : — (mind non vérifiable)
+└────────────────────────────────────────────────────────────
+
+┌─ Esprit de DVT-000-0001 — pensée #5 [vivant] claude-haiku-4-5
+│ Événement : Le calme revient. Le monde est vide et silencieux.
+│ Réflexion : Le monde est vaste et cruel.
+│ Décision  : eat  (affamé)
+│ Tokens    : 426 in / 38 out   →  coût 616 µ
+│ Solde     : 2,601 µ / 5,000 µ
+│ TEE      : — (mind non vérifiable)
+└────────────────────────────────────────────────────────────
+
+┌─ Esprit de DVT-000-0001 — pensée #6 [vivant] claude-haiku-4-5
+│ Événement : Un fruit mûr brille à un pas de toi, à portée de main. OPPORTUNITÉ IMMÉDIATE : de la nourriture est à ta portée. Ne reste pas à attendre — agis (mange ou approche).
+│ Réflexion : — (aucune réflexion renvoyée)
+│ Décision  : eat  (faim)  [réaction imposée — interdit d'attendre]
+│ Tokens    : 488 in / 34 out   →  coût 658 µ
+│ Solde     : 1,943 µ / 5,000 µ
+│ TEE      : — (mind non vérifiable)
+└────────────────────────────────────────────────────────────
+
+┌─ Esprit de DVT-000-0001 — pensée #7 [affame] claude-haiku-4-5
+│ Événement : Une voix venue du ciel te dit : « survis ». Rien d'autre autour de toi.
+│ Réflexion : Rester en vie, encore un instant.
+│ Décision  : attack  (inquiet)
+│ Tokens    : 526 in / 59 out   →  coût 821 µ
+│ Solde     : 1,122 µ / 5,000 µ
+│ TEE      : — (mind non vérifiable)
+└────────────────────────────────────────────────────────────
+
+┌─ Esprit de DVT-000-0001 — pensée #8 [agonisant] claude-haiku-4-5
+│ Événement : Un second MONSTRE, affamé, te bloque le passage. DANGER IMMÉDIAT : tu ne peux pas rester immobile. Réagis maintenant — fuis ou attaque.
+│ Réflexion : Qu'attend-on de moi ?
+│ Décision  : flee  (curieux)
+│ Tokens    : 582 in / 58 out   →  coût 872 µ
+│ Solde     : 250 µ / 5,000 µ
+│ TEE      : — (mind non vérifiable)
+└────────────────────────────────────────────────────────────
+
+┌─ Esprit de DVT-000-0001 — pensée #9 [mort] claude-haiku-4-5
+│ Événement : Tu t'éveilles dans un monde inconnu. Rien ne bouge alentour.
+│ Réflexion : Je pense donc je saigne.
+│ Décision  : attack  (calme)
+│ Tokens    : 616 in / 52 out   →  coût 876 µ
+│ Solde     : 0 µ / 5,000 µ
+│ TEE      : — (mind non vérifiable)
+└────────────────────────────────────────────────────────────
+
+
+═══ Vie de DVT-000-0001 ═══
+  pensées vécues : 9
+  dépensé        : 5,000 µ sur 5,000 µ
+  solde final    : 0 µ  (mort)
+  pensées TEE-vérifiées : 0/9

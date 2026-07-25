@@ -1,4 +1,4 @@
-import type { MicroUsd } from "@devot/shared";
+import type { Micro } from "@devot/shared";
 
 /**
  * A residue — what a devot leaves on the ground when it dies.
@@ -14,7 +14,7 @@ export interface Residue {
   /** The devot whose death produced this residue. */
   fromDevotId: string;
   /** The leftover life, in µ$ (same denomination as a devot's balance). */
-  balance: MicroUsd;
+  balance: Micro;
 }
 
 /**
@@ -22,12 +22,12 @@ export interface Residue {
  * left (a devot that starved to 0 leaves no food) — so no zero-value residue
  * litters the ground and conservation stays exact.
  */
-export function dropResidue(id: string, fromDevotId: string, leftover: MicroUsd): Residue | null {
+export function dropResidue(id: string, fromDevotId: string, leftover: Micro): Residue | null {
   if (leftover <= 0) return null;
   return { id, fromDevotId, balance: leftover };
 }
 
 /** The amount a devot gains by consuming a residue (pure; the caller credits it). */
-export function residueValue(r: Residue): MicroUsd {
+export function residueValue(r: Residue): Micro {
   return r.balance;
 }

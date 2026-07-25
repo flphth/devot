@@ -1,4 +1,4 @@
-import type { MicroUsd } from "./economy.ts";
+import type { Micro } from "./economy.ts";
 
 /**
  * THE single wei ↔ µ-unit conversion boundary (G2).
@@ -14,13 +14,13 @@ import type { MicroUsd } from "./economy.ts";
 export const WEI_PER_MICRO = 1_000_000_000_000n; // 1e12
 
 /** wei → µ-units, floored (a deposit never credits more life than it paid for). */
-export function weiToMicro(wei: bigint): MicroUsd {
+export function weiToMicro(wei: bigint): Micro {
   if (wei < 0n) throw new RangeError("weiToMicro: negative wei");
   return Number(wei / WEI_PER_MICRO);
 }
 
 /** µ-units → wei, exact (a withdrawal never pays out more than the balance holds). */
-export function microToWei(micro: MicroUsd): bigint {
+export function microToWei(micro: Micro): bigint {
   if (!Number.isInteger(micro) || micro < 0) throw new RangeError("microToWei: µ-units must be a non-negative integer");
   return BigInt(micro) * WEI_PER_MICRO;
 }

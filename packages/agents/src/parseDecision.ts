@@ -26,12 +26,12 @@ export function buildSchemaInstruction(): string {
     '{"action": <one of ' +
       DEVOT_ACTIONS.map((a) => `"${a}"`).join(", ") +
       ">,",
+    ' "reflection": string,       // ALWAYS: one short sentence of your inner thought right now',
     ' "targetId"?: string,        // devot or food id, for move/eat/attack/reproduce',
     ' "direction"?: {"x": number, "z": number},  // for move',
-    ' "utterance"?: string,       // for speak',
+    ' "utterance"?: string,       // what you SAY ALOUD — set this with action "speak" whenever addressed or wishing to reply',
     ' "emotion"?: string}         // one felt word',
-    ,
-    'Only "action" is required. Omit fields you do not use.',
+    'Always include "reflection". When a voice from the sky (your god) speaks to you, reflect on it and, if you have something to say, answer with action "speak" and an "utterance".',
   ].join("\n");
 }
 
@@ -102,6 +102,10 @@ export function parseDecision(text: string): ParseResult {
 
   const decision: Decision = { action: o.action };
 
+  if (o.reflection !== undefined) {
+    if (typeof o.reflection !== "string") return { ok: false, error: `"reflection" must be a string` };
+    decision.reflection = o.reflection;
+  }
   if (o.targetId !== undefined) {
     if (typeof o.targetId !== "string") return { ok: false, error: `"targetId" must be a string` };
     decision.targetId = o.targetId;
