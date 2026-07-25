@@ -1,12 +1,12 @@
 import { defineTypes, MapSchema, Schema } from "@colyseus/schema";
 
 /**
- * État autoritaire synchronisé (delta) vers les clients.
- * Le serveur est seul juge ; le client ne fait que rendre.
+ * Authoritative state, synchronised (delta) to the clients.
+ * The server is the sole judge; the client only renders.
  *
- * API defineTypes (sans décorateurs) : les champs sont `declare` + initialisés
- * dans le constructeur pour passer par les accesseurs installés sur le
- * prototype, quel que soit le réglage useDefineForClassFields du bundler.
+ * defineTypes API (no decorators): fields are `declare` + initialised in the
+ * constructor so they go through the accessors installed on the prototype,
+ * whatever the bundler's useDefineForClassFields setting.
  */
 export class DevotState extends Schema {
   declare id: string;
@@ -26,12 +26,12 @@ export class DevotState extends Schema {
   declare thought: string;
   declare age: number;
   /**
-   * Identité complète en JSON compact : apparence, stats, âme, signature.
-   * Un seul champ parce qu'elle ne change JAMAIS après la naissance — dix
-   * champs synchronisés à chaque tick pour une valeur figée seraient du gâchis.
+   * Full identity as compact JSON: appearance, stats, soul, signature.
+   * A single field because it NEVER changes after birth — ten fields
+   * synchronised every tick for a frozen value would be a waste.
    */
   declare identity: string;
-  /** Objets forgés, séparés par des virgules. Change rarement. */
+  /** Forged items, comma-separated. Rarely changes. */
   declare items: string;
 
   constructor() {
@@ -151,26 +151,26 @@ defineTypes(WorldState, {
 
 export interface CreateFounderMsg {
   name?: string;
-  /** 2 à 3 traits choisis dans TRAIT_POOL (validés côté serveur). */
+  /** 2 to 3 traits picked from TRAIT_POOL (validated server-side). */
   traits?: string[];
-  /** Apparence choisie à l'écran de création (validée côté serveur). */
+  /** Appearance chosen on the creation screen (validated server-side). */
   appearance?: unknown;
-  /** Répartition des stats sur le budget (validée côté serveur). */
+  /** Stat spread over the budget (validated server-side). */
   stats?: unknown;
-  /** Texte libre : ce que le devot croit être. Entre dans son prompt. */
+  /** Free text: what the devot believes itself to be. Enters its prompt. */
   soul?: string;
 }
 
 /**
- * Un vol de vie qui vient d'avoir lieu. Diffusé à tous : le combat est le
- * moment le plus lisible du jeu, il ne doit pas rester une ligne de journal.
+ * A theft of life that just happened. Broadcast to everyone: combat is the most
+ * legible moment of the game, it must not stay a line in a log.
  */
 export interface CombatFxMsg {
   attackerId: string;
   victimId: string;
-  /** PV réellement transférés ce tick. */
+  /** HP actually transferred this tick. */
   drained: number;
-  /** Position de la victime : c'est de là que jaillissent les chiffres. */
+  /** The victim's position: that is where the numbers spring from. */
   x: number;
   z: number;
   /** La victime en meurt-elle ? */
@@ -200,7 +200,7 @@ export interface JournalMsg {
   entries: JournalEntry[];
 }
 
-// ── Mode god (debug/créatif, hors règles du jeu) ────────────────────────────
+// ── God mode (debug/creative, outside the rules of the game) ────────────────
 
 export interface DebugSpawnDevotMsg {
   x: number;
@@ -224,7 +224,7 @@ export interface FeedMsg {
   z?: number;
 }
 
-/** Réponse serveur aux intentions rejetées. */
+/** Server response to rejected intents. */
 export interface ActionRejectedMsg {
   action: "createFounder" | "speak" | "feed" | "smite";
   reason: string;

@@ -4,8 +4,8 @@ import type { DevotEntity } from "@devot/shared";
 import { resolveReproduction, World, type Birth } from "@devot/sim";
 
 /**
- * Consomme les intentions de reproduction posées par les esprits et
- * concrétise les naissances : mécanique (sim) + héritage de contexte
+ * Consumes the reproduction intents left by the minds and carries out the
+ * births: mechanics (sim) + context inheritance
  * (chroniqueur) + persistance.
  */
 export async function processReproductions(
@@ -39,8 +39,8 @@ export async function processReproductions(
       traits: child.traits,
     });
 
-    // L'enfant naît avec des souvenirs : les vies de ses parents,
-    // condensées par le chroniqueur en un héritage cohérent.
+    // The child is born with memories: its parents' lives, condensed by the
+    // chronicler into a coherent inheritance.
     try {
       const { summary } = await chronicler.chronicle(
         parents.map((p) => ({ name: p.name, history: repos.messages.history(p.id) })),
@@ -64,7 +64,7 @@ export async function processReproductions(
   return births;
 }
 
-/** Un dieu peut refaçonner un fondateur ssi tous ses devots sont morts. */
+/** A god may shape a founder anew iff all of their devots are dead. */
 export function canRecreateFounder(world: World, godId: string): boolean {
   return ![...world.devots.values()].some(
     (d: DevotEntity) => d.godId === godId && d.state !== "dead",

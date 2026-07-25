@@ -72,11 +72,11 @@ CREATE TABLE IF NOT EXISTS divine_msgs (
 );
 `;
 
-/** Ouvre (ou crée) la base. `:memory:` pour les tests. */
+/** Opens (or creates) the database. `:memory:` for tests. */
 export function openDb(path: string): DevotDb {
   const sqlite = new Database(path);
   sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("foreign_keys = ON"); // requis pour le CASCADE
+  sqlite.pragma("foreign_keys = ON"); // required for CASCADE
   sqlite.exec(DDL);
   return drizzle(sqlite, { schema });
 }

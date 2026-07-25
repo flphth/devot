@@ -1,11 +1,11 @@
 /**
- * P0 — Cœur mortel (démo headless, sans 3D).
+ * P0 — Mortal core (headless demo, no 3D).
  *
- * Prouve la mécanique centrale : un devot, tick 250 ms, inférences structurées,
- * HP qui descendent selon l'usage réel, mort + destruction du contexte.
+ * Proves the central mechanic: one devot, a 250 ms tick, structured inferences,
+ * HP falling with real usage, death + destruction of the context.
  *
- * Backend des esprits (cf. .env.example) : abonnement Claude Code (défaut),
- * Messages API (MIND=api + clé), ou simulé (MIND=mock / --mock).
+ * Mind backend (see .env.example): Claude Code subscription (default), Messages
+ * API (MIND=api + key), or simulated (MIND=mock / --mock).
  */
 import { CognitionOrchestrator, createMind } from "@devot/agents";
 import { createRepos, openDb } from "@devot/db";
@@ -17,7 +17,7 @@ import { applyDecision, perceptionSystem, tick, World } from "@devot/sim";
 if (process.argv.includes("--mock")) process.env.MIND = "mock";
 const DB_PATH = new URL("../p0.sqlite", import.meta.url).pathname;
 const MAX_RUN_MS = 90_000;
-// hp_max réduit pour la démo : ~4-5 pensées avant la mort.
+// hp_max lowered for the demo: ~4-5 thoughts before death.
 const DEMO_HP_MAX = 6_000;
 
 function log(msg: string): void {
@@ -31,7 +31,7 @@ async function main(): Promise<void> {
   const payments = new FreeStubProvider();
   const world = new World(30);
 
-  // 1. Le dieu façonne son fondateur (gratuit via le stub).
+  // 1. The god shapes their founder (free through the stub).
   const godId = "god-demo";
   const receipt = await payments.chargeDevotCreation(godId);
   log(`Founder creation payment: ${receipt.ref}`);
@@ -59,12 +59,12 @@ async function main(): Promise<void> {
   repos.events.record("birth", [founder.id], { founder: true });
   log(`Birth of ${founder.name} (${founder.hp} HP = $${(founder.hp / 1e6).toFixed(4)} of thinking)`);
 
-  // 2. L'esprit : abonnement Claude Code (défaut), API (clé), ou mock.
+  // 2. The mind: Claude Code subscription (default), API (key), or mock.
   const { kind, mind } = createMind();
   log(
-    `Esprit : ${
+    `Mind: ${
       kind === "claude"
-        ? "abonnement Claude Code (Agent SDK)"
+        ? "Claude Code subscription (Agent SDK)"
         : kind === "api"
           ? "Claude Messages API (key)"
           : "MockMind (simulated)"
@@ -88,7 +88,7 @@ async function main(): Promise<void> {
     },
   );
 
-  // 3. Nourriture initiale éparse.
+  // 3. Sparse initial food.
   let foodSeq = 0;
   const spawnFood = () => {
     const f: FoodEntity = {
@@ -106,7 +106,7 @@ async function main(): Promise<void> {
   };
   for (let i = 0; i < 3; i++) spawnFood();
 
-  // 4. Boucle de simulation : le corps à 250 ms, l'esprit en tâche de fond.
+  // 4. Simulation loop: the body at 250 ms, the mind in the background.
   const start = Date.now();
   let tickCount = 0;
 
@@ -117,7 +117,7 @@ async function main(): Promise<void> {
 
       for (const { devotId, foodId, hpValue } of result.eaten) {
         const d = world.devots.get(devotId);
-        log(`${d?.name ?? devotId} mange ${foodId} (+${hpValue} HP → ${d?.hp.toFixed(0)})`);
+        log(`${d?.name ?? devotId} eats ${foodId} (+${hpValue} HP -> ${d?.hp.toFixed(0)})`);
         repos.events.record("meal", [devotId], { foodId, hpValue });
       }
 
@@ -125,7 +125,7 @@ async function main(): Promise<void> {
         orchestrator.enqueue(t);
       }
 
-      // Réflexion oisive périodique (toutes les ~3 s) pour animer la démo.
+      // Periodic idle reflection (every ~3 s) to keep the demo alive.
       if (tickCount % 12 === 0) {
         for (const d of world.aliveDevots()) {
           orchestrator.enqueue({
@@ -138,7 +138,7 @@ async function main(): Promise<void> {
         }
       }
 
-      // Snapshot périodique de l'état chaud (1 s).
+      // Periodic snapshot of the hot state (1 s).
       if (tickCount % 4 === 0) {
         for (const d of world.devots.values()) repos.devots.snapshot(d);
       }
@@ -148,10 +148,10 @@ async function main(): Promise<void> {
         const ctxBefore = repos.devots.contextSize(devotId);
         repos.devots.kill(devotId, cause);
         const ctxAfter = repos.devots.contextSize(devotId);
-        log(`☠ ${d?.name ?? devotId} est mort (${cause}).`);
+        log(`x ${d?.name ?? devotId} is dead (${cause}).`);
         log(
           `  Context destroyed: ${ctxBefore} messages → ${ctxAfter}. ` +
-            `Il ne reste que la pierre tombale et ce que le monde se souvient.`,
+            `Nothing is left but the gravestone and what the world remembers.`,
         );
       }
 
@@ -167,7 +167,7 @@ async function main(): Promise<void> {
   const row = repos.devots.get(founder.id);
   log(
     `End of run: ${tickCount} ticks, final state of ${founder.name}: ` +
-      `${row?.state} (died_at=${row?.diedAt ?? "—"}), contexte=${repos.devots.contextSize(founder.id)} messages.`,
+      `${row?.state} (died_at=${row?.diedAt ?? "-"}), context=${repos.devots.contextSize(founder.id)} messages.`,
   );
 }
 

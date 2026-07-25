@@ -9,10 +9,10 @@ import {
   type JournalMsg,
 } from "@devot/shared";
 
-/** Identifiant local d'un effet de combat : sert de clé de rendu. */
+/** Local id for a combat effect: used as the render key. */
 let combatSeq = 0;
 
-/** Vue plate (côté client) de l'état synchronisé. */
+/** Flat (client-side) view of the synchronised state. */
 export interface DevotView {
   id: string;
   godId: string;
@@ -30,9 +30,9 @@ export interface DevotView {
   emotion: string;
   thought: string;
   age: number;
-  /** Identité figée : apparence, stats, âme, signature, en JSON. */
+  /** Frozen identity: appearance, stats, soul, signature, as JSON. */
   identity: string;
-  /** Objets forgés, séparés par des virgules. */
+  /** Forged items, comma-separated. */
   items: string;
 }
 
@@ -59,8 +59,8 @@ export interface WorldSnapshot {
 }
 
 /**
- * Un vol de vie observé. On en garde une file courte : plusieurs combats
- * peuvent se dérouler en même temps, et chacun doit laisser sa trace à l'écran.
+ * A theft of life, observed. We keep a short queue of them: several fights can
+ * happen at once, and each must leave its mark on screen.
  */
 export interface CombatFx {
   id: number;
@@ -96,7 +96,7 @@ export interface WorldConnection {
   status: "connecting" | "connected" | "error";
   lastRejection: string | null;
   lastSmite: SmiteFx | null;
-  /** Combats récents, du plus ancien au plus récent. */
+  /** Recent fights, oldest to newest. */
   combats: CombatFx[];
   journals: Record<string, JournalEntry[]>;
   actions: WorldActions;
@@ -136,8 +136,8 @@ export function useWorld(godName: string): WorldConnection {
           setLastSmite({ ...msg, at: Date.now() });
         });
         room.onMessage("combat", (msg: CombatFxMsg) => {
-          // File courte : plusieurs combats peuvent se dérouler en même temps,
-          // et l'affichage ne garde que les plus récents.
+          // Short queue: several fights can happen at once, and the display
+          // only keeps the most recent ones.
           setCombats((prev) => [
             ...prev.slice(-19),
             { ...msg, id: combatSeq++, at: Date.now() },

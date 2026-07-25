@@ -1,6 +1,6 @@
 // Cadence
-export const TICK_MS = 250; // fenêtre d'action du corps (couche réactive)
-export const PATCH_RATE_MS = 50; // synchro réseau Colyseus (P1)
+export const TICK_MS = 250; // the body's action window (reactive layer)
+export const PATCH_RATE_MS = 50; // Colyseus network sync (P1)
 
 // Verbe divin
 export const DIVINE_MSG_MAX_CHARS = 140;
@@ -9,23 +9,23 @@ export const DIVINE_MSG_COOLDOWN_MS = 60_000;
 // Paroles de devot
 export const UTTERANCE_MAX_CHARS = 140;
 
-// Économie vie ↔ tokens.
-// HP exprimés en µ$ d'inférence : 1 HP = 1e-6 $ de pensée.
+// Life ↔ token economy.
+// HP expressed in µ$ of inference: 1 HP = 1e-6 $ of thinking.
 //
-// hp_max par défaut = 150 000 HP = 0,15 $ de budget cognitif.
+// Default hp_max = 150,000 HP = $0.15 of cognitive budget.
 //
-// Triplé depuis 50 000. Comme le prix d'une pensée est calculé sur l'usage RÉEL
-// de tokens, tripler la réserve triple littéralement le nombre de pensées d'une
-// vie : un devot vit trois fois plus longtemps ET réfléchit trois fois plus.
+// Tripled from 50,000. Since a thought's price is computed from REAL token
+// usage, tripling the pool literally triples the number of thoughts in a life:
+// a devot lives three times longer AND thinks three times more.
 //
-// Les grandeurs exprimées en FRACTION de hp_max suivent d'elles-mêmes (faim,
-// agonie, coûts de reproduction). Celles qui sont en HP ABSOLUS deviennent
-// mécaniquement trois fois moins lourdes par rapport à une vie entière — c'est
-// noté à chacune d'elles, car plusieurs y perdent une part de leur sens.
+// Quantities expressed as a FRACTION of hp_max follow along on their own
+// (hunger, agony, reproduction costs). Those in ABSOLUTE HP mechanically become
+// three times lighter relative to a whole life — noted at each of them, because
+// several lose part of their meaning.
 export const HP_MAX_DEFAULT = 150_000;
 export const LETHALITY = 1e6; // usd → µ$ (HP)
 
-// Prix par 1M tokens (in / out), cf. PLAN.md §5.2
+// Price per 1M tokens (in / out), see PLAN.md §5.2
 export const PRICE_PER_MTOK = {
   "claude-haiku-4-5": { in: 1, out: 5 },
   "claude-sonnet-4-6": { in: 3, out: 15 },
@@ -34,50 +34,50 @@ export const PRICE_PER_MTOK = {
 
 export type ModelId = keyof typeof PRICE_PER_MTOK;
 
-// Garde-fous budget
-// Coût plancher estimé d'une pensée (HP) : en-dessous, l'esprit ne se lance pas.
+// Budget guardrails
+// Estimated floor cost of a thought (HP): below it, the mind does not engage.
 export const THOUGHT_COST_FLOOR_HP = 500;
-// Concurrence maximale d'inférences simultanées.
+// Maximum number of simultaneous inferences.
 export const MAX_CONCURRENT_INFERENCES = 4;
-// Token bucket global : plafond de dépense serveur (µ$ / minute).
+// Global token bucket: server spending ceiling (µ$ per minute).
 export const GLOBAL_BUDGET_UHP_PER_MIN = 500_000; // 0,50 $/min max
 
-// Corps
-export const DEVOT_SPEED = 2; // unités / seconde
+// Body
+export const DEVOT_SPEED = 2; // units per second
 export const EAT_RADIUS = 0.75;
 export const PERCEPTION_RADIUS = 10;
-export const HUNGRY_THRESHOLD = 0.4; // fraction de hpMax
+export const HUNGRY_THRESHOLD = 0.4; // fraction of hpMax
 export const AGONIZING_THRESHOLD = 0.15;
 
-// Métabolisme passif : vivre coûte un peu, même sans penser (µ$/tick),
-// pour que l'inaction totale ne soit pas une stratégie dominante éternelle.
+// Passive metabolism: living costs a little, even without thinking (µ$/tick),
+// so that total inaction is not an eternally dominant strategy.
 //
-// ATTENTION : avec la réserve triplée, ce coût pèse trois fois moins sur une
-// vie, donc ne rien faire est devenu trois fois plus viable. L'argument
-// ci-dessus s'est affaibli d'autant.
+// CAREFUL: with the pool tripled, this cost weighs three times less on a life,
+// so doing nothing has become three times more viable. The argument above has
+// weakened accordingly.
 export const METABOLISM_HP_PER_TICK = 1;
 
-// Combat : prédation vitale (transfert de HP victime → agresseur).
+// Combat: vital predation (HP transfer from victim to attacker).
 export const ATTACK_RADIUS = 1.5;
-// HP prélevés à la victime par tick. Valeur absolue : avec la réserve triplée,
-// tuer quelqu'un prend désormais trois fois plus longtemps.
+// HP taken from the victim per tick. Absolute value: with the pool tripled,
+// killing someone now takes three times longer.
 export const ATTACK_DRAIN_PER_TICK = 150;
-export const ATTACK_EFFICIENCY = 0.7; // part effectivement absorbée par l'agresseur
+export const ATTACK_EFFICIENCY = 0.7; // share actually absorbed by the attacker
 
-// Reproduction : procréer épuise.
-// En-dessous, trop faible pour procréer. Seuil absolu : il correspond maintenant
-// à 5 % d'une vie au lieu de 16 %, donc procréer est accessible bien plus tôt.
+// Reproduction: procreating exhausts.
+// Below this, too weak to procreate. Absolute threshold: it now amounts to 5%
+// of a life instead of 16%, so procreating is reachable much earlier.
 export const REPRO_MIN_HP = 8_000;
-export const REPRO_SOLO_COST_FRACTION = 0.4; // bourgeonnement : 40% des HP courants
-export const REPRO_PAIR_COST_FRACTION = 0.3; // sexuée : 30% chacun
-export const REPRO_TRANSFER_EFFICIENCY = 0.8; // part du coût qui devient la vie de l'enfant
-export const REPRO_RADIUS = 3; // distance max entre partenaires
+export const REPRO_SOLO_COST_FRACTION = 0.4; // budding: 40% of current HP
+export const REPRO_PAIR_COST_FRACTION = 0.3; // sexual: 30% each
+export const REPRO_TRANSFER_EFFICIENCY = 0.8; // share of the cost that becomes the child's life
+export const REPRO_RADIUS = 3; // max distance between partners
 
-// Vieillir, c'est oublier : au-delà de ce nombre de messages, le chroniqueur
-// condense l'historique en un souvenir unique.
+// To grow old is to forget: beyond this many messages, the chronicler condenses
+// the history into a single memory.
 export const CONTEXT_COMPACT_THRESHOLD_MSGS = 24;
 
-// Banque de traits pour les mutations à la naissance.
+// Trait pool for mutations at birth.
 export const TRAIT_POOL = [
   "curious",
   "cautious",

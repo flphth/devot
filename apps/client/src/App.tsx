@@ -21,19 +21,19 @@ export default function App() {
     useWorld(godName);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [godMode, setGodMode] = useState(false);
-  // Ref synchrone : les handlers R3F la lisent sans dépendre du commit du
-  // pont React↔canvas (qui peut retarder d'une frame la mise à jour des props).
+  // Synchronous ref: R3F handlers read it without depending on the React<->canvas
+  // bridge commit (which can delay a prop update by a frame).
   const godModeRef = useRef(false);
 
   const selected = snapshot.devots.find((d) => d.id === selectedId) ?? null;
 
-  // L'écran de création s'impose tant que le dieu n'a aucun devot vivant :
-  // c'est le premier contact avec le jeu, et le seul moment où l'on façonne.
+  // The creation screen takes over as long as the god has no living devot:
+  // it is the first contact with the game, and the only moment of shaping.
   const god = snapshot.gods.find((g) => g.id === godId) ?? null;
   const hasLiving = snapshot.devots.some((d) => d.godId === godId && d.state !== "dead");
   const creating = status === "connected" && godId !== null && !hasLiving;
 
-  // Hooks de test pilotés (dev uniquement) : état + sélection programmable.
+  // Driven-test hooks (dev only): state + programmable selection.
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     (window as unknown as Record<string, unknown>).__devot = {
@@ -44,13 +44,13 @@ export default function App() {
       select: setSelectedId,
       createFounder: actions.createFounder,
       combats,
-      // Actions du mode god, exposées pour le pilotage : c'est le seul moyen de
-      // provoquer une rencontre à volonté, le monde étant vaste et l'errance lente.
+      // God-mode actions, exposed for driving: the only way to force an
+      // encounter at will, the world being wide and wandering slow.
       spawnAt: actions.debugSpawnDevot,
     };
   });
 
-  // Touche 1 : mode god (debug/créatif) — ignorée quand on tape du texte.
+  // Key 1: god mode (debug/creative) — ignored while typing text.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "1") return;
@@ -65,7 +65,7 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Journal du devot sélectionné : chargé à la sélection puis rafraîchi.
+  // Journal of the selected devot: loaded on selection, then refreshed.
   useEffect(() => {
     if (!selectedId) return;
     actions.getJournal(selectedId);

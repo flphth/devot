@@ -25,8 +25,8 @@ export interface TickResult {
 }
 
 /**
- * Couche réactive : un pas de simulation déterministe (0 token).
- * Fait vivre les corps et détecte les déclencheurs qui réveilleront les esprits.
+ * Reactive layer: one deterministic simulation step (0 tokens).
+ * Keeps the bodies alive and detects the triggers that will wake the minds.
  */
 export function tick(world: World, now: number = Date.now()): TickResult {
   const result: TickResult = { triggers: [], deaths: [], eaten: [], combats: [] };
@@ -54,8 +54,8 @@ function movementSystem(devot: DevotEntity, world: World, dt: number): void {
     case "idle":
       return;
     case "wander": {
-      // Errance lissée : le cap dérive lentement (déterministe par âge) au lieu
-      // de zigzaguer — le corps garde sa direction plusieurs ticks.
+      // Smoothed wandering: the heading drifts slowly (deterministic on age)
+      // instead of zigzagging — the body keeps its direction for several ticks.
       const angle = devot.id.length * 1.7 + devot.age * 0.045;
       devot.pos.x += Math.cos(angle) * step * 0.5;
       devot.pos.z += Math.sin(angle) * step * 0.5;
@@ -89,7 +89,7 @@ function movementSystem(devot: DevotEntity, world: World, dt: number): void {
         devot.currentGoal = { kind: "wander" };
         return;
       }
-      // Chasse : s'approcher jusqu'à portée de frappe.
+      // Hunting: close in until within striking range.
       if (dist2(devot.pos, target.pos) > ATTACK_RADIUS * ATTACK_RADIUS) {
         stepToward(devot, target.pos.x, target.pos.z, step * 1.2);
       }
@@ -99,7 +99,7 @@ function movementSystem(devot: DevotEntity, world: World, dt: number): void {
   clampToWorld(devot.pos, world.size);
 }
 
-/** Prédation vitale : au contact, transfert de HP victime → agresseur. */
+/** Vital predation: on contact, HP transfer from victim to attacker. */
 function combatSystem(
   devot: DevotEntity,
   world: World,
@@ -119,8 +119,8 @@ function combatSystem(
   devot.hp = Math.min(devot.hpMax, devot.hp + drained * ATTACK_EFFICIENCY);
   result.combats.push({ attackerId: devot.id, victimId: victim.id, drained });
 
-  // La victime est alertée une fois par agresseur : à elle de décider
-  // (fuir, rendre les coups, supplier, se sacrifier).
+  // The victim is alerted once per attacker: it is up to them to decide
+  // (flee, strike back, beg, sacrifice themselves).
   if (victim.underAttackBy !== devot.id) {
     victim.underAttackBy = devot.id;
     result.triggers.push({
@@ -151,7 +151,7 @@ function feedingSystem(devot: DevotEntity, world: World, result: TickResult): vo
       if (devot.currentGoal.kind === "seek_food" && devot.currentGoal.foodId === food.id) {
         devot.currentGoal = { kind: "wander" };
       }
-      break; // une bouchée par tick
+      break; // one mouthful per tick
     }
   }
 }
@@ -164,7 +164,7 @@ function hungerSystem(devot: DevotEntity, result: TickResult, now: number): void
   else if (ratio <= HUNGRY_THRESHOLD) devot.state = "starving";
   else devot.state = "alive";
 
-  // Déclencheur de survie au franchissement de seuil (pas à chaque tick).
+  // Survival trigger when a threshold is crossed (not on every tick).
   if (devot.state !== prev && (devot.state === "starving" || devot.state === "dying")) {
     result.triggers.push({
       kind: "survival",
@@ -177,8 +177,8 @@ function hungerSystem(devot: DevotEntity, result: TickResult, now: number): void
     });
   }
 
-  // Un affamé sans but se met d'office à chercher à manger : le corps
-  // garde le devot crédible même quand l'esprit dort.
+  // A starving devot with no goal starts looking for food on its own: the body
+  // keeps the devot credible even while the mind sleeps.
   if (
     (devot.state === "starving" || devot.state === "dying") &&
     (devot.currentGoal.kind === "idle" || devot.currentGoal.kind === "wander")
@@ -199,8 +199,8 @@ function deathSystem(devot: DevotEntity, result: TickResult): void {
 }
 
 /**
- * Système de perception : signale nourriture et devots visibles.
- * Une rencontre entre devots n'est signalée qu'une fois (metDevots).
+ * Perception system: reports visible food and devots.
+ * An encounter between devots is reported only once (metDevots).
  */
 export function perceptionSystem(world: World, now: number = Date.now()): Trigger[] {
   const triggers: Trigger[] = [];
@@ -208,11 +208,11 @@ export function perceptionSystem(world: World, now: number = Date.now()): Trigge
 
   for (const devot of alive) {
     if (devot.thinking) continue;
-    // La portée de vue est PROPRE À CHAQUE DEVOT : c'est elle qui décide de ce
-    // qui entre dans son prompt, donc de ce sur quoi il peut réfléchir.
+    // Sight range is PER DEVOT: it decides what enters their prompt, and
+    // therefore what they are able to think about.
     const r2 = sightOf(devot) ** 2;
 
-    // Rencontre d'un autre devot (y compris d'une lignée rivale).
+    // Meeting another devot (including one from a rival line).
     for (const other of alive) {
       if (other.id === devot.id) continue;
       if (devot.metDevots?.includes(other.id)) continue;
@@ -222,10 +222,10 @@ export function perceptionSystem(world: World, now: number = Date.now()): Trigge
         triggers.push({
           kind: "encounter",
           devotId: devot.id,
-          // L'ALLURE entre dans la perception : c'est là que l'apparence
-          // choisie à la création cesse d'être décorative. Le modèle voit une
-          // silhouette avant de voir un identifiant, et décide seul de ce qu'il
-          // en fait — craindre, suivre, éviter. Aucune règle ne l'impose.
+          // LOOK enters perception: this is where the appearance chosen at
+          // creation stops being decorative. The model sees a silhouette before
+          // it sees an id, and decides on its own what to make of it — fear it,
+          // follow it, avoid it. No rule forces any of that.
           eventText: `You meet ${other.name} (id "${other.id}"), a devot ${sameGod ? "of your own line" : "of a rival line, watched over by another god"}, ${describeIdentity(other.identityJson)}. They are at x=${other.pos.x.toFixed(1)}, z=${other.pos.z.toFixed(1)}.`,
           createdAt: now,
         });
@@ -247,14 +247,14 @@ export function perceptionSystem(world: World, now: number = Date.now()): Trigge
   return triggers;
 }
 
-/** Applique une décision d'esprit au corps (nouveau but, parole…). */
+/** Applies a mind's decision to the body (new goal, utterance, …). */
 export function applyDecision(devot: DevotEntity, decision: Decision, world: World): void {
   if (devot.state === "dead") return;
   switch (decision.action) {
     case "craft": {
-      // FORGER : la matière première est la vie. Le coût est prélevé ici, une
-      // fois, et l'objet reste tant que le devot vit. Le refus est silencieux
-      // côté simulation ; c'est la salle qui explique au devot pourquoi.
+      // FORGING: the raw material is life. The cost is taken here, once, and
+      // the item stays as long as the devot lives. Refusal is silent on the
+      // simulation side; it is the room that tells the devot why.
       const refusal = canCraft(decision.item, devot.hp, devot.items);
       if (refusal) return;
       const recipe = recipeOf(decision.item)!;
@@ -283,8 +283,8 @@ export function applyDecision(devot: DevotEntity, decision: Decision, world: Wor
       if (foodId && world.food.has(foodId)) {
         devot.currentGoal = { kind: "seek_food", foodId };
       } else {
-        // Repli borné à la perception : le corps ne « connaît » pas la
-        // nourriture que le devot ne peut pas voir.
+        // Fallback bounded by perception: the body does not "know" about food
+        // the devot cannot see.
         const nearest = world.nearestFood(devot.pos);
         if (
           nearest &&
@@ -318,8 +318,8 @@ export function applyDecision(devot: DevotEntity, decision: Decision, world: Wor
       break;
     }
     case "reproduce":
-      // Intention posée ici, concrétisée par le serveur (ReproductionSystem),
-      // qui gère aussi l'héritage de contexte via le chroniqueur.
+      // Intent recorded here, carried out by the server (ReproductionSystem),
+      // which also handles context inheritance through the chronicler.
       devot.pendingReproduction = { partnerId: decision.targetId };
       break;
   }

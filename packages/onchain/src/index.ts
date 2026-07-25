@@ -1,7 +1,7 @@
 /**
- * Point d'accroche onchain (différé — ARCHITECTURE.md §10).
- * Seul le stub gratuit existe aujourd'hui ; la chaîne, la nature du paiement
- * et l'identité seront définies plus tard, derrière cette même interface.
+ * Onchain hook point (deferred — ARCHITECTURE.md §10).
+ * Only the free stub exists today; the chain, the nature of the payment and
+ * identity will be settled later, behind this same interface.
  */
 export interface Receipt {
   ok: boolean;
@@ -9,7 +9,7 @@ export interface Receipt {
 }
 
 export interface PaymentProvider {
-  /** Création / recréation d'un devot fondateur. */
+  /** Creation / re-creation of a founder devot. */
   chargeDevotCreation(godId: string): Promise<Receipt>;
   /** Don de nourriture. */
   chargeFeed(godId: string): Promise<Receipt>;

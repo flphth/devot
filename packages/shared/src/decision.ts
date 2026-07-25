@@ -39,7 +39,7 @@ export const DECISION_SCHEMA = {
     },
     emotion: {
       type: "string",
-      description: "Émotion dominante en un mot.",
+      description: "Dominant emotion, in one word.",
     },
   },
 } as const;

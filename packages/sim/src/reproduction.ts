@@ -28,9 +28,9 @@ export interface ReproFailure {
 let childSeq = 0;
 
 /**
- * Concrétise une décision de reproduction (mécanique pure, 0 token).
- * L'héritage de contexte (chroniqueur) est fait ensuite par l'appelant.
- * `rng` injectable pour des tests déterministes.
+ * Carries out a reproduction decision (pure mechanics, 0 tokens).
+ * Context inheritance (the chronicler) is done afterwards by the caller.
+ * `rng` is injectable for deterministic tests.
  */
 export function resolveReproduction(
   world: World,
@@ -46,7 +46,7 @@ export function resolveReproduction(
   const partner = partnerId ? world.devots.get(partnerId) : undefined;
 
   if (partner && partner.id !== parent.id) {
-    // Reproduction sexuée — y compris entre lignées de dieux différents.
+    // Sexual reproduction — including across the lines of different gods.
     if (partner.state === "dead") return { reason: "partenaire mort" };
     if (partner.hp < REPRO_MIN_HP) return { reason: "partenaire trop faible" };
     if (dist2(parent.pos, partner.pos) > REPRO_RADIUS * REPRO_RADIUS) {
@@ -61,7 +61,7 @@ export function resolveReproduction(
     return { child, parents: [parent, partner], mode: "sexuee" };
   }
 
-  // Bourgeonnement : clone muté.
+  // Budding: a mutated clone.
   const cost = parent.hp * REPRO_SOLO_COST_FRACTION;
   parent.hp -= cost;
   const child = makeChild(parent, undefined, cost * REPRO_TRANSFER_EFFICIENCY, rng);
@@ -78,8 +78,8 @@ function makeChild(
     b ? mixTraits(a.traits, b.traits, rng) : [...a.traits],
     rng,
   );
-  // L'enfant hérite de l'allure ET des stats de ses parents : on reconnaît une
-  // famille à l'écran, et une lignée finit par avoir un tempérament physique.
+  // The child inherits the look AND the stats of its parents: a family is
+  // recognisable on screen, and a line ends up with a physical temperament.
   const identity = inheritIdentity(
     decodeIdentity(a.identityJson) ?? defaultIdentity(a.traits),
     b ? (decodeIdentity(b.identityJson) ?? defaultIdentity(b.traits)) : undefined,
@@ -87,8 +87,8 @@ function makeChild(
     rng,
   );
 
-  // Suzeraineté (question ouverte du design) : l'enfant naît sous le dieu
-  // du parent initiateur — son allégeance réelle reste un ressort narratif.
+  // Overlordship (an open design question): the child is born under the god of
+  // the initiating parent — its real allegiance stays a narrative device.
   return {
     id: `devot-child-${Date.now()}-${childSeq++}`,
     godId: a.godId,
@@ -100,15 +100,15 @@ function makeChild(
       z: a.pos.z + (rng() - 0.5) * 2,
     },
     hp,
-    // Ses PV maximaux découlent de la vigueur héritée, pas de celle du parent
-    // le mieux doté : un enfant frêle de parents robustes reste frêle.
+    // Its max HP follow from the inherited vitality, not from the best-endowed
+    // parent's: a frail child of sturdy parents stays frail.
     hpMax: Math.round(HP_MAX_DEFAULT * statMultiplier(identity.stats.vitality)),
     state: "alive",
     profile: a.profile,
     traits,
     identityJson: encodeIdentity(identity),
-    // Un enfant naît les mains nues : un objet se forge au prix de SA vie,
-    // il ne se transmet pas (T6 traitera de ce qui tombe à la mort).
+    // A child is born empty-handed: an item is forged at the price of ITS OWN
+    // life, it is not handed down (T6 will deal with what drops on death).
     items: [],
     age: 0,
     thinking: false,

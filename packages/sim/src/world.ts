@@ -1,10 +1,10 @@
 import type { DevotEntity, FoodEntity, Vec3 } from "@devot/shared";
 
-/** État chaud du monde, en mémoire. Persistance périodique côté serveur. */
+/** The world's hot state, in memory. Persisted periodically by the server. */
 export class World {
   devots = new Map<string, DevotEntity>();
   food = new Map<string, FoodEntity>();
-  /** Taille de la carte : carré [-size, size] sur x/z. */
+  /** Map size: the square [-size, size] on x/z. */
   constructor(public size = 50) {}
 
   aliveDevots(): DevotEntity[] {

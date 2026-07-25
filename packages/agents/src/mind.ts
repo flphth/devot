@@ -7,16 +7,16 @@ import { buildEventBlock, buildPersona, WORLD_RULES } from "./prompts.js";
 export interface ThoughtResult {
   decision: Decision;
   usage: InferenceUsage;
-  /** Contenu brut assistant à append à l'historique. */
+  /** Raw assistant content to append to the history. */
   rawAssistantContent: unknown;
-  /** Tour utilisateur (événement) à append à l'historique. */
+  /** User turn (the event) to append to the history. */
   userTurn: string;
 }
 
 /**
- * L'esprit d'un devot : produit une décision structurée à partir de son
- * historique et d'un événement. Interface injectable — implémentation réelle
- * (Claude) ou factice (tests / démo sans clé).
+ * A devot's mind: produces a structured decision from its history and an event.
+ * Injectable interface — real implementation (Claude) or fake (tests / demo
+ * without a key).
  */
 export interface MindProvider {
   think(
@@ -89,8 +89,8 @@ export class AnthropicMind implements MindProvider {
 }
 
 /**
- * Esprit factice pour tests et démo sans clé API : décisions plausibles,
- * usage simulé (donc dégâts de HP réels dans la boucle).
+ * Fake mind for tests and for the demo without an API key: plausible decisions,
+ * simulated usage (so real HP damage in the loop).
  */
 export class MockMind implements MindProvider {
   constructor(
@@ -109,28 +109,28 @@ export class MockMind implements MindProvider {
     const scripted = this.script?.[this.callCount % (this.script.length || 1)];
     this.callCount++;
 
-    // Ciblage : réutilise le premier id cité dans l'événement (nourriture,
-    // devot rencontré, agresseur…) pour les actions qui exigent une cible.
+    // Targeting: reuses the first id quoted in the event (food, a devot just
+    // met, an attacker…) for the actions that require a target.
     const quotedId = /id "([^"]+)"/.exec(eventText)?.[1];
 
     const decision: Decision = scripted
       ? {
           action: "idle",
           targetId: quotedId,
-          // Forger exige de nommer l'objet. Sans ce choix, un script « craft »
-          // produirait une décision incomplète que le monde refuserait, et le
-          // mode de développement ne pourrait jamais exercer la forge.
+          // Forging requires naming the item. Without this pick, a "craft"
+          // script would produce an incomplete decision the world would refuse,
+          // and dev mode could never exercise the forge.
           item: ITEM_KINDS[this.callCount % ITEM_KINDS.length],
           thought: "I do what is written in me.",
           ...scripted,
         }
-      : eventText.includes("nourriture")
+      : eventText.includes("food")
         ? {
             action: "move",
             direction: { x: 1, z: 0 },
             thought: "Eating buys thinking time.",
           }
-        : { action: "idle", emotion: "prudence", thought: "Le silence me garde en vie." };
+        : { action: "idle", emotion: "wariness", thought: "Silence keeps me alive." };
 
     const usage: InferenceUsage = {
       inputTokens: this.mockUsage.inputTokens ?? 1200,
@@ -139,7 +139,7 @@ export class MockMind implements MindProvider {
       cacheCreationInputTokens: this.mockUsage.cacheCreationInputTokens ?? 0,
     };
 
-    // Simule la latence d'une vraie inférence (corps et esprit découplés).
+    // Simulates the latency of a real inference (body and mind decoupled).
     await new Promise((r) => setTimeout(r, 30));
 
     return {

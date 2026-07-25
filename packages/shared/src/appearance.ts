@@ -1,17 +1,17 @@
 /**
- * L'APPARENCE ET LES STATS D'UN DEVOT.
+ * A DEVOT'S APPEARANCE AND STATS.
  *
- * Ce module est la source unique de vérité : le client s'en sert pour dessiner
- * l'écran de création et l'aperçu, le serveur pour VALIDER ce qu'il reçoit, et
- * la simulation pour en tirer les effets de jeu. Une seule définition, donc
- * aucune divergence possible entre ce que le joueur croit choisir, ce que le
- * serveur accepte, et ce qui se produit dans le monde.
+ * This module is the single source of truth: the client uses it to draw the
+ * creation screen and the preview, the server to VALIDATE what it receives, and
+ * the simulation to derive the game effects. One definition, so no possible
+ * divergence between what the player believes they chose, what the server
+ * accepts, and what actually happens in the world.
  *
- * Rien de ce qui vient du client n'est cru sur parole. `validateAppearance`
- * est appelée côté serveur avant toute naissance.
+ * Nothing coming from a client is taken on trust. `validateAppearance` is called
+ * server-side before any birth.
  */
 
-// ── Emplacements d'apparence ────────────────────────────────────────────────
+// ── Appearance slots ────────────────────────────────────────────────────────
 
 export const HATS = ["none", "cap", "widebrim", "helmet", "crown"] as const;
 export const CAPES = ["none", "short", "long"] as const;
@@ -24,10 +24,10 @@ export type Face = (typeof FACES)[number];
 export type Build = (typeof BUILDS)[number];
 
 /**
- * Palettes fermées plutôt que couleurs libres. Deux raisons : le serveur peut
- * valider ce qu'il reçoit (une couleur arbitraire serait un vecteur d'injection
- * dans le rendu et dans les prompts), et un monde à palette limitée reste
- * lisible — on distingue les devots au lieu de nager dans un dégradé.
+ * Closed palettes rather than free colours. Two reasons: the server can validate
+ * what it receives (an arbitrary colour would be an injection vector into both
+ * the rendering and the prompts), and a world with a limited palette stays
+ * readable — you tell devots apart instead of swimming in a gradient.
  */
 export const SHIRT_COLORS = [
   "#e0634c",
@@ -68,23 +68,23 @@ export interface Appearance {
   build: Build;
 }
 
-// ── Stats, réparties sur un budget ──────────────────────────────────────────
+// ── Stats, spread over a budget ─────────────────────────────────────────────
 
 /**
- * Quatre stats, chacune entre 1 et 5, dont la somme vaut EXACTEMENT le budget.
+ * Four stats, each between 1 and 5, summing to EXACTLY the budget.
  *
- * Le budget est ce qui empêche la création d'être une simple liste de courses :
- * on ne choisit pas « le meilleur casque », on répartit une enveloppe. Chaque
- * point donné à la vigueur est un point retiré à la vue.
+ * The budget is what stops creation from being a shopping list: you do not pick
+ * "the best helmet", you spread a fixed allowance. Every point given to vigour
+ * is a point taken from sight.
  */
 export interface Stats {
-  /** Points de vie maximaux — donc durée de vie ET budget de pensée. */
+  /** Maximum hit points — hence lifespan AND thinking budget. */
   vitality: number;
-  /** Dégâts infligés en attaquant. */
+  /** Damage dealt when attacking. */
   power: number;
-  /** Vitesse de déplacement. */
+  /** Movement speed. */
   speed: number;
-  /** Rayon de perception, donc ce qui entre dans son prompt. */
+  /** Perception radius, hence what enters their prompt. */
   sight: number;
 }
 
@@ -102,12 +102,12 @@ export const STAT_LABELS: Record<StatKey, string> = {
 };
 
 /**
- * Multiplicateur appliqué à la grandeur de base d'une stat.
+ * Multiplier applied to a stat's base magnitude.
  *
- * 3 est le point neutre (multiplicateur 1). Chaque point vaut 20 % : de 0,6 à
- * 1,4. L'écart est net sans être écrasant — un devot de vigueur 5 vit presque
- * deux fois plus longtemps qu'un devot de vigueur 1, ce qui se voit, mais il
- * l'a payé sur ses trois autres stats.
+ * 3 is the neutral point (multiplier 1). Each point is worth 20%: from 0.6 to
+ * 1.4. The gap is clear without being crushing — a devot with vigour 5 lives
+ * almost twice as long as one with vigour 1, which shows, but they paid for it
+ * across their three other stats.
  */
 export function statMultiplier(value: number): number {
   return 0.4 + 0.2 * clampStat(value);
@@ -119,7 +119,7 @@ function clampStat(v: number): number {
   return n < STAT_MIN ? STAT_MIN : n > STAT_MAX ? STAT_MAX : n;
 }
 
-// ── Valeurs par défaut ──────────────────────────────────────────────────────
+// ── Defaults ────────────────────────────────────────────────────────────────
 
 export const DEFAULT_STATS: Stats = { vitality: 3, power: 3, speed: 3, sight: 3 };
 
@@ -133,15 +133,15 @@ export const DEFAULT_APPEARANCE: Appearance = {
   build: "average",
 };
 
-// ── Validation, côté serveur ────────────────────────────────────────────────
+// ── Validation, server-side ─────────────────────────────────────────────────
 
 export interface Rejection {
   reason: string;
 }
 
 /**
- * Valide une apparence reçue d'un client. Renvoie null si elle est légale.
- * Tout est vérifié : chaque emplacement doit appartenir à sa liste fermée.
+ * Validates an appearance received from a client. Returns null if it is legal.
+ * Everything is checked: each slot must belong to its closed list.
  */
 export function validateAppearance(a: unknown): Rejection | null {
   if (!a || typeof a !== "object") return { reason: "Missing appearance." };
@@ -160,9 +160,9 @@ export function validateAppearance(a: unknown): Rejection | null {
 }
 
 /**
- * Valide une répartition de stats. C'est ICI que se joue l'anti-triche de la
- * création : un client modifié qui demanderait 5 partout serait refusé, parce
- * que la somme doit valoir exactement le budget.
+ * Validates a stat spread. THIS is where creation's anti-cheat lives: a tampered
+ * client asking for 5 everywhere is refused, because the total must equal the
+ * budget exactly.
  */
 export function validateStats(s: unknown): Rejection | null {
   if (!s || typeof s !== "object") return { reason: "Missing stats." };
@@ -189,12 +189,13 @@ export function validateStats(s: unknown): Rejection | null {
 // ── Signature ───────────────────────────────────────────────────────────────
 
 /**
- * Identifiant court dérivé de TOUS les choix : apparence, stats, traits, âme.
+ * A short identifier derived from ALL the choices: appearance, stats, traits,
+ * soul.
  *
- * Ce n'est pas un secret ni une preuve — c'est une référence, comme le numéro
- * d'une pièce dans une collection. Deux devots identiques auraient la même,
- * mais avec sept emplacements, quatre stats réparties et douze traits, l'espace
- * est assez vaste pour que cela n'arrive pas en pratique.
+ * It is neither a secret nor a proof — it is a reference, like the number on a
+ * piece in a collection. Two identical devots would share one, but with seven
+ * slots, four spread stats and twelve traits, the space is wide enough that this
+ * does not happen in practice.
  */
 export function signatureOf(
   appearance: Appearance,
@@ -215,8 +216,8 @@ export function signatureOf(
     soul,
   ].join("|");
 
-  // FNV-1a 32 bits : court, sans dépendance, et suffisamment dispersé pour que
-  // deux choix voisins donnent deux signatures franchement différentes.
+  // FNV-1a 32-bit: short, dependency-free, and dispersed enough that two
+  // neighbouring choices give two clearly different signatures.
   let h = 0x811c9dc5;
   for (let i = 0; i < source.length; i++) {
     h ^= source.charCodeAt(i);
@@ -226,17 +227,17 @@ export function signatureOf(
   return `DVT-${body.slice(0, 3)}-${body.slice(3)}`;
 }
 
-// ── Sérialisation ───────────────────────────────────────────────────────────
+// ── Serialisation ───────────────────────────────────────────────────────────
 
 /**
- * L'apparence voyage et se persiste en JSON compact. Elle ne change jamais
- * après la naissance : un seul champ, écrit une fois, plutôt qu'une dizaine de
- * champs synchronisés à chaque tick.
+ * The appearance travels and persists as compact JSON. It never changes after
+ * birth: a single field, written once, rather than a dozen fields synchronised
+ * on every tick.
  */
 export interface Identity {
   appearance: Appearance;
   stats: Stats;
-  /** Le texte libre du joueur : ce que le devot croit être. */
+  /** The player's free text: what the devot believes itself to be. */
   soul: string;
   signature: string;
 }
@@ -247,7 +248,7 @@ export function encodeIdentity(identity: Identity): string {
   return JSON.stringify(identity);
 }
 
-/** Décode une identité persistée. Renvoie null si elle est illisible. */
+/** Decodes a persisted identity. Returns null if it is unreadable. */
 export function decodeIdentity(raw: string | null | undefined): Identity | null {
   if (!raw) return null;
   try {
@@ -259,7 +260,7 @@ export function decodeIdentity(raw: string | null | undefined): Identity | null 
   }
 }
 
-/** Identité par défaut : pour un devot né sans création (reproduction, mode god). */
+/** Default identity: for a devot born without creation (reproduction, god mode). */
 export function defaultIdentity(traits: readonly string[] = []): Identity {
   return {
     appearance: { ...DEFAULT_APPEARANCE },
@@ -269,19 +270,19 @@ export function defaultIdentity(traits: readonly string[] = []): Identity {
   };
 }
 
-// ── Hérédité ────────────────────────────────────────────────────────────────
+// ── Heredity ────────────────────────────────────────────────────────────────
 
 /**
- * L'identité d'un enfant, tirée de celle de ses parents.
+ * A child's identity, drawn from its parents'.
  *
- * L'apparence se mélange emplacement par emplacement : le chapeau vient de
- * l'un, le t-shirt de l'autre, au hasard. On reconnaît donc une famille à
- * l'écran — c'est le pendant visible du mélange de traits qui existe déjà.
+ * The appearance mixes slot by slot: the hat from one, the shirt from the other,
+ * at random. You can therefore recognise a family on screen — the visible
+ * counterpart of the trait mixing that already exists.
  *
- * Les stats se moyennent, puis sont RAMENÉES AU BUDGET. Sans cette
- * renormalisation, deux parents doués donneraient un enfant hors budget, et la
- * validation du serveur le refuserait dans les générations suivantes : une
- * lignée finirait par produire des enfants illégaux.
+ * Stats are averaged, then BROUGHT BACK TO BUDGET. Without that renormalisation
+ * two gifted parents would produce an over-budget child, and the server's
+ * validation would refuse it a few generations later: a line would end up
+ * producing illegal children.
  */
 export function inheritIdentity(
   a: Identity,
@@ -309,12 +310,12 @@ export function inheritIdentity(
 }
 
 /**
- * Ramène quatre valeurs quelconques à une répartition LÉGALE : entiers, chacun
- * entre STAT_MIN et STAT_MAX, de somme exactement STAT_BUDGET.
+ * Brings any four values back to a LEGAL spread: whole numbers, each between
+ * STAT_MIN and STAT_MAX, summing to exactly STAT_BUDGET.
  *
- * On arrondit d'abord, puis on corrige le reste point par point en le donnant
- * (ou en le retirant) à la stat la plus éloignée de sa borne. La forme du
- * profil parental est ainsi conservée autant que le budget le permet.
+ * We round first, then correct the remainder point by point, giving it to (or
+ * taking it from) the stat furthest from its bound. The shape of the parental
+ * profile is thus preserved as far as the budget allows.
  */
 export function normalizeToBudget(values: readonly number[]): Stats {
   const n = STAT_KEYS.length;
@@ -328,8 +329,8 @@ export function normalizeToBudget(values: readonly number[]): Stats {
   let guard = 0;
   while (total !== STAT_BUDGET && guard++ < 64) {
     const up = total < STAT_BUDGET;
-    // La stat la plus basse monte, la plus haute descend : on reste au plus
-    // près du profil hérité.
+    // The lowest stat goes up, the highest goes down: we stay as close as
+    // possible to the inherited profile.
     let best = -1;
     let bestValue = up ? STAT_MAX + 1 : STAT_MIN - 1;
     for (let i = 0; i < n; i++) {
@@ -339,7 +340,7 @@ export function normalizeToBudget(values: readonly number[]): Stats {
         bestValue = v;
       }
     }
-    if (best < 0) break; // toutes aux bornes : le budget est inatteignable
+    if (best < 0) break; // all at their bounds: the budget is unreachable
     out[best] = out[best]! + (up ? 1 : -1);
     total += up ? 1 : -1;
   }
@@ -351,9 +352,9 @@ export function normalizeToBudget(values: readonly number[]): Stats {
   return stats;
 }
 
-// ── Décrire une allure ──────────────────────────────────────────────────────
+// ── Describing a look ───────────────────────────────────────────────────────
 
-/** Nom courant d'une couleur : « écarlate » parle au modèle, « #e0634c » non. */
+/** A colour common name: "scarlet" means something to a model, "#e0634c" does not. */
 const COLOR_NAMES: Record<string, string> = {
   "#e0634c": "scarlet",
   "#e0b34c": "saffron",
@@ -376,12 +377,12 @@ export function colorName(hex: string): string {
 }
 
 /**
- * L'allure d'un devot, en français.
+ * A devot's look, in plain words.
  *
- * Une SEULE formulation, utilisée pour ce qu'un devot sait de lui-même et pour
- * ce que les autres perçoivent de lui. C'est ce qui donne son poids social à
- * l'apparence : le modèle décide seul qui craindre ou qui suivre, sans qu'aucune
- * règle ne l'impose — mais encore faut-il qu'il puisse le voir.
+ * ONE formulation, used both for what a devot knows about itself and for what
+ * others perceive of it. This is what gives appearance its social weight: the
+ * model decides on its own who to fear or follow, with no rule imposing it — but
+ * only if it can see it in the first place.
  */
 export function describeAppearance(a: Appearance): string {
   const parts: string[] = [`${a.build} build`, `${colorName(a.shirt)} shirt`];
@@ -393,7 +394,7 @@ export function describeAppearance(a: Appearance): string {
   return parts.join(", ");
 }
 
-/** Allure d'un devot dont on n'a que l'identité sérialisée. */
+/** The look of a devot when all we hold is its serialised identity. */
 export function describeIdentity(identityJson: string): string {
   const identity = decodeIdentity(identityJson);
   return identity ? describeAppearance(identity.appearance) : "of unremarkable appearance";

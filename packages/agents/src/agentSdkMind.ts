@@ -7,17 +7,17 @@ import type { MindProvider, ThoughtResult } from "./mind.js";
 import { buildEventBlock, buildPersona, WORLD_RULES } from "./prompts.js";
 
 /**
- * Esprits animés par l'abonnement Claude Code (Agent SDK) : aucune clé API
- * pay-per-token — chaque pensée passe par les identifiants Claude Code de la
- * machine. L'usage réel (tokens) est toujours converti en dégâts de HP.
+ * Minds driven by the Claude Code subscription (Agent SDK): no pay-per-token
+ * API key — every thought goes through the machine's Claude Code credentials.
+ * Real usage (tokens) is still converted into HP damage.
  *
- * Chaque pensée est une session éphémère : l'historique du devot est rejoué
- * dans le prompt sous forme de transcript (sa mémoire vit dans notre base).
+ * Each thought is an ephemeral session: the devot's history is replayed into
+ * the prompt as a transcript (its memory lives in our database).
  */
 /**
- * Environnement du sous-processus Claude Code, purgé des clés API : en mode
- * abonnement, une ANTHROPIC_API_KEY résiduelle (shell, .env, placeholder)
- * prendrait le dessus sur l'OAuth et provoquerait `invalid x-api-key`.
+ * Environment for the Claude Code subprocess, stripped of API keys: in
+ * subscription mode a leftover ANTHROPIC_API_KEY (shell, .env, placeholder)
+ * would take precedence over OAuth and cause `invalid x-api-key`.
  */
 function subscriptionEnv(): Record<string, string | undefined> {
   return {
@@ -76,7 +76,7 @@ export class AgentSdkMind implements MindProvider {
   }
 }
 
-/** Chroniqueur sur abonnement : condense les mémoires via une session Haiku. */
+/** Chronicler on the subscription: condenses memories through a Haiku session. */
 export class AgentSdkChronicler implements Chronicler {
   async chronicle(
     histories: Array<{ name: string; history: StoredMessage[] }>,
@@ -89,7 +89,7 @@ export class AgentSdkChronicler implements Chronicler {
 
     const q = query({
       prompt: `${instruction}\n\n${histories
-        .map((h) => `### Vie de ${h.name}\n${renderTranscript(h.history)}`)
+        .map((h) => `### Life of ${h.name}\n${renderTranscript(h.history)}`)
         .join("\n\n")}`,
       options: {
         systemPrompt:

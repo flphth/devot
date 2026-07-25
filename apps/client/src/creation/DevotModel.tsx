@@ -3,15 +3,15 @@ import { useMemo } from "react";
 import { BUILDS, type Appearance, type Build, type ItemKind } from "@devot/shared";
 
 /**
- * LE CORPS D'UN DEVOT, en une seule définition.
+ * A DEVOT'S BODY, in a single definition.
  *
- * Ce composant est utilisé par l'aperçu de l'écran de création ET par la scène
- * du monde. C'est délibéré : la promesse faite au joueur est que ce qu'il
- * façonne est exactement ce qui naîtra. Deux modèles séparés dériveraient au
- * premier ajout de chapeau.
+ * This component is used by the creation screen preview AND by the world scene.
+ * That is deliberate: the promise made to the player is that what they shape is
+ * exactly what will be born. Two separate models would drift at the first hat
+ * added.
  */
 
-/** La corpulence agit sur la largeur, pas sur la hauteur : on reste à l'échelle. */
+/** Build affects width, not height: everything stays to scale. */
 const BUILD_WIDTH: Record<Build, number> = {
   slim: 0.78,
   average: 1,
@@ -31,7 +31,7 @@ export function DevotModel({
   appearance: Appearance;
   selected?: boolean;
   emissive?: number;
-  /** Objets forgés, portés sur le corps : ils se voient, ils se sont payés. */
+  /** Forged items, worn on the body: they show, they were paid for. */
   items?: readonly ItemKind[];
 }) {
   const w = buildWidth(appearance.build);
@@ -42,7 +42,7 @@ export function DevotModel({
 
   return (
     <group>
-      {/* jambes */}
+      {/* legs */}
       <mesh position={[-0.12 * w, 0.14, 0]}>
         <boxGeometry args={[0.16 * w, 0.28, 0.2]} />
         <meshStandardMaterial color={pants} flatShading />
@@ -52,7 +52,7 @@ export function DevotModel({
         <meshStandardMaterial color={pants} flatShading />
       </mesh>
 
-      {/* torse : c'est lui qui porte la couleur de t-shirt */}
+      {/* torso: this is what carries the shirt colour */}
       <mesh position={[0, 0.53, 0]}>
         <boxGeometry args={[0.46 * w, 0.44, 0.32]} />
         <meshStandardMaterial
@@ -63,7 +63,7 @@ export function DevotModel({
         />
       </mesh>
 
-      {/* bras */}
+      {/* arms */}
       <mesh position={[-(0.29 * w), 0.55, 0]}>
         <boxGeometry args={[0.11 * w, 0.36, 0.16]} />
         <meshStandardMaterial color={skin} flatShading />
@@ -73,12 +73,12 @@ export function DevotModel({
         <meshStandardMaterial color={skin} flatShading />
       </mesh>
 
-      {/* tête */}
+      {/* head */}
       <mesh position={[0, 0.93, 0]}>
         <boxGeometry args={[0.4, 0.36, 0.36]} />
         <meshStandardMaterial color={skin} flatShading />
       </mesh>
-      {/* yeux : masqués si le visage est couvert */}
+      {/* eyes: hidden when the face is covered */}
       {appearance.face !== "mask" && appearance.face !== "blindfold" && (
         <>
           <mesh position={[-0.09, 0.95, 0.185]}>
@@ -128,7 +128,7 @@ function FaceGear({ appearance }: { appearance: Appearance }) {
       </mesh>
     );
   }
-  // masque : couvre tout le bas du visage
+  // mask: covers the whole lower face
   return (
     <mesh position={[0, 0.88, 0.01]}>
       <boxGeometry args={[0.42, 0.18, 0.38]} />
@@ -206,9 +206,8 @@ function Cape({ appearance, width }: { appearance: Appearance; width: number }) 
 
 
 /**
- * CE QUE LE DEVOT A FORGÉ. Chaque objet a coûté des points de vie, donc du
- * temps de pensée : il doit se voir sur le corps, sinon le sacrifice reste
- * abstrait.
+ * WHAT THE DEVOT FORGED. Every item cost hit points, and therefore thinking
+ * time: it must show on the body, otherwise the sacrifice stays abstract.
  */
 function CarriedItems({ items, width }: { items: readonly ItemKind[]; width: number }) {
   return (

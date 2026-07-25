@@ -19,7 +19,7 @@ export interface AppliedThought {
   hpLoss: number;
 }
 
-/** Token bucket : plafonne la dépense globale d'inférence (µ$/min). */
+/** Token bucket: caps global inference spending (µ$/min). */
 class BudgetBucket {
   private spent = 0;
   private windowStart = Date.now();
@@ -37,18 +37,18 @@ class BudgetBucket {
     return true;
   }
 
-  /** Ajuste avec le coût réel une fois l'inférence terminée. */
+  /** Adjusts with the real cost once the inference is done. */
   settle(estimate: number, actual: number): void {
     this.spent += actual - estimate;
   }
 }
 
 /**
- * File d'inférences priorisée, découplée du tick :
- * - concurrence bornée (p-limit)
- * - une seule pensée en vol par devot
- * - priorité : divin > menace > survie > rencontre > oisif
- * - pré-check hp > coût plancher + token bucket global
+ * Prioritised inference queue, decoupled from the tick:
+ * - bounded concurrency (p-limit)
+ * - a single thought in flight per devot
+ * - priority: divine > threat > survival > encounter > idle
+ * - pre-check hp > floor cost + global token bucket
  */
 export class CognitionOrchestrator {
   private queue: Trigger[] = [];
@@ -67,11 +67,11 @@ export class CognitionOrchestrator {
     private chronicler?: Chronicler,
   ) {}
 
-  /** Dépose un déclencheur ; l'esprit sera sollicité en tâche de fond. */
+  /** Drops off a trigger; the mind will be engaged in the background. */
   enqueue(trigger: Trigger): void {
     const devot = this.getDevot(trigger.devotId);
     if (!devot || devot.state === "dead") return;
-    // Un devot déjà en train de penser, ou déjà en file, n'est pas relancé.
+    // A devot already thinking, or already queued, is not woken again.
     if (this.inFlight.has(trigger.devotId)) return;
     if (this.queue.some((t) => t.devotId === trigger.devotId)) return;
     this.queue.push(trigger);
@@ -89,11 +89,11 @@ export class CognitionOrchestrator {
       const devot = this.getDevot(trigger.devotId);
       if (!devot || devot.state === "dead") continue;
 
-      // Pré-check budget : un devot trop pauvre pour penser s'abstient.
+      // Budget pre-check: a devot too poor to think abstains.
       if (devot.hp <= THOUGHT_COST_FLOOR_HP) continue;
       if (!this.bucket.tryConsume(THOUGHT_COST_FLOOR_HP)) {
-        // Sous pression budgétaire : les non-prioritaires s'endorment.
-        // Le corps continue ; l'esprit patiente jusqu'à la fenêtre suivante.
+        // Under budget pressure: the non-priority ones fall asleep.
+        // The body carries on; the mind waits for the next window.
         this.queue.unshift(trigger);
         return;
       }
@@ -116,7 +116,7 @@ export class CognitionOrchestrator {
       let history = this.repos.messages.history(devot.id);
 
       // Vieillir, c'est oublier : historique trop long → le chroniqueur le
-      // condense en un souvenir unique. Ce travail de mémoire coûte des HP.
+      // condenses it into a single memory. That memory work costs HP.
       if (this.chronicler && history.length > CONTEXT_COMPACT_THRESHOLD_MSGS) {
         const { summary, usage } = await this.chronicler.chronicle(
           [{ name: devot.name, history }],
@@ -131,11 +131,11 @@ export class CognitionOrchestrator {
       const loss = hpCost(result.usage, profile.model);
       this.bucket.settle(THOUGHT_COST_FLOOR_HP, loss);
 
-      // Le devot peut être mort pendant que l'esprit pensait.
+      // The devot may have died while the mind was thinking.
       const current = this.getDevot(devot.id);
       if (!current || current.state === "dead") return;
 
-      // Persiste l'échange dans l'historique du devot.
+      // Persists the exchange in the devot's history.
       this.repos.messages.append(devot.id, "user", result.userTurn);
       this.repos.messages.append(
         devot.id,

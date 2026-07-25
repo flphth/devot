@@ -12,19 +12,17 @@ import {
 } from "@devot/shared";
 
 /**
- * LES STATS EN JEU.
+ * STATS IN PLAY.
  *
- * Chaque grandeur du monde passe désormais par ici plutôt que d'utiliser sa
- * constante brute. Un devot vigoureux vit plus longtemps, un devot vif se
- * déplace plus vite, un devot à la vue perçante voit plus loin — donc reçoit
- * davantage dans son prompt.
+ * Every quantity in the world now goes through here instead of using its raw
+ * constant. A hardy devot lives longer, a quick devot moves faster, a
+ * sharp-sighted devot sees further — and therefore receives more in its prompt.
  *
- * Les stats viennent de l'identité PERSISTÉE, jamais de ce qu'un client
- * affirme : elles ont été validées une fois pour toutes à la naissance.
+ * Stats come from the PERSISTED identity, never from what a client claims:
+ * they were validated once and for all at birth.
  *
- * Le décodage JSON est mémoïsé par chaîne d'identité. Sans cela, on
- * reparserait le même JSON pour chaque devot à chaque tick, dans la boucle la
- * plus chaude du serveur.
+ * JSON decoding is memoised by identity string. Without that, we would reparse
+ * the same JSON for every devot on every tick, in the server's hottest loop.
  */
 const cache = new Map<string, Stats>();
 
@@ -35,20 +33,20 @@ function bodyStatsOf(devot: DevotEntity): Stats {
   const hit = cache.get(raw);
   if (hit) return hit;
   const stats = decodeIdentity(raw)?.stats ?? DEFAULT_STATS;
-  // Borne de sûreté : le cache suit le nombre d'identités DISTINCTES, pas le
-  // nombre de devots. Il ne peut donc pas croître indéfiniment dans un monde
-  // stable, mais un monde qui tourne des mois finirait par accumuler.
+  // Safety bound: the cache tracks the number of DISTINCT identities, not the
+  // number of devots. It therefore cannot grow without limit in a stable world,
+  // but a world running for months would eventually pile up.
   if (cache.size > 4096) cache.clear();
   cache.set(raw, stats);
   return stats;
 }
 
 /**
- * Stats EFFECTIVES : le corps, plus ce qu'il a forgé.
+ * EFFECTIVE stats: the body, plus what it has forged.
  *
- * Un objet n'est pas un ornement : il déplace une stat, donc il change ce que
- * le devot peut faire. Et comme il a été payé en PV, il a aussi raccourci sa
- * vie — c'est le marché.
+ * An item is not an ornament: it shifts a stat, and therefore changes what the
+ * devot can do. And since it was paid for in HP, it also shortened that devot's
+ * life — that is the bargain.
  */
 export function statsOf(devot: DevotEntity): Stats {
   const body = bodyStatsOf(devot);
@@ -60,17 +58,17 @@ export function hpMaxOf(devot: DevotEntity): number {
   return Math.round(HP_MAX_DEFAULT * statMultiplier(statsOf(devot).vitality));
 }
 
-/** Vitesse de déplacement, en unités par seconde. */
+/** Movement speed, in units per second. */
 export function speedOf(devot: DevotEntity): number {
   return DEVOT_SPEED * statMultiplier(statsOf(devot).speed);
 }
 
-/** Rayon de perception : ce que ce devot voit, donc ce qui entre dans sa tête. */
+/** Perception radius: what this devot sees, hence what enters its head. */
 export function sightOf(devot: DevotEntity): number {
   return PERCEPTION_RADIUS * statMultiplier(statsOf(devot).sight);
 }
 
-/** HP prélevés par tick quand ce devot attaque. */
+/** HP drained per tick when this devot attacks. */
 export function drainOf(devot: DevotEntity): number {
   return ATTACK_DRAIN_PER_TICK * statMultiplier(statsOf(devot).power);
 }

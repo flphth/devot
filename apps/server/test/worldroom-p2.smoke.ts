@@ -1,7 +1,7 @@
 /**
- * Smoke test P2 : reproduction observable dans la WorldRoom réelle.
- * L'esprit mock est scripté pour décider "reproduce" → l'enfant naît dans
- * l'état synchronisé, avec héritage de contexte (chroniqueur mock).
+ * P2 smoke test: reproduction observable in the real WorldRoom.
+ * The mock mind is scripted to decide "reproduce" -> the child is born into the
+ * synchronised state, with context inheritance (mock chronicler).
  */
 import { createServer } from "node:http";
 import { Server } from "@colyseus/core";
@@ -35,9 +35,9 @@ async function main(): Promise<void> {
 
   room.send("createFounder", { name: "Lilith", traits: ["curious", "generous"] });
   await sleep(800);
-  check("fondatrice née", state().devots.size >= 1);
+  check("founder born", state().devots.size >= 1);
 
-  // La pensée de naissance (scriptée "reproduce") déclenche un bourgeonnement.
+  // The birth thought (scripted "reproduce") triggers a budding.
   await sleep(3000);
   const count = state().devots.size;
   check(`descendance apparue (${count} devots)`, count >= 2);
@@ -45,9 +45,9 @@ async function main(): Promise<void> {
   const devots = [...state().devots.values()] as any[];
   const child = devots.find((d) => !d.isFounder);
   const founder = devots.find((d) => d.isFounder);
-  check("l'enfant appartient à la même lignée", child?.godId === founder?.godId);
+  check("the child belongs to the same line", child?.godId === founder?.godId);
   check(
-    "procréer a épuisé le parent (HP < hpMax)",
+    "procreating exhausted the parent (HP < hpMax)",
     founder && founder.hp < founder.hpMax * 0.75,
   );
   check("l'enfant est vivant avec des HP", child && child.hp > 0 && child.state !== "dead");

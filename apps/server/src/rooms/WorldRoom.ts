@@ -43,7 +43,7 @@ import { canRecreateFounder, processReproductions } from "../lifecycle.js";
 
 const GOD_COLORS = ["#e0b34c", "#4ca6e0", "#9c4ce0", "#4ce07a", "#e04c5f"];
 
-/** PV maximaux pour une vigueur donnée. Même formule partout (cf. sim/stats). */
+/** Max HP for a given vitality. Same formula everywhere (see sim/stats). */
 function hpMaxFor(vitality: number): number {
   return Math.round(HP_MAX_DEFAULT * statMultiplier(vitality));
 }
@@ -117,10 +117,10 @@ export class WorldRoom extends Room<WorldState> {
       this.handleGetJournal(client, msg),
     );
     this.onMessage("select", () => {
-      /* lecture seule : la sélection vit côté client */
+      /* read-only: selection lives on the client */
     });
 
-    // Mode god (debug/créatif) : hors règles du jeu, mais toujours validé ici.
+    // God mode (debug/creative): outside the rules of the game, still validated here.
     this.onMessage("debugSpawnDevot", (client, msg: DebugSpawnDevotMsg) =>
       this.handleDebugSpawnDevot(client, msg),
     );
@@ -158,7 +158,7 @@ export class WorldRoom extends Room<WorldState> {
     }
   }
 
-  // ── Intentions du dieu (validées ici, jamais côté client) ────────────────
+  // ── God intents (validated here, never on the client) ────────────────────
 
   private godOf(client: Client): string | undefined {
     return this.sessions.get(client.sessionId);
@@ -176,7 +176,7 @@ export class WorldRoom extends Room<WorldState> {
       return this.reject(client, "createFounder", "Your line is still alive.");
     }
 
-    // Traits choisis par le joueur : 2 à 3, tous issus de la banque.
+    // Traits chosen by the player: 2 to 3, all drawn from the pool.
     const traits = msg.traits ?? [];
     const pool = TRAIT_POOL as readonly string[];
     if (traits.length < 2 || traits.length > 3) {
@@ -186,9 +186,9 @@ export class WorldRoom extends Room<WorldState> {
       return this.reject(client, "createFounder", "Invalid traits.");
     }
 
-    // APPARENCE ET STATS. Rien de ce qui arrive ici n'est cru sur parole : le
-    // budget de points est vérifié par le serveur, sinon un client modifié
-    // s'octroierait le maximum sur les quatre stats.
+    // APPEARANCE AND STATS. Nothing arriving here is taken on trust: the point
+    // budget is checked by the server, otherwise a tampered client would grant
+    // itself the maximum on all four stats.
     const badLook = validateAppearance(msg.appearance);
     if (badLook) return this.reject(client, "createFounder", badLook.reason);
     const badStats = validateStats(msg.stats);
@@ -238,8 +238,8 @@ export class WorldRoom extends Room<WorldState> {
       identity?: Identity;
     },
   ): DevotEntity {
-    // Un devot né sans écran de création (reproduction, mode god) reçoit une
-    // identité neutre : le monde n'a jamais de devot sans apparence.
+    // A devot born without the creation screen (reproduction, god mode) gets a
+    // neutral identity: the world never holds a devot with no appearance.
     const identity = opts.identity ?? defaultIdentity(opts.traits);
     const devot: DevotEntity = {
       id: `devot-${godId}-${Date.now()}-${++this.devotSeq}`,
@@ -251,13 +251,13 @@ export class WorldRoom extends Room<WorldState> {
         y: 0,
         z: opts.z ?? (Math.random() - 0.5) * this.world.size,
       },
-      // Les PV maximaux découlent de la VIGUEUR choisie : c'est la stat qui
-      // pèse le plus, puisque les PV sont aussi le budget de pensée. Un devot
-      // vigoureux ne vit pas seulement plus longtemps, il pense plus longtemps.
+      // Max HP follow from the chosen VITALITY: it is the heaviest stat, since
+      // HP are also the thinking budget. A hardy devot does not merely live
+      // longer, it thinks longer.
       hp: hpMaxFor(identity.stats.vitality),
       hpMax: hpMaxFor(identity.stats.vitality),
       identityJson: encodeIdentity(identity),
-      // Un devot naît les mains nues : tout objet devra être forgé, et payé.
+      // A devot is born empty-handed: every item must be forged, and paid for.
       items: [],
       state: "alive",
       profile: "frugal",
@@ -272,14 +272,14 @@ export class WorldRoom extends Room<WorldState> {
     return devot;
   }
 
-  /** Foudre divine : le dieu peut tuer son propre devot. Irréversible. */
+  /** Divine lightning: a god may kill their own devot. Irreversible. */
   private handleSmite(client: Client, msg: SmiteMsg): void {
     const godId = this.godOf(client);
     if (!godId || !msg) return;
     const devot = this.world.devots.get(msg.devotId ?? "");
-    if (!devot) return this.reject(client, "smite", "Devot introuvable.");
+    if (!devot) return this.reject(client, "smite", "Devot not found.");
     if (devot.godId !== godId) {
-      return this.reject(client, "smite", "Ce devot ne t'appartient pas.");
+      return this.reject(client, "smite", "This devot is not yours.");
     }
     if (devot.state === "dead") {
       return this.reject(client, "smite", "They are already dead.");
@@ -295,7 +295,7 @@ export class WorldRoom extends Room<WorldState> {
     if (s) s.utterance = "";
   }
 
-  /** Journal du panneau « Esprit » : la vie du devot, datée, côté serveur. */
+  /** Journal for the "Mind" panel: the devot's life, timestamped, server-side. */
   private handleGetJournal(client: Client, msg: JournalRequestMsg): void {
     if (!msg?.devotId) return;
     const rows = this.repos.messages.journal(msg.devotId);
@@ -303,7 +303,7 @@ export class WorldRoom extends Room<WorldState> {
       if (m.role === "user") {
         return { kind: "event", text: String(m.content), at: m.createdAt };
       }
-      // Tour assistant : contenu = décision JSON (ou blocs de texte).
+      // Assistant turn: content = JSON decision (or text blocks).
       let decision: Record<string, unknown> = {};
       try {
         const raw = m.content as unknown;
@@ -312,7 +312,7 @@ export class WorldRoom extends Room<WorldState> {
           : String(raw);
         decision = JSON.parse(text) as Record<string, unknown>;
       } catch {
-        /* contenu non structuré : ignoré */
+        /* unstructured content: ignored */
       }
       return {
         kind: "decision",
@@ -359,15 +359,15 @@ export class WorldRoom extends Room<WorldState> {
     const god = this.state.gods.get(godId);
     const devot = this.world.devots.get(msg.devotId ?? "");
 
-    if (!god || !devot) return this.reject(client, "speak", "Devot introuvable.");
+    if (!god || !devot) return this.reject(client, "speak", "Devot not found.");
     if (devot.godId !== godId) {
-      return this.reject(client, "speak", "Ce devot ne t'appartient pas.");
+      return this.reject(client, "speak", "This devot is not yours.");
     }
     if (devot.state === "dead") {
-      return this.reject(client, "speak", "Les morts n'entendent plus.");
+      return this.reject(client, "speak", "The dead no longer hear.");
     }
     if (typeof msg.text !== "string" || msg.text.length === 0) {
-      return this.reject(client, "speak", "Message vide.");
+      return this.reject(client, "speak", "Empty message.");
     }
     if (msg.text.length > DIVINE_MSG_MAX_CHARS) {
       return this.reject(client, "speak", `${DIVINE_MSG_MAX_CHARS} characters maximum.`);
@@ -381,7 +381,7 @@ export class WorldRoom extends Room<WorldState> {
     god.lastSpeakAt = now;
     this.repos.divineMsgs.record(godId, devot.id, msg.text);
 
-    // Contenu non fiable : encadré, injecté dans le tour utilisateur uniquement.
+    // Untrusted content: fenced, injected into the user turn only.
     this.orchestrator.enqueue({
       kind: "divine_message",
       devotId: devot.id,
@@ -407,7 +407,7 @@ export class WorldRoom extends Room<WorldState> {
       }
     }
     if (typeof x !== "number" || typeof z !== "number") {
-      return this.reject(client, "feed", "Cible invalide.");
+      return this.reject(client, "feed", "Invalid target.");
     }
     this.spawnFood("god", { x, z }, "fruit", 4000);
   }
@@ -432,7 +432,7 @@ export class WorldRoom extends Room<WorldState> {
       }
       // Le combat se voit : on diffuse le transfert pour que le client trace le
       // trait, fasse monter les chiffres et fasse clignoter la victime. Sans
-      // cela, le vol de vie — qui est le cœur du jeu — reste invisible.
+      // that, life theft — the heart of the game — stays invisible.
       const victim = this.world.devots.get(victimId);
       this.broadcast("combat", {
         attackerId,
@@ -444,7 +444,7 @@ export class WorldRoom extends Room<WorldState> {
       } satisfies CombatFxMsg);
     }
 
-    // Naissances : consomme les intentions posées par les esprits.
+    // Births: consumes the intents left by the minds.
     if (!this.reproInFlight) {
       this.reproInFlight = true;
       void processReproductions(this.world, this.repos, this.chronicler, (birth) => {
@@ -524,7 +524,7 @@ export class WorldRoom extends Room<WorldState> {
     this.world.food.set(f.id, f);
   }
 
-  /** Recopie l'état chaud (sim) vers l'état synchronisé (schema). */
+  /** Copies the hot state (sim) into the synchronised state (schema). */
   private syncState(): void {
     for (const d of this.world.devots.values()) {
       let s = this.state.devots.get(d.id);
@@ -536,8 +536,8 @@ export class WorldRoom extends Room<WorldState> {
         s.isFounder = d.isFounder;
         s.profile = d.profile;
         s.hpMax = d.hpMax;
-        // L'identité est écrite UNE FOIS, à l'entrée dans l'état : elle ne
-        // change jamais, il serait absurde de la resynchroniser à chaque tick.
+        // Identity is written ONCE, when entering the state: it never changes,
+        // and resynchronising it every tick would be absurd.
         s.identity = d.identityJson;
         this.state.devots.set(d.id, s);
       }
@@ -549,8 +549,8 @@ export class WorldRoom extends Room<WorldState> {
       s.thinking = d.thinking;
       s.utterance = d.utterance;
       s.age = d.age;
-      // Les objets changent en cours de vie (une forge) : contrairement à
-      // l'identité, il faut les resynchroniser.
+      // Items change during a life (a forging): unlike identity, they do need
+      // to be resynchronised.
       s.items = d.items.join(",");
     }
     for (const [id, f] of this.world.food) {

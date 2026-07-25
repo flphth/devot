@@ -63,7 +63,7 @@ function TraitPicker({
 }
 
 function Journal({ entries }: { entries: JournalEntry[] }) {
-  const items = [...entries].reverse(); // du plus récent au plus ancien
+  const items = [...entries].reverse(); // newest first
   return (
     <div
       style={{
@@ -77,7 +77,7 @@ function Journal({ entries }: { entries: JournalEntry[] }) {
       }}
     >
       {items.length === 0 && (
-        <div style={{ opacity: 0.5 }}>Aucun souvenir encore. Il n'a pas vécu.</div>
+        <div style={{ opacity: 0.5 }}>No memory yet. They have not lived.</div>
       )}
       {items.map((e, i) => (
         <div
@@ -182,13 +182,13 @@ export function Hud({
 
       <CombatLog combats={combats} devots={snapshot.devots} />
 
-      {/* Panthéon / création */}
+      {/* Pantheon / creation */}
       <div style={{ ...panel, top: 14, left: 14, width: 250 }}>
         <div style={{ fontWeight: 700, marginBottom: 6 }}>
           {god ? `⚡ ${god.name}` : "Connecting…"}
         </div>
-        {/* La création vit désormais dans son propre écran, plein et centré
-            (CreationScreen) : ce panneau n'est plus que le panthéon. */}
+        {/* Creation now lives in its own full-screen, centred view
+            (CreationScreen): this panel is nothing but the pantheon. */}
         {myDevots.map((d) => (
           <div key={d.id} style={{ marginTop: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -222,13 +222,13 @@ export function Hud({
               />
             </div>
             <div style={{ opacity: 0.6, fontSize: 11, marginTop: 2 }}>
-              {Math.round(d.hp)} / {d.hpMax} HP — {(d.hp / 1e6).toFixed(4)} $ de pensée
+              {Math.round(d.hp)} / {d.hpMax} HP — ${(d.hp / 1e6).toFixed(4)} of thinking
             </div>
           </div>
         ))}
       </div>
 
-      {/* Panneau Esprit : la vie intérieure du devot sélectionné */}
+      {/* Mind panel: the inner life of the selected devot */}
       {selected && (
         <div style={{ ...panel, top: 14, left: 280, width: 320 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -246,7 +246,7 @@ export function Hud({
         </div>
       )}
 
-      {/* Devot sélectionné : verbe divin + nourrir + foudroyer */}
+      {/* Selected devot: divine word + feed + smite */}
       {selected && (
         <div style={{ ...panel, bottom: 14, left: "50%", transform: "translateX(-50%)", width: 470 }}>
           <div style={{ marginBottom: 6 }}>
@@ -334,11 +334,11 @@ export function Hud({
               <div style={{ opacity: 0.55, fontSize: 11, marginTop: 5 }}>
                 {confirmSmite
                   ? "⚠ Smiting is irreversible: their mind will be erased forever."
-                  : `${text.length}/${DIVINE_MSG_MAX_CHARS} — une parole par minute. Le silence est parfois le plus grand des cadeaux.`}
+                  : `${text.length}/${DIVINE_MSG_MAX_CHARS} — one word per minute. Silence is sometimes the greatest gift of all.`}
               </div>
             </>
           ) : (
-            <div style={{ opacity: 0.65 }}>Ce devot appartient à un autre dieu.</div>
+            <div style={{ opacity: 0.65 }}>This devot belongs to another god.</div>
           )}
         </div>
       )}
@@ -365,11 +365,11 @@ export function Hud({
 /**
  * LE JOURNAL DES COMBATS.
  *
- * Il ne se contente pas de lister des transferts : il rappelle ce qu'ils sont.
- * Dans ce monde, les PV sont le budget de pensée — un devot dépense sa vie
- * chaque fois qu'il réfléchit. Voler la vie de quelqu'un, c'est donc lui voler
- * du temps de réflexion : il pense moins, décide plus mal, et meurt. Le joueur
- * doit comprendre cela en regardant, pas en lisant la documentation.
+ * It does not merely list transfers: it says what they are. In this world HP
+ * are the thinking budget — a devot spends its life every time it thinks. To
+ * steal someone's life is therefore to steal their thinking time: they think
+ * less, decide worse, and die. The player must understand that by watching,
+ * not by reading the documentation.
  */
 function CombatLog({ combats, devots }: { combats: CombatFx[]; devots: DevotView[] }) {
   if (combats.length === 0) return null;

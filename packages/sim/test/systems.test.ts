@@ -41,7 +41,7 @@ describe("reactive layer (0 tokens)", () => {
     expect(after).toBeLessThan(before);
   });
 
-  it("manger au contact recharge les HP et consomme la nourriture", () => {
+  it("eating on contact restores HP and consumes the food", () => {
     const world = new World();
     const devot = makeDevot({ hp: 5000, pos: { x: 10, y: 0, z: 0 } });
     world.devots.set(devot.id, devot);
@@ -67,7 +67,7 @@ describe("reactive layer (0 tokens)", () => {
 
   it("emits a survival trigger when the hunger threshold is crossed", () => {
     const world = new World();
-    // Juste au-dessus du seuil affamé (40%) : le métabolisme le fait franchir.
+    // Just above the starving threshold (40%): metabolism pushes it across.
     const devot = makeDevot({ hp: 4000.5, hpMax: 10_000 });
     world.devots.set(devot.id, devot);
 
@@ -75,12 +75,12 @@ describe("reactive layer (0 tokens)", () => {
     expect(devot.state).toBe("starving");
     expect(result.triggers.some((t) => t.kind === "survival")).toBe(true);
 
-    // Pas de re-déclenchement au tick suivant (seulement au franchissement).
+    // No re-trigger on the next tick (only on crossing).
     const result2 = tick(world);
     expect(result2.triggers.filter((t) => t.kind === "survival")).toHaveLength(0);
   });
 
-  it("un devot mort ne bouge plus et ne vieillit plus", () => {
+  it("a dead devot no longer moves nor ages", () => {
     const world = new World();
     const devot = makeDevot({ hp: 0, state: "dead", age: 42 });
     world.devots.set(devot.id, devot);
@@ -89,8 +89,8 @@ describe("reactive layer (0 tokens)", () => {
   });
 });
 
-describe("applyDecision — l'esprit pilote le corps", () => {
-  it("eat vise la nourriture demandée", () => {
+describe("applyDecision — the mind drives the body", () => {
+  it("eat aims at the requested food", () => {
     const world = new World();
     const devot = makeDevot();
     world.food.set("f1", makeFood("f1", 5, 5));
@@ -98,7 +98,7 @@ describe("applyDecision — l'esprit pilote le corps", () => {
     expect(devot.currentGoal).toEqual({ kind: "seek_food", foodId: "f1" });
   });
 
-  it("eat sans cible valide retombe sur la nourriture la plus proche", () => {
+  it("eat with no valid target falls back to the nearest food", () => {
     const world = new World();
     const devot = makeDevot();
     world.food.set("f2", makeFood("f2", 3, 0));
@@ -106,16 +106,16 @@ describe("applyDecision — l'esprit pilote le corps", () => {
     expect(devot.currentGoal).toEqual({ kind: "seek_food", foodId: "f2" });
   });
 
-  it("speak pose la bulle de parole", () => {
+  it("speak sets the speech bubble", () => {
     const world = new World();
     const devot = makeDevot();
-    applyDecision(devot, { action: "speak", utterance: "Je pense donc je meurs." }, world);
-    expect(devot.utterance).toBe("Je pense donc je meurs.");
+    applyDecision(devot, { action: "speak", utterance: "I think, therefore I die." }, world);
+    expect(devot.utterance).toBe("I think, therefore I die.");
   });
 });
 
-describe("perception étanche — rien hors du rayon ne fuit", () => {
-  it("pas de déclencheur pour une nourriture hors de portée", async () => {
+describe("watertight perception — nothing beyond the radius leaks", () => {
+  it("no trigger for food out of range", async () => {
     const { perceptionSystem } = await import("../src/index.js");
     const world = new World();
     const devot = makeDevot();
@@ -124,7 +124,7 @@ describe("perception étanche — rien hors du rayon ne fuit", () => {
     expect(perceptionSystem(world)).toHaveLength(0);
   });
 
-  it("le repli eat n'atteint pas une nourriture invisible", () => {
+  it("the eat fallback does not reach invisible food", () => {
     const world = new World();
     const devot = makeDevot();
     world.devots.set(devot.id, devot);
@@ -133,7 +133,7 @@ describe("perception étanche — rien hors du rayon ne fuit", () => {
     expect(devot.currentGoal.kind).not.toBe("seek_food");
   });
 
-  it("pas de rencontre pour un devot hors de portée", async () => {
+  it("no encounter for a devot out of range", async () => {
     const { perceptionSystem } = await import("../src/index.js");
     const world = new World();
     const a = makeDevot({ id: "a" });
@@ -143,12 +143,12 @@ describe("perception étanche — rien hors du rayon ne fuit", () => {
     expect(perceptionSystem(world)).toHaveLength(0);
   });
 
-  it("l'errance garde un cap lissé (pas de zigzag)", () => {
+  it("wandering keeps a smoothed heading (no zigzag)", () => {
     const world = new World();
     const devot = makeDevot({ currentGoal: { kind: "wander" } });
     world.devots.set(devot.id, devot);
 
-    // Directions de deux ticks consécutifs : presque colinéaires.
+    // Directions of two consecutive ticks: nearly collinear.
     const p0 = { ...devot.pos };
     tick(world);
     const p1 = { ...devot.pos };

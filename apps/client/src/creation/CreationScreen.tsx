@@ -27,15 +27,15 @@ import {
 import { DevotModel } from "./DevotModel.js";
 
 /**
- * L'ÉCRAN DE CRÉATION — le premier contact avec le jeu.
+ * THE CREATION SCREEN — the first contact with the game.
  *
- * Plein écran et centré : ce n'est pas un panneau de réglages, c'est le moment
- * où l'on façonne un être. Trois colonnes — la personnalité à gauche, la
- * créature au centre, l'apparence et le corps à droite — pour que l'aperçu
- * reste toujours sous les yeux pendant qu'on choisit.
+ * Full-screen and centred: this is not a settings panel, it is the moment a
+ * being is shaped. Three columns — personality on the left, the creature in the
+ * middle, appearance and body on the right — so the preview stays in sight the
+ * whole time you are choosing.
  *
- * Tout ce qui est choisi ici est REVALIDÉ par le serveur. Cet écran ne fait
- * qu'aider à composer une demande légale ; il n'a aucune autorité.
+ * Everything chosen here is REVALIDATED by the server. This screen only helps
+ * compose a legal request; it holds no authority.
  */
 
 export interface CreationResult {
@@ -131,7 +131,7 @@ export function CreationScreen({
             alignItems: "start",
           }}
         >
-          {/* ── Colonne 1 : l'âme ─────────────────────────────────────────── */}
+          {/* ── Column 1: the soul ────────────────────────────────────────── */}
           <div style={CARD}>
             <SectionTitle>Their soul</SectionTitle>
             <Help>
@@ -174,16 +174,16 @@ export function CreationScreen({
             </div>
           </div>
 
-          {/* ── Colonne 2 : l'aperçu ──────────────────────────────────────── */}
+          {/* ── Column 2: the preview ─────────────────────────────────────── */}
           <div style={{ ...CARD, padding: 0, overflow: "hidden" }}>
             <div style={{ height: 380, background: "#0a0e15" }}>
               <Canvas camera={{ position: [0, 0.05, 2.9], fov: 40 }}>
                 <hemisphereLight args={["#cfe3ff", "#1a1a20", 1.0]} />
                 <directionalLight position={[3, 5, 3]} intensity={1.3} color="#fff3e2" />
                 <directionalLight position={[-3, 2, -2]} intensity={0.4} color="#8fb6ff" />
-                {/* La caméra de R3F regarde droit devant : on descend la scène
-                    pour que le milieu du corps tombe dans son axe, plutôt que
-                    de viser le sommet du crâne et de couper la tête. */}
+                {/* The R3F camera looks straight ahead: we drop the scene so
+                    the middle of the body falls on its axis, rather than
+                    aiming at the top of the skull and cropping the head. */}
                 <group position={[0, -0.62, 0]}>
                   <Turntable>
                     <DevotModel appearance={appearance} emissive={0.12} />
@@ -253,7 +253,7 @@ export function CreationScreen({
             </div>
           </div>
 
-          {/* ── Colonne 3 : le corps ──────────────────────────────────────── */}
+          {/* ── Column 3: the body ────────────────────────────────────────── */}
           <div style={CARD}>
             <SectionTitle>Their look</SectionTitle>
             <Row label="Hat">
@@ -307,7 +307,7 @@ export function CreationScreen({
   );
 }
 
-/** L'aperçu tourne lentement : on voit la cape et le dos sans avoir à agir. */
+/** The preview turns slowly: you see the cape and the back without acting. */
 function Turntable({ children }: { children: React.ReactNode }) {
   const ref = useRef<THREE.Group>(null);
   useFrame((_, dt) => {

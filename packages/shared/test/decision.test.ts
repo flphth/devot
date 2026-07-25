@@ -25,10 +25,10 @@ describe("parseDecision", () => {
   });
 
   it("carries the inner monologue (thought), truncated to 140 chars", () => {
-    const d = parseDecision({ action: "idle", thought: "Je crains la nuit. " + "x".repeat(200) });
+    const d = parseDecision({ action: "idle", thought: "I fear the night. " + "x".repeat(200) });
     expect(d.thought).toBeDefined();
     expect(d.thought!.length).toBeLessThanOrEqual(UTTERANCE_MAX_CHARS);
-    expect(d.thought).toContain("Je crains la nuit.");
+    expect(d.thought).toContain("I fear the night.");
   });
 
   it("the schema requires action AND thought", async () => {
@@ -37,11 +37,11 @@ describe("parseDecision", () => {
     expect(DECISION_SCHEMA.required).toContain("thought");
   });
 
-  it("rejette une action inconnue", () => {
+  it("rejects an unknown action", () => {
     expect(() => parseDecision({ action: "fly" })).toThrow();
   });
 
-  it("rejette une non-décision", () => {
+  it("rejects a non-decision", () => {
     expect(() => parseDecision("idle")).toThrow();
     expect(() => parseDecision(null)).toThrow();
   });

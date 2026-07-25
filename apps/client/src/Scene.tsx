@@ -91,7 +91,7 @@ function PrairieGround({
           }
 
           void main() {
-            // Variation de teinte façon patchwork de prairie (aplats, pas de bruit fin).
+            // Meadow-patchwork hue variation (flat areas, no fine noise).
             float n = hash(floor(vWorld * 0.8));
             vec3 grass = uLit * (0.92 + 0.16 * n);
 
@@ -131,7 +131,7 @@ function PrairieGround({
   );
 }
 
-// ── Touffes d'herbe instanciées ─────────────────────────────────────────────
+// ── Instanced grass tufts ───────────────────────────────────────────────────
 
 function GrassTufts({ vision, godMode }: { vision: VisionCircle[]; godMode: boolean }) {
   const ref = useRef<THREE.InstancedMesh>(null);
@@ -198,7 +198,7 @@ function VoxelDevot({
   devot: DevotView;
   color: string;
   selected: boolean;
-  /** Vient d'être mordu : le corps se signale, il ne suffit pas que sa barre baisse. */
+  /** Just bitten: the body flags it — a dropping bar is not enough. */
   bitten: boolean;
   onSelect: (id: string) => void;
 }) {
@@ -215,14 +215,14 @@ function VoxelDevot({
     const b = bodyGroup.current;
     if (!g || !b) return;
 
-    // Interpolation : plus aucune téléportation entre deux patches réseau.
+    // Interpolation: no more teleporting between two network patches.
     const before = g.position.clone();
     g.position.lerp(target.current, 1 - Math.exp(-dt * 7));
     const delta = g.position.clone().sub(before);
     const speed = delta.length() / Math.max(dt, 1e-4);
     const moving = speed > 0.15 && !dead;
 
-    // Orientation vers la direction de déplacement (amortie).
+    // Turn toward the direction of travel (damped).
     if (moving) {
       const desired = Math.atan2(delta.x, delta.z);
       let diff = desired - heading.current;
@@ -239,7 +239,7 @@ function VoxelDevot({
       b.scale.setScalar(1);
       return;
     }
-    // Marche : bob + balancement. Faim : tremblement. Pensée : pulsation.
+    // Walking: bob + sway. Hunger: trembling. Thinking: pulsing.
     const bob = moving ? Math.abs(Math.sin(t * 9)) * 0.07 : 0;
     const tremble =
       devot.state === "dying"
@@ -254,16 +254,17 @@ function VoxelDevot({
     b.scale.setScalar(pulse);
   });
 
-  // L'apparence vient de l'identité figée à la naissance ; un devot d'avant
-  // cette version, ou né hors écran de création, retombe sur l'allure neutre.
+  // Appearance comes from the identity frozen at birth; a devot from before
+  // this version, or born outside the creation screen, falls back to the
+  // neutral look.
   const identity = decodeIdentity(devot.identity);
   const look = identity?.appearance ?? DEFAULT_APPEARANCE;
-  // Une morsure fait virer le corps au rouge le temps d'un éclat : c'est ce
-  // qui rend le vol de vie perceptible sans lire un chiffre.
+  // A bite flashes the body red for an instant: that is what makes the theft
+  // of life perceptible without reading a number.
   const struck = bitten;
-  // Ce que ce devot a forgé, donc payé de sa vie.
+  // What this devot forged, and therefore paid for with its life.
   const carried = (devot.items ? devot.items.split(",") : []) as ItemKind[];
-  // L'état vital délave les couleurs : un agonisant est visiblement éteint.
+  // Vital state washes the colours out: a dying devot is visibly extinguished.
   const appearance =
     devot.state === "dying"
       ? { ...look, shirt: fade(look.shirt, "#444444", 0.55), skin: fade(look.skin, "#444444", 0.45) }
@@ -300,9 +301,9 @@ function VoxelDevot({
             </mesh>
           </group>
         ) : (
-          // Le MÊME modèle que l'aperçu de l'écran de création : ce que le
-          // joueur a façonné est exactement ce qui vit ici. Deux modèles
-          // séparés auraient dérivé dès le premier chapeau ajouté.
+          // The SAME model as the creation screen preview: what the player
+          // shaped is exactly what lives here. Two separate models would have
+          // drifted at the very first hat added.
           <DevotModel
             appearance={
               struck
@@ -463,9 +464,9 @@ function LightningFx({ fx }: { fx: SmiteFx }) {
 }
 
 /**
- * Suivi caméra : tant qu'un devot est sélectionné, la cible des OrbitControls
- * glisse vers lui (amorti) et la caméra se déplace du même vecteur — l'angle
- * et le zoom choisis par le joueur sont conservés, rotation/zoom restent libres.
+ * Camera follow: while a devot is selected, the OrbitControls target glides
+ * toward it (damped) and the camera moves by the same vector — the angle and
+ * zoom chosen by the player are preserved, rotation/zoom stay free.
  */
 function CameraFollow({
   snapshot,
@@ -493,7 +494,7 @@ function CameraFollow({
   return null;
 }
 
-/** Expose la caméra aux tests pilotés (dev uniquement). */
+/** Exposes the camera to driven tests (dev only). */
 function DevTestHooks() {
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
@@ -504,7 +505,7 @@ function DevTestHooks() {
   return null;
 }
 
-// ── Scène ───────────────────────────────────────────────────────────────────
+// ── Scene ───────────────────────────────────────────────────────────────────
 
 export function Scene({
   snapshot,
@@ -616,7 +617,7 @@ export function Scene({
   );
 }
 
-/** Délave une couleur vers une autre : l'état vital se lit sur le corps. */
+/** Washes one colour toward another: vital state reads on the body. */
 function fade(hex: string, towards: string, amount: number): string {
   return "#" + new THREE.Color(hex).lerp(new THREE.Color(towards), amount).getHexString();
 }

@@ -11,9 +11,9 @@ import type { DevotEntity } from "@devot/shared";
 import { UTTERANCE_MAX_CHARS } from "@devot/shared";
 
 /**
- * Règles du monde : préfixe IDENTIQUE pour tous les devots, placé en tête du
- * system avec cache_control — c'est la condition du cache partagé.
- * Ne jamais y interpoler de contenu variable.
+ * World rules: an IDENTICAL prefix for every devot, placed at the head of the
+ * system prompt with cache_control — that is what makes the shared cache work.
+ * Never interpolate variable content into it.
  */
 export const WORLD_RULES = `You are a devot: a living creature in a shared world, watched over by a distant god.
 
@@ -54,7 +54,7 @@ You may carry only 2 items, and you cannot forge if fewer than 8000 HP would rem
 ## Your reply
 You reply ONLY with a structured decision (one action), together with "thought": your inner monologue, one intimate sentence in the first person. Think sparingly: every token you produce — monologue included — brings you closer to your end.`;
 
-/** Persona : partie variable du system, placée APRÈS le préfixe caché. */
+/** Persona: the variable part of the system prompt, placed AFTER the cached prefix. */
 export function buildPersona(devot: DevotEntity): string {
   const identity = decodeIdentity(devot.identityJson);
   const lines = [
@@ -63,27 +63,27 @@ export function buildPersona(devot: DevotEntity): string {
     `Your traits: ${devot.traits.length > 0 ? devot.traits.join(", ") : "not yet defined"}.`,
   ];
 
-  // L'ÂME : le texte libre écrit par le joueur à la création. C'est la seule
-  // chose du monde qu'un humain ait écrite directement dans la tête du devot,
-  // et la promesse faite au joueur est qu'elle compte vraiment.
+  // THE SOUL: the free text written by the player at creation. It is the only
+  // thing in this world a human wrote directly into a devot's head, and the
+  // promise made to the player is that it truly counts.
   if (identity?.soul) {
     lines.push(`What you believe yourself to be, deep down: "${identity.soul}"`);
   }
 
-  // Le corps est une donnée de personnage, pas une décoration : un devot doit
-  // savoir qu'il est massif ou fluet, vif ou lent, et pouvoir en tenir compte.
+  // The body is character data, not decoration: a devot must know whether it
+  // is heavy or slight, quick or slow, and be able to reckon with it.
   if (identity) {
     lines.push(`Your look: ${describeAppearance(identity.appearance)}.`);
     lines.push(`Your body: ${describeStats(identity.stats)}.`);
   }
-  // Ce qu'il porte fait partie de ce qu'il est : un devot doit savoir qu'il a
-  // déjà payé de sa vie pour une lance avant d'envisager d'en forger une autre.
+  // What it carries is part of what it is: a devot must know it already paid
+  // with its life for a spear before considering forging another.
   lines.push(`You carry: ${describeItems(devot.items)}.`);
   lines.push(`Age: ${devot.age} cycles.`);
   return lines.join("\n");
 }
 
-/** Ce qu'un devot sait de son propre corps : sa force et sa faiblesse. */
+/** What a devot knows of its own body: its strength and its weakness. */
 function describeStats(s: Stats): string {
   const strongest = STAT_KEYS.reduce((a, b) => (s[a] >= s[b] ? a : b));
   const weakest = STAT_KEYS.reduce((a, b) => (s[a] <= s[b] ? a : b));
@@ -91,7 +91,7 @@ function describeStats(s: Stats): string {
 }
 
 
-/** Bloc événement courant, injecté en dernier tour utilisateur. */
+/** Current event block, injected as the last user turn. */
 export function buildEventBlock(devot: DevotEntity, eventText: string): string {
   const pct = Math.max(0, Math.round((devot.hp / devot.hpMax) * 100));
   return `[Vital state: ${pct}% of your HP remaining — ${devot.state}]

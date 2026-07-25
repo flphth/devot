@@ -24,7 +24,7 @@ export const devots = sqliteTable("devots", {
   currentGoal: text("current_goal_json"),
   age: integer("age").notNull().default(0),
   traitsJson: text("traits_json").notNull().default("[]"),
-  /** Apparence, stats, âme et signature, en JSON. Figée à la naissance. */
+  /** Appearance, stats, soul and signature, as JSON. Frozen at birth. */
   identityJson: text("identity_json").notNull().default(""),
   parentA: text("parent_a"),
   parentB: text("parent_b"),
@@ -33,7 +33,7 @@ export const devots = sqliteTable("devots", {
   lastActionAt: integer("last_action_at").notNull().default(0),
 });
 
-// L'historique LLM du devot. Mort = DELETE CASCADE de ces lignes.
+// The devot's LLM history. Death = DELETE CASCADE on these rows.
 export const messages = sqliteTable("messages", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   devotId: text("devot_id")
@@ -46,7 +46,7 @@ export const messages = sqliteTable("messages", {
   createdAt: integer("created_at").notNull(),
 });
 
-// Mémoire du monde : ce qui survit aux morts (pierres tombales incluses).
+// The world's memory: what outlives the dead (gravestones included).
 export const worldEvents = sqliteTable("world_events", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   type: text("type").notNull(),

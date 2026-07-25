@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { hpCost } from "../src/hpCost.js";
 
-describe("hpCost — vie ↔ tokens", () => {
+describe("hpCost — life <-> tokens", () => {
   it("convertit l'usage Haiku en µ$ de HP", () => {
     // 1M in at $1 + 1M out at $5 = $6 = 6e6 µ$
     const loss = hpCost(

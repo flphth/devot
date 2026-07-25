@@ -1,9 +1,9 @@
 /**
- * Smoke test P3 : deux dieux dans le même monde, PvP inter-lignées,
- * recréation du fondateur après extinction de la lignée.
- * White-box assumé : on téléporte les fondateurs l'un près de l'autre pour ne
- * pas attendre une rencontre organique ; tout le reste passe par les vrais
- * systèmes (perception → esprit scripté "attack" → combat → mort → recréation).
+ * P3 smoke test: two gods in the same world, cross-line PvP, founder re-creation
+ * once a line is extinct.
+ * Deliberately white-box: we teleport the founders next to each other rather
+ * than wait for an organic encounter; everything else goes through the real
+ * systems (perception -> scripted "attack" mind -> combat -> death -> re-creation).
  */
 import { createServer } from "node:http";
 import { matchMaker, Server } from "@colyseus/core";
@@ -37,16 +37,16 @@ async function main(): Promise<void> {
   const roomB = await clientB.join(ROOM_NAME, { godName: "Abel" });
   const state = () => roomA.state as any;
 
-  check("les deux dieux partagent la même room", roomA.roomId === roomB.roomId);
+  check("both gods share the same room", roomA.roomId === roomB.roomId);
   await sleep(300);
-  check("deux dieux dans l'état", state().gods.size === 2);
+  check("two gods in the state", state().gods.size === 2);
 
   roomA.send("createFounder", { name: "Kain", traits: ["fierce", "envious"] });
   roomB.send("createFounder", { name: "Abel", traits: ["peaceful", "pious"] });
   await sleep(800);
-  check("deux fondateurs de lignées différentes", state().devots.size === 2);
+  check("two founders from different lines", state().devots.size === 2);
 
-  // White-box : téléporte les fondateurs côte à côte, affaiblit Abel.
+  // White-box: teleport the founders side by side, weaken Abel.
   const room = matchMaker.getLocalRoomById(roomA.roomId) as unknown as {
     world: { devots: Map<string, any> };
   };
@@ -57,29 +57,29 @@ async function main(): Promise<void> {
   abel.pos = { x: 2, y: 0, z: 0 };
   abel.hp = 2500;
 
-  // Rencontre → pensée "attack" → chasse → prédation → mort.
-  // Poll : le combat mutuel (les deux se drainent) peut prendre 10-20 s.
+  // Encounter -> "attack" thought -> hunt -> predation -> death.
+  // Polling: mutual combat (both draining each other) can take 10-20 s.
   const kainHpBeforeKill = room.world.devots.get(kain.id)!.hp;
   const deadline = Date.now() + 25_000;
   while (Date.now() < deadline && state().devots.get(abel.id)?.state !== "dead") {
     await sleep(500);
   }
   check(
-    "Abel est mort au combat (PvP inter-lignées)",
+    "Abel died in combat (cross-line PvP)",
     state().devots.get(abel.id)?.state === "dead",
   );
-  check("Abel a bien été drainé jusqu'à 0 HP", state().devots.get(abel.id)?.hp === 0);
+  check("Abel really was drained to 0 HP", state().devots.get(abel.id)?.hp === 0);
   console.log(
-    `  (Kain : ${Math.round(kainHpBeforeKill)} HP avant l'estocade, ${Math.round(room.world.devots.get(kain.id)!.hp)} après)`,
+    `  (Kain: ${Math.round(kainHpBeforeKill)} HP before the killing blow, ${Math.round(room.world.devots.get(kain.id)!.hp)} after)`,
   );
 
-  // La lignée d'Abel est éteinte : son dieu peut refaçonner un fondateur.
-  roomB.send("createFounder", { name: "Abel-le-Second", traits: ["cautious", "pious"] });
+  // Abel's line is extinct: his god may shape a founder anew.
+  roomB.send("createFounder", { name: "Abel the Second", traits: ["cautious", "pious"] });
   await sleep(800);
   const abelGodDevots = [...state().devots.values()].filter(
     (d: any) => d.godId === "god-abel" && d.state !== "dead",
   );
-  check("le dieu d'Abel a refaçonné un fondateur", abelGodDevots.length === 1);
+  check("Abel's god shaped a new founder", abelGodDevots.length === 1);
   check(
     "le nouveau fondateur est bien un fondateur",
     abelGodDevots[0]?.isFounder === true,

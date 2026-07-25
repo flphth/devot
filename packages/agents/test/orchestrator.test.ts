@@ -56,14 +56,14 @@ describe("orchestrateur cognitif", () => {
     orchestrator.enqueue({
       kind: "idle_reflection",
       devotId: "d1",
-      eventText: "Rien ne se passe.",
+      eventText: "Nothing is happening.",
       createdAt: Date.now(),
     });
     await settle(orchestrator);
 
     expect(applied).toHaveLength(1);
     expect(applied[0]!.hpLoss).toBeGreaterThan(0);
-    // MockMind : 1200 in / 60 out sur Haiku → 1500 HP.
+    // MockMind: 1200 in / 60 out on Haiku -> 1500 HP.
     expect(devot.hp).toBeCloseTo(10_000 - 1500, 0);
     // History: user turn (event) + assistant turn (decision).
     expect(repos.devots.contextSize("d1")).toBe(2);
@@ -110,7 +110,7 @@ describe("orchestrateur cognitif", () => {
     orchestrator.enqueue({
       kind: "divine_message",
       devotId: "d1",
-      eventText: "Une voix venue du ciel te dit : reviens.",
+      eventText: "A voice from the sky tells you: come back.",
       createdAt: Date.now(),
     });
     await settle(orchestrator);
@@ -120,7 +120,7 @@ describe("orchestrateur cognitif", () => {
   it("prioritises the divine message over idle reflection", async () => {
     const a = makeDevot("a");
     const b = makeDevot("b");
-    // Un seul slot effectif : on vérifie l'ordre de sortie de la file.
+    // A single effective slot: we check the order in which the queue drains.
     const order: string[] = [];
     const mind = new MockMind();
     const { orchestrator } = setup([a, b], mind);
@@ -139,13 +139,13 @@ describe("orchestrateur cognitif", () => {
     orchestrator.enqueue({
       kind: "divine_message",
       devotId: "b",
-      eventText: "Une voix venue du ciel te dit : lève-toi.",
+      eventText: "A voice from the sky tells you: rise.",
       createdAt: Date.now(),
     });
     await settle(orchestrator);
 
-    // Les deux ont pensé ; la concurrence rend l'ordre de départ non garanti
-    // au-delà du tri de file, on vérifie simplement que les deux passent.
+    // Both thought; concurrency makes the start order unguaranteed beyond the
+    // queue sort, so we simply check that both go through.
     expect(order.sort()).toEqual(["a", "b"]);
   });
 });

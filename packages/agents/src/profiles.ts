@@ -1,14 +1,14 @@
 import type { CognitionProfile, CognitionProfileName } from "@devot/shared";
 
 /**
- * Palier de modèles = tempérament × endurance (ARCHITECTURE.md §7.2).
- * Un prophète pense mieux mais saigne plus vite.
+ * Model tier = temperament x endurance (ARCHITECTURE.md §7.2).
+ * A prophet thinks better but bleeds faster.
  */
 export const PROFILES: Record<CognitionProfileName, CognitionProfile> = {
   frugal: {
     name: "frugal",
     model: "claude-haiku-4-5",
-    // Pas de thinking : effort/adaptive non supportés sur Haiku 4.5.
+    // No thinking: effort/adaptive are not supported on Haiku 4.5.
     maxTokens: 512,
   },
   equilibre: {

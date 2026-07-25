@@ -8,7 +8,7 @@ export type CognitionProfileName = "frugal" | "equilibre" | "prophete";
 export interface CognitionProfile {
   name: CognitionProfileName;
   model: ModelId;
-  /** Passé tel quel à l'API ; undefined = pas de thinking (Haiku). */
+  /** Passed straight to the API; undefined = no thinking (Haiku). */
   thinking?: { type: "adaptive" };
   effort?: "low" | "medium" | "high";
   maxTokens: number;
@@ -27,27 +27,27 @@ export type DecisionAction =
 export interface Decision {
   action: DecisionAction;
   targetId?: string;
-  /** Objet à forger si action="craft". */
+  /** Item to forge when action="craft". */
   item?: ItemKind;
   direction?: { x: number; z: number };
   utterance?: string;
   emotion?: string;
-  /** Monologue intérieur : pensée intime, une phrase (≤140c). */
+  /** Inner monologue: one intimate sentence (<=140 chars). */
   thought?: string;
 }
 
 export type TriggerKind =
-  | "divine_message" // priorité max
-  | "threat" // combat / menace
-  | "survival" // HP bas
-  | "encounter" // rencontre significative
-  | "utterance_heard" // parole reçue d'un autre devot
-  | "idle_reflection"; // réflexion oisive
+  | "divine_message" // top priority
+  | "threat" // combat / danger
+  | "survival" // low HP
+  | "encounter" // meaningful encounter
+  | "utterance_heard" // words received from another devot
+  | "idle_reflection"; // idle musing
 
 export interface Trigger {
   kind: TriggerKind;
   devotId: string;
-  /** Description de l'événement, injectée dans le tour utilisateur. */
+  /** Description of the event, injected into the user turn. */
   eventText: string;
   createdAt: number;
 }
@@ -67,7 +67,7 @@ export interface Vec3 {
   z: number;
 }
 
-/** État "chaud" d'un devot dans la simulation (en mémoire). */
+/** The "hot" state of a devot in the simulation (in memory). */
 export interface DevotEntity {
   id: string;
   godId: string;
@@ -80,17 +80,17 @@ export interface DevotEntity {
   profile: CognitionProfileName;
   traits: string[];
   /**
-   * Identité figée à la naissance : apparence, stats, âme, signature, en JSON.
-   * Portée par l'entité pour que la simulation ET la persistance y accèdent
-   * sans repasser par la base à chaque tick.
+   * Identity frozen at birth: appearance, stats, soul, signature, as JSON.
+   * Carried by the entity so that the simulation AND persistence can reach it
+   * without going back to the database on every tick.
    */
   identityJson: string;
-  /** Objets forgés et portés. Deux au plus (MAX_CARRIED). */
+  /** Items forged and carried. Two at most (MAX_CARRIED). */
   items: ItemKind[];
-  age: number; // cycles vécus
-  thinking: boolean; // une inférence est en vol
-  utterance: string; // dernière parole (bulle)
-  /** But courant du corps (mouvement déterministe entre deux pensées). */
+  age: number; // cycles lived
+  thinking: boolean; // an inference is in flight
+  utterance: string; // last utterance (speech bubble)
+  /** The body's current goal (deterministic movement between two thoughts). */
   currentGoal:
     | { kind: "wander" }
     | { kind: "seek_food"; foodId: string }
@@ -98,11 +98,11 @@ export interface DevotEntity {
     | { kind: "flee"; from: Vec3 }
     | { kind: "attack"; targetId: string }
     | { kind: "idle" };
-  /** Posée par une décision "reproduce" ; consommée par le serveur. */
+  /** Set by a "reproduce" decision; consumed by the server. */
   pendingReproduction?: { partnerId?: string };
-  /** Id du dernier agresseur signalé (évite de re-déclencher chaque tick). */
+  /** Id of the last reported attacker (avoids re-triggering every tick). */
   underAttackBy?: string;
-  /** Devots déjà rencontrés (une rencontre = un seul déclencheur). */
+  /** Devots already met (one encounter = a single trigger). */
   metDevots?: string[];
 }
 

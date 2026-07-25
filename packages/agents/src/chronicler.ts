@@ -8,9 +8,9 @@ export interface ChronicleResult {
 }
 
 /**
- * Le chroniqueur : un appel Haiku bon marché qui condense des historiques.
- * Deux usages : vieillir (compacter son propre passé) et hériter (fusionner
- * les mémoires des parents en souvenirs pour l'enfant).
+ * The chronicler: a cheap Haiku call that condenses histories.
+ * Two uses: ageing (compacting one's own past) and inheritance (merging the
+ * parents' memories into memories for the child).
  */
 export interface Chronicler {
   chronicle(
@@ -72,7 +72,7 @@ export class AnthropicChronicler implements Chronicler {
   }
 }
 
-/** Chroniqueur factice : condense naïvement (tests / démo sans clé). */
+/** Fake chronicler: condenses naively (tests / demo without a key). */
 export class MockChronicler implements Chronicler {
   async chronicle(
     histories: Array<{ name: string; history: StoredMessage[] }>,

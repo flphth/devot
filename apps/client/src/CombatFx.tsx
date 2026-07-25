@@ -7,20 +7,20 @@ import type { CombatFx, DevotView } from "./useWorld.js";
 /**
  * LE VOL DE VIE, RENDU VISIBLE.
  *
- * Le combat existait déjà et fonctionnait : un agresseur draine les PV de sa
- * victime et en absorbe une part. Mais il ne se voyait pas — c'était une ligne
- * dans un journal, alors que c'est le geste le plus lourd de sens du jeu.
+ * Combat already existed and worked: an attacker drains their victim's HP and
+ * absorbs a share of it. But it could not be seen — it was a line in a log,
+ * when it is the most meaningful act in the game.
  *
- * Ici, un vol de vie produit trois choses, et chacune dit quelque chose de
- * différent :
+ * Here, a theft of life produces three things, each saying something
+ * different:
  *
- * - un TRAIT qui va de l'agresseur à la victime : qui prend à qui ;
- * - des CHIFFRES qui montent depuis la victime : combien de temps de pensée
+ * - a BEAM running from attacker to victim: who is taking from whom;
+ * - NUMBERS rising from the victim: how much thinking time
  *   vient de changer de mains ;
- * - un ÉCLAT rouge au sol quand le coup est fatal.
+ * - a red FLASH on the ground when the blow is fatal.
  *
- * Chaque effet vit environ une seconde puis s'efface tout seul : la file
- * d'effets est bornée en amont, donc rien ne s'accumule.
+ * Each effect lives about a second and then fades on its own: the effect queue
+ * is bounded upstream, so nothing piles up.
  */
 
 const LIFETIME_MS = 1100;
@@ -89,7 +89,7 @@ function CombatBeam({
     const age = (Date.now() - combat.at) / LIFETIME_MS;
     const fade = Math.max(0, 1 - age);
     material.opacity = fade * 0.9;
-    // Les chiffres montent : ce qui est parti de la victime s'élève et s'efface.
+    // The numbers rise: what left the victim floats up and fades.
     if (labelRef.current) labelRef.current.position.y = 1.1 + age * 0.9;
     if (flashRef.current) {
       const s = 0.4 + age * 1.6;
@@ -128,8 +128,8 @@ function CombatBeam({
 }
 
 /**
- * Un devot vient-il d'être mordu ? Sert au clignotement du corps : la victime
- * doit se signaler, pas seulement voir sa barre descendre.
+ * Has a devot just been bitten? Drives the body flash: the victim must flag
+ * itself, not merely watch its bar drop.
  */
 export function recentlyBitten(combats: CombatFx[], devotId: string): boolean {
   const now = Date.now();

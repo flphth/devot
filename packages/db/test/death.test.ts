@@ -23,14 +23,14 @@ function makeDevot(id: string): DevotEntity {
   };
 }
 
-describe("mort = destruction du contexte", () => {
-  it("supprime tous les messages du devot mais garde la pierre tombale", () => {
+describe("death = destruction of the context", () => {
+  it("deletes all of the devot's messages but keeps the gravestone", () => {
     const db = openDb(":memory:");
     const repos = createRepos(db);
     const devot = makeDevot("devot-1");
     repos.devots.insertFromEntity(devot);
 
-    repos.messages.append("devot-1", "user", "Une voix venue du ciel te dit : vis.");
+    repos.messages.append("devot-1", "user", "A voice from the sky tells you: live.");
     repos.messages.append("devot-1", "assistant", [{ type: "text", text: '{"action":"idle"}' }]);
     expect(repos.devots.contextSize("devot-1")).toBe(2);
 
@@ -47,7 +47,7 @@ describe("mort = destruction du contexte", () => {
     expect(row?.hp).toBe(0);
   });
 
-  it("ne touche pas au contexte des autres devots", () => {
+  it("leaves other devots' contexts untouched", () => {
     const db = openDb(":memory:");
     const repos = createRepos(db);
     repos.devots.insertFromEntity(makeDevot("devot-a"));
@@ -61,7 +61,7 @@ describe("mort = destruction du contexte", () => {
     expect(repos.devots.contextSize("devot-b")).toBe(1);
   });
 
-  it("l'historique persiste et se relit dans l'ordre", () => {
+  it("history persists and reads back in order", () => {
     const db = openDb(":memory:");
     const repos = createRepos(db);
     repos.devots.insertFromEntity(makeDevot("devot-1"));

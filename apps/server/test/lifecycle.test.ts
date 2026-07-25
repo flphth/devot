@@ -73,8 +73,8 @@ describe("naissances (lifecycle serveur)", () => {
   });
 });
 
-describe("recréation du fondateur", () => {
-  it("possible seulement quand toute la lignée est morte", () => {
+describe("founder re-creation", () => {
+  it("only possible once the whole line is dead", () => {
     const world = new World();
     expect(canRecreateFounder(world, "g1")).toBe(true);
 
@@ -84,7 +84,7 @@ describe("recréation du fondateur", () => {
 
     devot.state = "dead";
     expect(canRecreateFounder(world, "g1")).toBe(true);
-    // La lignée d'un autre dieu n'interfère pas.
+    // Another god's line does not interfere.
     expect(canRecreateFounder(world, "g2")).toBe(true);
   });
 });
@@ -120,7 +120,7 @@ describe("to grow old is to forget (compaction)", () => {
     while (orchestrator.pendingCount > 0) await new Promise((r) => setTimeout(r, 10));
 
     expect(applied).toBe(1);
-    // Historique : 1 souvenir condensé + le tour de la pensée qui vient d'avoir lieu.
+    // History: 1 condensed memory + the turn of the thought that just happened.
     const history = repos.messages.history(devot.id);
     expect(history.length).toBe(3);
     expect(String(history[0]!.content)).toContain("Condensed memories");
