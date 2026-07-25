@@ -75,6 +75,12 @@ export interface DevotEntity {
   state: DevotLifeState;
   profile: CognitionProfileName;
   traits: string[];
+  /**
+   * Identité figée à la naissance : apparence, stats, âme, signature, en JSON.
+   * Portée par l'entité pour que la simulation ET la persistance y accèdent
+   * sans repasser par la base à chaque tick.
+   */
+  identityJson: string;
   age: number; // cycles vécus
   thinking: boolean; // une inférence est en vol
   utterance: string; // dernière parole (bulle)

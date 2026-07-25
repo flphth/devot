@@ -16,6 +16,7 @@ const devot: DevotEntity = {
   state: "vivant",
   profile: "frugal",
   traits: ["curieux", "économe"],
+  identityJson: "",
   age: 12,
   thinking: false,
   utterance: "",

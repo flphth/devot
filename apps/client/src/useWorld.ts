@@ -1,6 +1,12 @@
 import { Client, Room } from "colyseus.js";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ROOM_NAME, SERVER_PORT, type JournalEntry, type JournalMsg } from "@devot/shared";
+import {
+  ROOM_NAME,
+  SERVER_PORT,
+  type CreateFounderMsg,
+  type JournalEntry,
+  type JournalMsg,
+} from "@devot/shared";
 
 /** Vue plate (côté client) de l'état synchronisé. */
 export interface DevotView {
@@ -20,6 +26,8 @@ export interface DevotView {
   emotion: string;
   thought: string;
   age: number;
+  /** Identité figée : apparence, stats, âme, signature, en JSON. */
+  identity: string;
 }
 
 export interface FoodView {
@@ -52,7 +60,7 @@ export interface SmiteFx {
 }
 
 export interface WorldActions {
-  createFounder: (name: string | undefined, traits: string[]) => void;
+  createFounder: (msg: CreateFounderMsg) => void;
   speak: (devotId: string, text: string) => void;
   feed: (devotId: string) => void;
   smite: (devotId: string) => void;
@@ -115,6 +123,7 @@ export function useWorld(godName: string): WorldConnection {
               godId: d.godId,
               name: d.name,
               isFounder: d.isFounder,
+              identity: d.identity ?? "",
               x: d.x,
               y: d.y,
               z: d.z,
@@ -158,8 +167,8 @@ export function useWorld(godName: string): WorldConnection {
     };
   }, [godName]);
 
-  const createFounder = useCallback((name: string | undefined, traits: string[]) => {
-    roomRef.current?.send("createFounder", { name, traits });
+  const createFounder = useCallback((msg: CreateFounderMsg) => {
+    roomRef.current?.send("createFounder", msg);
   }, []);
   const speak = useCallback((devotId: string, text: string) => {
     roomRef.current?.send("speak", { devotId, text });

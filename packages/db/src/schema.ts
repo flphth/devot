@@ -24,6 +24,8 @@ export const devots = sqliteTable("devots", {
   currentGoal: text("current_goal_json"),
   age: integer("age").notNull().default(0),
   traitsJson: text("traits_json").notNull().default("[]"),
+  /** Apparence, stats, âme et signature, en JSON. Figée à la naissance. */
+  identityJson: text("identity_json").notNull().default(""),
   parentA: text("parent_a"),
   parentB: text("parent_b"),
   bornAt: integer("born_at").notNull(),

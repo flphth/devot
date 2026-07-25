@@ -183,31 +183,8 @@ export function Hud({
         <div style={{ fontWeight: 700, marginBottom: 6 }}>
           {god ? `⚡ ${god.name}` : "Connexion…"}
         </div>
-        {!hasLiving && (
-          <>
-            <div style={{ opacity: 0.75, fontSize: 12 }}>
-              Façonne ton fondateur : choisis 2 à 3 traits qui forgeront son âme.
-            </div>
-            <TraitPicker selected={traits} onToggle={toggleTrait} />
-            <button
-              onClick={() => actions.createFounder(undefined, traits)}
-              disabled={traits.length < 2}
-              style={{
-                width: "100%",
-                marginTop: 10,
-                padding: "8px 10px",
-                borderRadius: 8,
-                border: "none",
-                background: traits.length >= 2 ? (god?.color ?? "#4ca6e0") : "#2a3245",
-                color: traits.length >= 2 ? "#10131a" : "#5a6478",
-                fontWeight: 700,
-                cursor: traits.length >= 2 ? "pointer" : "default",
-              }}
-            >
-              Façonner ton devot fondateur
-            </button>
-          </>
-        )}
+        {/* La création vit désormais dans son propre écran, plein et centré
+            (CreationScreen) : ce panneau n'est plus que le panthéon. */}
         {myDevots.map((d) => (
           <div key={d.id} style={{ marginTop: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>

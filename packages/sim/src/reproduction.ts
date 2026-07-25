@@ -6,6 +6,10 @@ import {
   REPRO_SOLO_COST_FRACTION,
   REPRO_TRANSFER_EFFICIENCY,
   TRAIT_POOL,
+  decodeIdentity,
+  defaultIdentity,
+  encodeIdentity,
+  inheritIdentity,
 } from "@devot/shared";
 import { dist2, World } from "./world.js";
 
@@ -89,6 +93,16 @@ function makeChild(
     state: "vivant",
     profile: a.profile,
     traits,
+    // L'enfant hérite de l'allure de ses parents comme il hérite de leurs
+    // traits : on reconnaît une famille à l'écran.
+    identityJson: encodeIdentity(
+      inheritIdentity(
+        decodeIdentity(a.identityJson) ?? defaultIdentity(a.traits),
+        b ? (decodeIdentity(b.identityJson) ?? defaultIdentity(b.traits)) : undefined,
+        traits,
+        rng,
+      ),
+    ),
     age: 0,
     thinking: false,
     utterance: "",

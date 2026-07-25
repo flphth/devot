@@ -23,6 +23,7 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     state: "vivant",
     profile: "frugal",
     traits: ["curieux"],
+    identityJson: "",
     age: 0,
     thinking: false,
     utterance: "",

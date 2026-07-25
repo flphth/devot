@@ -1,5 +1,6 @@
 import { Canvas } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CreationScreen } from "./creation/CreationScreen.js";
 import { Hud } from "./Hud.js";
 import { Scene } from "./Scene.js";
 import { useWorld } from "./useWorld.js";
@@ -26,6 +27,12 @@ export default function App() {
 
   const selected = snapshot.devots.find((d) => d.id === selectedId) ?? null;
 
+  // L'écran de création s'impose tant que le dieu n'a aucun devot vivant :
+  // c'est le premier contact avec le jeu, et le seul moment où l'on façonne.
+  const god = snapshot.gods.find((g) => g.id === godId) ?? null;
+  const hasLiving = snapshot.devots.some((d) => d.godId === godId && d.state !== "mort");
+  const creating = status === "connected" && godId !== null && !hasLiving;
+
   // Hooks de test pilotés (dev uniquement) : état + sélection programmable.
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -33,7 +40,9 @@ export default function App() {
       snapshot,
       godId,
       godMode,
+      creating,
       select: setSelectedId,
+      createFounder: actions.createFounder,
     };
   });
 
@@ -84,6 +93,21 @@ export default function App() {
         godMode={godMode}
         journal={selectedId ? (journals[selectedId] ?? []) : []}
       />
+      {creating && (
+        <CreationScreen
+          godName={god?.name ?? godName}
+          godColor={god?.color ?? "#4ca6e0"}
+          rejection={lastRejection}
+          onCreate={(r) =>
+            actions.createFounder({
+              traits: r.traits,
+              appearance: r.appearance,
+              stats: r.stats,
+              soul: r.soul,
+            })
+          }
+        />
+      )}
       {status !== "connected" && (
         <div
           style={{

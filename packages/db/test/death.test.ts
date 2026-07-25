@@ -14,6 +14,7 @@ function makeDevot(id: string): DevotEntity {
     state: "vivant",
     profile: "frugal",
     traits: [],
+    identityJson: "",
     age: 0,
     thinking: false,
     utterance: "",

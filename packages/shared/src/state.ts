@@ -25,6 +25,12 @@ export class DevotState extends Schema {
   declare emotion: string;
   declare thought: string;
   declare age: number;
+  /**
+   * Identité complète en JSON compact : apparence, stats, âme, signature.
+   * Un seul champ parce qu'elle ne change JAMAIS après la naissance — dix
+   * champs synchronisés à chaque tick pour une valeur figée seraient du gâchis.
+   */
+  declare identity: string;
 
   constructor() {
     super();
@@ -44,6 +50,7 @@ export class DevotState extends Schema {
     this.emotion = "";
     this.thought = "";
     this.age = 0;
+    this.identity = "";
   }
 }
 defineTypes(DevotState, {
@@ -63,6 +70,7 @@ defineTypes(DevotState, {
   emotion: "string",
   thought: "string",
   age: "number",
+  identity: "string",
 });
 
 export class FoodState extends Schema {
@@ -141,6 +149,12 @@ export interface CreateFounderMsg {
   name?: string;
   /** 2 à 3 traits choisis dans TRAIT_POOL (validés côté serveur). */
   traits?: string[];
+  /** Apparence choisie à l'écran de création (validée côté serveur). */
+  appearance?: unknown;
+  /** Répartition des stats sur le budget (validée côté serveur). */
+  stats?: unknown;
+  /** Texte libre : ce que le devot croit être. Entre dans son prompt. */
+  soul?: string;
 }
 
 export interface SmiteMsg {

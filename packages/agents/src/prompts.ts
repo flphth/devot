@@ -1,3 +1,10 @@
+import {
+  STAT_KEYS,
+  STAT_LABELS,
+  decodeIdentity,
+  type Appearance,
+  type Stats,
+} from "@devot/shared";
 import type { DevotEntity } from "@devot/shared";
 import { UTTERANCE_MAX_CHARS } from "@devot/shared";
 
@@ -36,10 +43,64 @@ Tu réponds UNIQUEMENT par une décision structurée (une action), accompagnée 
 
 /** Persona : partie variable du system, placée APRÈS le préfixe caché. */
 export function buildPersona(devot: DevotEntity): string {
-  return `## Qui tu es
-Tu t'appelles ${devot.name}.${devot.isFounder ? " Tu es le fondateur de ta lignée : le premier devot façonné par ton dieu. Toute ta descendance viendra de toi." : ""}
-Tes traits : ${devot.traits.length > 0 ? devot.traits.join(", ") : "encore indéfinis"}.
-Âge : ${devot.age} cycles.`;
+  const identity = decodeIdentity(devot.identityJson);
+  const lines = [
+    `## Qui tu es`,
+    `Tu t'appelles ${devot.name}.${devot.isFounder ? " Tu es le fondateur de ta lignée : le premier devot façonné par ton dieu. Toute ta descendance viendra de toi." : ""}`,
+    `Tes traits : ${devot.traits.length > 0 ? devot.traits.join(", ") : "encore indéfinis"}.`,
+  ];
+
+  // L'ÂME : le texte libre écrit par le joueur à la création. C'est la seule
+  // chose du monde qu'un humain ait écrite directement dans la tête du devot,
+  // et la promesse faite au joueur est qu'elle compte vraiment.
+  if (identity?.soul) {
+    lines.push(`Ce que tu crois être, au fond : « ${identity.soul} »`);
+  }
+
+  // Le corps est une donnée de personnage, pas une décoration : un devot doit
+  // savoir qu'il est massif ou fluet, vif ou lent, et pouvoir en tenir compte.
+  if (identity) {
+    lines.push(`Ton allure : ${describeAppearance(identity.appearance)}.`);
+    lines.push(`Ton corps : ${describeStats(identity.stats)}.`);
+  }
+  lines.push(`Âge : ${devot.age} cycles.`);
+  return lines.join("\n");
+}
+
+/**
+ * L'allure en français, pour le prompt ET pour ce que les autres perçoivent.
+ * Une seule formulation : un devot doit se décrire comme les autres le voient.
+ */
+export function describeAppearance(a: Appearance): string {
+  const parts: string[] = [];
+  parts.push(`de corpulence ${a.build}`);
+  parts.push(`t-shirt ${colorName(a.shirt)}`);
+  if (a.hat !== "aucun") parts.push(`coiffé d'un chapeau ${a.hat}`);
+  if (a.cape !== "aucune") parts.push(`portant une cape ${a.cape}`);
+  if (a.face !== "aucun") parts.push(`le visage barré d'un ${a.face}`);
+  return parts.join(", ");
+}
+
+function describeStats(s: Stats): string {
+  const strongest = STAT_KEYS.reduce((a, b) => (s[a] >= s[b] ? a : b));
+  const weakest = STAT_KEYS.reduce((a, b) => (s[a] <= s[b] ? a : b));
+  return `fort en ${STAT_LABELS[strongest]}, faible en ${STAT_LABELS[weakest]}`;
+}
+
+/** Nom courant d'une couleur : « écarlate » parle au modèle, « #e0634c » non. */
+const COLOR_NAMES: Record<string, string> = {
+  "#e0634c": "écarlate",
+  "#e0b34c": "safran",
+  "#7dbc5e": "vert mousse",
+  "#4ca6e0": "bleu ciel",
+  "#9c4ce0": "violet",
+  "#e04c8f": "rose vif",
+  "#e8e4d8": "écru",
+  "#3a4150": "ardoise",
+};
+
+function colorName(hex: string): string {
+  return COLOR_NAMES[hex] ?? "d'une teinte indéfinissable";
 }
 
 /** Bloc événement courant, injecté en dernier tour utilisateur. */

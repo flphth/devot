@@ -12,7 +12,16 @@ import {
   PATCH_RATE_MS,
   PERCEPTION_RADIUS,
   TICK_MS,
+  SOUL_MAX_CHARS,
   TRAIT_POOL,
+  defaultIdentity,
+  encodeIdentity,
+  signatureOf,
+  validateAppearance,
+  validateStats,
+  type Appearance,
+  type Identity,
+  type Stats,
   WorldState,
   type ActionRejectedMsg,
   type CreateFounderMsg,
@@ -170,6 +179,24 @@ export class WorldRoom extends Room<WorldState> {
       return this.reject(client, "createFounder", "Traits invalides.");
     }
 
+    // APPARENCE ET STATS. Rien de ce qui arrive ici n'est cru sur parole : le
+    // budget de points est vérifié par le serveur, sinon un client modifié
+    // s'octroierait le maximum sur les quatre stats.
+    const badLook = validateAppearance(msg.appearance);
+    if (badLook) return this.reject(client, "createFounder", badLook.reason);
+    const badStats = validateStats(msg.stats);
+    if (badStats) return this.reject(client, "createFounder", badStats.reason);
+
+    const appearance = msg.appearance as Appearance;
+    const stats = msg.stats as Stats;
+    const soul = String(msg.soul ?? "").slice(0, SOUL_MAX_CHARS).trim();
+    const identity: Identity = {
+      appearance,
+      stats,
+      soul,
+      signature: signatureOf(appearance, stats, traits, soul),
+    };
+
     const receipt = await this.payments.chargeDevotCreation(godId);
     if (!receipt.ok) {
       return this.reject(client, "createFounder", "Paiement refusé.");
@@ -179,6 +206,7 @@ export class WorldRoom extends Room<WorldState> {
       name: msg.name,
       traits: ["premier de sa lignée", ...traits],
       isFounder: true,
+      identity,
     });
     this.repos.events.record("birth", [devot.id], { founder: true, godId });
 
@@ -193,8 +221,19 @@ export class WorldRoom extends Room<WorldState> {
 
   private spawnDevot(
     godId: string,
-    opts: { name?: string; traits: string[]; isFounder: boolean; x?: number; z?: number },
+    opts: {
+      name?: string;
+      traits: string[];
+      isFounder: boolean;
+      x?: number;
+      z?: number;
+      /** Absente pour une naissance par reproduction ou en mode god. */
+      identity?: Identity;
+    },
   ): DevotEntity {
+    // Un devot né sans écran de création (reproduction, mode god) reçoit une
+    // identité neutre : le monde n'a jamais de devot sans apparence.
+    const identity = opts.identity ?? defaultIdentity(opts.traits);
     const devot: DevotEntity = {
       id: `devot-${godId}-${Date.now()}-${++this.devotSeq}`,
       godId,
@@ -207,6 +246,7 @@ export class WorldRoom extends Room<WorldState> {
       },
       hp: HP_MAX_DEFAULT,
       hpMax: HP_MAX_DEFAULT,
+      identityJson: encodeIdentity(identity),
       state: "vivant",
       profile: "frugal",
       traits: opts.traits,
@@ -472,6 +512,9 @@ export class WorldRoom extends Room<WorldState> {
         s.isFounder = d.isFounder;
         s.profile = d.profile;
         s.hpMax = d.hpMax;
+        // L'identité est écrite UNE FOIS, à l'entrée dans l'état : elle ne
+        // change jamais, il serait absurde de la resynchroniser à chaque tick.
+        s.identity = d.identityJson;
         this.state.devots.set(d.id, s);
       }
       s.x = d.pos.x;
