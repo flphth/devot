@@ -7,6 +7,7 @@ import {
   DIVINE_MSG_COOLDOWN_MS,
   DIVINE_MSG_MAX_CHARS,
   FoodState,
+  MonsterState,
   GodState,
   HP_MAX_DEFAULT,
   PATCH_RATE_MS,
@@ -29,6 +30,7 @@ import {
   type CreateFounderMsg,
   type DebugMoveFoodMsg,
   type DebugSpawnDevotMsg,
+  type DebugSpawnMonsterMsg,
   type DevotEntity,
   type FeedMsg,
   type FoodEntity,
@@ -43,7 +45,9 @@ import {
   applyDecision,
   describeSurroundings,
   dist2,
+  monsterSystem,
   perceptionSystem,
+  spawnMonster,
   tick,
   World,
 } from "@devot/sim";
@@ -135,6 +139,9 @@ export class WorldRoom extends Room<WorldState> {
     this.onMessage("debugMoveFood", (_client, msg: DebugMoveFoodMsg) =>
       this.handleDebugMoveFood(msg),
     );
+    this.onMessage("debugSpawnMonster", (_client, msg: DebugSpawnMonsterMsg) => {
+      spawnMonster(this.world, msg?.x ?? 0, msg?.z ?? 0);
+    });
 
     this.setSimulationInterval(() => this.simulate(), TICK_MS);
   }
@@ -447,8 +454,35 @@ export class WorldRoom extends Room<WorldState> {
       this.repos.events.record("meal", [devotId], { foodId, hpValue });
     }
 
-    for (const t of [...result.triggers, ...perceptionSystem(this.world)]) {
+    // Monsters move before the triggers are dispatched, so a devot woken this
+    // tick is told about the beast that is already upon it, not where it stood.
+    const beasts = monsterSystem(this.world, Date.now());
+
+    for (const t of [...result.triggers, ...beasts.triggers, ...perceptionSystem(this.world)]) {
       this.wake(t);
+    }
+
+    for (const { attackerId, victimId, drained } of beasts.combats) {
+      const victim = this.world.devots.get(victimId);
+      this.broadcast("combat", {
+        attackerId,
+        victimId,
+        drained: Math.round(drained),
+        x: victim?.pos.x ?? 0,
+        z: victim?.pos.z ?? 0,
+        lethal: !!victim && victim.hp <= 0,
+      } satisfies CombatFxMsg);
+    }
+
+    // A monster's death — starved or slain — gives back everything it took.
+    // Nothing is created and nothing vanishes; it only changes hands.
+    for (const death of [...beasts.deaths, ...result.monsterDeaths]) {
+      this.dropCarrion(death.x, death.z, death.hoard);
+      this.world.monsters.delete(death.monsterId);
+      this.state.monsters.delete(death.monsterId);
+      this.repos.events.record("monster_death", [death.monsterId], {
+        hoard: Math.round(death.hoard),
+      });
     }
 
     for (const { attackerId, victimId, drained } of result.combats) {
@@ -549,6 +583,26 @@ export class WorldRoom extends Room<WorldState> {
     this.world.food.set(f.id, f);
   }
 
+  /**
+   * What a monster took, returned to the world where it fell.
+   *
+   * This is the rule the economy rests on: a hoard is never destroyed and never
+   * minted, it is dropped as food for whoever is standing there. Usually that
+   * is the devot who just killed it, which is exactly the intent — bringing a
+   * fat monster down is the one act in this world that pays.
+   */
+  private dropCarrion(x: number, z: number, hoard: number): void {
+    if (hoard < 1) return;
+    const food: FoodEntity = {
+      id: `food-carrion-${this.foodSeq++}`,
+      pos: { x, y: 0, z },
+      type: "carrion",
+      hpValue: Math.round(hoard),
+      source: "spawn",
+    };
+    this.world.food.set(food.id, food);
+  }
+
   /** Copies the hot state (sim) into the synchronised state (schema). */
   private syncState(): void {
     for (const d of this.world.devots.values()) {
@@ -577,6 +631,23 @@ export class WorldRoom extends Room<WorldState> {
       // Items change during a life (a forging): unlike identity, they do need
       // to be resynchronised.
       s.items = d.items.join(",");
+    }
+
+    for (const m of this.world.monsters.values()) {
+      let s = this.state.monsters.get(m.id);
+      if (!s) {
+        s = new MonsterState();
+        s.id = m.id;
+        s.name = m.name;
+        s.hpMax = m.hpMax;
+        this.state.monsters.set(m.id, s);
+      }
+      s.x = m.pos.x;
+      s.z = m.pos.z;
+      s.hp = m.hp;
+      s.hoard = m.hoard;
+      s.state = m.state;
+      s.targetId = m.targetId ?? "";
     }
     for (const [id, f] of this.world.food) {
       let s = this.state.food.get(id);

@@ -1,14 +1,19 @@
-import type { DevotEntity, FoodEntity, Vec3 } from "@devot/shared";
+import type { DevotEntity, FoodEntity, MonsterEntity, Vec3 } from "@devot/shared";
 
 /** The world's hot state, in memory. Persisted periodically by the server. */
 export class World {
   devots = new Map<string, DevotEntity>();
   food = new Map<string, FoodEntity>();
+  monsters = new Map<string, MonsterEntity>();
   /** Map size: the square [-size, size] on x/z. */
   constructor(public size = 50) {}
 
   aliveDevots(): DevotEntity[] {
     return [...this.devots.values()].filter((d) => d.state !== "dead");
+  }
+
+  aliveMonsters(): MonsterEntity[] {
+    return [...this.monsters.values()].filter((m) => m.state !== "dead");
   }
 
   nearestFood(pos: Vec3): FoodEntity | undefined {

@@ -92,3 +92,15 @@ export const TRAIT_POOL = [
   "generous",
   "envious",
 ] as const;
+
+// ── Monsters ────────────────────────────────────────────────────────────────
+// The world's predator. It never thinks, so it never pays for inference; the
+// metabolism below is what stops it being a free, unbounded drain on everyone
+// else. A monster that does not hunt dies, and gives back what it took.
+export const MONSTER_HP_MAX = 60_000;
+export const MONSTER_METABOLISM_HP_PER_TICK = 90;
+export const MONSTER_DRAIN_PER_TICK = 260;
+export const MONSTER_SPEED = 2.4;
+export const MONSTER_SIGHT = 14;
+/** Share of what it drains that it actually absorbs; the rest swells the hoard. */
+export const MONSTER_ABSORB = 0.35;

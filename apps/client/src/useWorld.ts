@@ -44,6 +44,19 @@ export interface FoodView {
   source: string;
 }
 
+/** A monster, as the client draws it. Its hoard is the part that matters. */
+export interface MonsterView {
+  id: string;
+  name: string;
+  x: number;
+  z: number;
+  hp: number;
+  hpMax: number;
+  hoard: number;
+  state: string;
+  targetId: string;
+}
+
 export interface GodView {
   id: string;
   name: string;
@@ -56,6 +69,7 @@ export interface WorldSnapshot {
   devots: DevotView[];
   food: FoodView[];
   gods: GodView[];
+  monsters: MonsterView[];
 }
 
 /**
@@ -88,6 +102,7 @@ export interface WorldActions {
   getJournal: (devotId: string) => void;
   debugSpawnDevot: (x: number, z: number) => void;
   debugMoveFood: (foodId: string, x: number, z: number) => void;
+  debugSpawnMonster: (x: number, z: number) => void;
 }
 
 export interface WorldConnection {
@@ -102,7 +117,7 @@ export interface WorldConnection {
   actions: WorldActions;
 }
 
-const EMPTY: WorldSnapshot = { devots: [], food: [], gods: [] };
+const EMPTY: WorldSnapshot = { devots: [], food: [], gods: [], monsters: [] };
 
 export function useWorld(godName: string): WorldConnection {
   const [snapshot, setSnapshot] = useState<WorldSnapshot>(EMPTY);
@@ -185,7 +200,21 @@ export function useWorld(godName: string): WorldConnection {
               connected: g.connected,
             });
           });
-          setSnapshot({ devots, food, gods });
+          const monsters: MonsterView[] = [];
+          state.monsters?.forEach((m: any) => {
+            monsters.push({
+              id: m.id,
+              name: m.name,
+              x: m.x,
+              z: m.z,
+              hp: m.hp,
+              hpMax: m.hpMax,
+              hoard: m.hoard,
+              state: m.state,
+              targetId: m.targetId ?? "",
+            });
+          });
+          setSnapshot({ devots, food, gods, monsters });
         });
       })
       .catch((err) => {
@@ -221,6 +250,9 @@ export function useWorld(godName: string): WorldConnection {
   const debugMoveFood = useCallback((foodId: string, x: number, z: number) => {
     roomRef.current?.send("debugMoveFood", { foodId, x, z });
   }, []);
+  const debugSpawnMonster = useCallback((x: number, z: number) => {
+    roomRef.current?.send("debugSpawnMonster", { x, z });
+  }, []);
 
   return {
     snapshot,
@@ -238,6 +270,7 @@ export function useWorld(godName: string): WorldConnection {
       getJournal,
       debugSpawnDevot,
       debugMoveFood,
+      debugSpawnMonster,
     },
   };
 }

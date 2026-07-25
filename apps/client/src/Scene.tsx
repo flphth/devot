@@ -9,7 +9,14 @@ import {
   decodeIdentity,
   type ItemKind,
 } from "@devot/shared";
-import type { CombatFx, DevotView, FoodView, SmiteFx, WorldSnapshot } from "./useWorld.js";
+import type {
+  CombatFx,
+  DevotView,
+  FoodView,
+  MonsterView,
+  SmiteFx,
+  WorldSnapshot,
+} from "./useWorld.js";
 import { CombatEffects, recentlyBitten } from "./CombatFx.js";
 import { DevotModel } from "./creation/DevotModel.js";
 
@@ -471,6 +478,82 @@ function LightningFx({ fx }: { fx: SmiteFx }) {
 }
 
 /**
+ * A MONSTER, drawn to read as danger at a glance: dark, angular, bigger than a
+ * devot, and crowned by the size of its hoard. A fat monster must look like a
+ * fat monster — that is the whole wager the player is being offered.
+ */
+function MonsterMesh({
+  monster,
+  onSelect,
+}: {
+  monster: MonsterView;
+  onSelect: (id: string) => void;
+}) {
+  const group = useRef<THREE.Group>(null);
+  const target = useRef(new THREE.Vector3(monster.x, 0, monster.z));
+  target.current.set(monster.x, 0, monster.z);
+
+  useFrame((_, dt) => {
+    if (group.current) group.current.position.lerp(target.current, 1 - Math.exp(-dt * 7));
+  });
+
+  // Bulk grows with the hoard: what it ate is written on its body.
+  const bulk = 1 + Math.min(0.6, monster.hoard / 120_000);
+  const hunting = monster.targetId !== "";
+
+  return (
+    <group
+      ref={group}
+      position={[monster.x, 0, monster.z]}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect(monster.id);
+      }}
+    >
+      <mesh position={[0, 0.55 * bulk, 0]}>
+        <boxGeometry args={[0.85 * bulk, 0.9 * bulk, 0.7 * bulk]} />
+        <meshStandardMaterial
+          color="#2b1f2c"
+          flatShading
+          emissive={hunting ? "#8b1e2d" : "#000000"}
+          emissiveIntensity={hunting ? 0.5 : 0}
+        />
+      </mesh>
+      {/* eyes: the only bright thing on it */}
+      <mesh position={[-0.2, 0.85 * bulk, 0.36 * bulk]}>
+        <boxGeometry args={[0.12, 0.1, 0.03]} />
+        <meshStandardMaterial color="#ff5a3c" emissive="#ff5a3c" emissiveIntensity={1.4} />
+      </mesh>
+      <mesh position={[0.2, 0.85 * bulk, 0.36 * bulk]}>
+        <boxGeometry args={[0.12, 0.1, 0.03]} />
+        <meshStandardMaterial color="#ff5a3c" emissive="#ff5a3c" emissiveIntensity={1.4} />
+      </mesh>
+      {/* legs */}
+      {[-0.28, 0.28].map((x) => (
+        <mesh key={x} position={[x * bulk, 0.14, 0]}>
+          <boxGeometry args={[0.22 * bulk, 0.3, 0.24 * bulk]} />
+          <meshStandardMaterial color="#1b1420" flatShading />
+        </mesh>
+      ))}
+      <Billboard position={[0, 1.5 * bulk, 0]}>
+        <Html center distanceFactor={16} style={{ pointerEvents: "none" }}>
+          <div
+            style={{
+              font: "700 11px system-ui, sans-serif",
+              color: "#ffb3a7",
+              textShadow: "0 1px 3px #000",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {monster.name} · {Math.round(monster.hoard).toLocaleString()}
+          </div>
+        </Html>
+      </Billboard>
+    </group>
+  );
+}
+
+/**
  * Camera follow: while a devot is selected, the OrbitControls target glides
  * toward it (damped) and the camera moves by the same vector — the angle and
  * zoom chosen by the player are preserved, rotation/zoom stay free.
@@ -557,6 +640,10 @@ export function Scene({
     (d) => d.godId === godId || isVisible(d.x, d.z, vision, godMode),
   );
   const visibleFood = snapshot.food.filter((f) => isVisible(f.x, f.z, vision, godMode));
+  // Monsters obey the same fog: one you cannot see is one you cannot avoid.
+  const visibleMonsters = snapshot.monsters.filter(
+    (m) => m.state !== "dead" && isVisible(m.x, m.z, vision, godMode),
+  );
 
   const handleGroundClick = (e: ThreeEvent<MouseEvent>) => {
     if (draggingFood) return;
@@ -612,6 +699,9 @@ export function Scene({
       ))}
       {visibleFood.map((f) => (
         <VoxelFood key={f.id} food={f} godModeRef={godModeRef} onDragStart={setDraggingFood} />
+      ))}
+      {visibleMonsters.map((m) => (
+        <MonsterMesh key={m.id} monster={m} onSelect={onSelect} />
       ))}
 
       {lastSmite && Date.now() - lastSmite.at < 600 && <LightningFx fx={lastSmite} />}

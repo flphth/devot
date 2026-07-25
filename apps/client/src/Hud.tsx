@@ -4,6 +4,7 @@ import {
   DIVINE_MSG_MAX_CHARS,
   TRAIT_POOL,
   type JournalEntry,
+  type SpawnKind,
 } from "@devot/shared";
 import type { CombatFx, DevotView, WorldActions, WorldSnapshot } from "./useWorld.js";
 import { useT } from "./i18n.js";
@@ -120,6 +121,8 @@ export function Hud({
   actions,
   rejection,
   godMode,
+  spawnKind,
+  onSpawnKind,
   journal,
   combats,
 }: {
@@ -129,6 +132,8 @@ export function Hud({
   actions: WorldActions;
   rejection: string | null;
   godMode: boolean;
+  spawnKind: SpawnKind;
+  onSpawnKind: (k: SpawnKind) => void;
   journal: JournalEntry[];
   combats: CombatFx[];
 }) {
@@ -179,7 +184,35 @@ export function Hud({
             letterSpacing: 1,
           }}
         >
-          {t("godmode.banner")}
+          <div>{t("godmode.banner")}</div>
+          {/* What the next click brings into the world. A monster is not a
+              devot with different art: it never thinks, it hunts, and it holds
+              what it has taken. */}
+          <div style={{ display: "flex", gap: 6, marginTop: 8, alignItems: "center" }}>
+            <span style={{ opacity: 0.75, fontWeight: 400, letterSpacing: 0 }}>
+              {t("godmode.spawn")}
+            </span>
+            {(["devot", "monster"] as const).map((k) => (
+              <button
+                key={k}
+                onClick={() => onSpawnKind(k)}
+                data-testid={`spawn-${k}`}
+                style={{
+                  padding: "3px 10px",
+                  borderRadius: 999,
+                  border: `1px solid ${spawnKind === k ? "#e0b34c" : "#4a3f22"}`,
+                  background: spawnKind === k ? "#e0b34c" : "transparent",
+                  color: spawnKind === k ? "#10131a" : "#e0b34c",
+                  font: "12px system-ui, sans-serif",
+                  fontWeight: spawnKind === k ? 700 : 400,
+                  letterSpacing: 0,
+                  cursor: "pointer",
+                }}
+              >
+                {k === "monster" ? `👹 ${t("godmode.monster")}` : `🧍 ${t("godmode.devot")}`}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

@@ -23,6 +23,8 @@ export interface TickResult {
   deaths: Array<{ devotId: string; cause: string }>;
   eaten: Array<{ devotId: string; foodId: string; hpValue: number }>;
   combats: Array<{ attackerId: string; victimId: string; drained: number }>;
+  /** Monsters brought down by devots. Their hoard has to go somewhere. */
+  monsterDeaths: Array<{ monsterId: string; killerId: string; hoard: number; x: number; z: number }>;
 }
 
 /**
@@ -30,7 +32,7 @@ export interface TickResult {
  * Keeps the bodies alive and detects the triggers that will wake the minds.
  */
 export function tick(world: World, now: number = Date.now()): TickResult {
-  const result: TickResult = { triggers: [], deaths: [], eaten: [], combats: [] };
+  const result: TickResult = { triggers: [], deaths: [], eaten: [], combats: [], monsterDeaths: [] };
   const dt = TICK_MS / 1000;
 
   for (const devot of world.aliveDevots()) {
@@ -85,7 +87,7 @@ function movementSystem(devot: DevotEntity, world: World, dt: number): void {
       break;
     }
     case "attack": {
-      const target = world.devots.get(goal.targetId);
+      const target = world.devots.get(goal.targetId) ?? world.monsters.get(goal.targetId);
       if (!target || target.state === "dead") {
         devot.currentGoal = { kind: "wander" };
         return;
@@ -108,7 +110,9 @@ function combatSystem(
   now: number,
 ): void {
   if (devot.currentGoal.kind !== "attack") return;
-  const victim = world.devots.get(devot.currentGoal.targetId);
+  const targetId = devot.currentGoal.targetId;
+  const monster = world.monsters.get(targetId);
+  const victim = world.devots.get(targetId) ?? monster;
   if (!victim || victim.state === "dead") {
     devot.currentGoal = { kind: "wander" };
     return;
@@ -120,13 +124,33 @@ function combatSystem(
   devot.hp = Math.min(devot.hpMax, devot.hp + drained * ATTACK_EFFICIENCY);
   result.combats.push({ attackerId: devot.id, victimId: victim.id, drained });
 
+  // Killing a monster is the one act in this world that pays: everything it
+  // took from the devots it ate is released where it falls.
+  if (monster && monster.hp <= 0) {
+    monster.hp = 0;
+    monster.state = "dead";
+    devot.currentGoal = { kind: "wander" };
+    result.monsterDeaths.push({
+      monsterId: monster.id,
+      killerId: devot.id,
+      hoard: monster.hoard,
+      x: monster.pos.x,
+      z: monster.pos.z,
+    });
+    return;
+  }
+  // Past this point the victim is another devot, and only a devot can be told
+  // it is being eaten — a monster has no mind to alert.
+  const prey = world.devots.get(targetId);
+  if (!prey) return;
+
   // The victim is alerted once per attacker: it is up to them to decide
   // (flee, strike back, beg, sacrifice themselves).
-  if (victim.underAttackBy !== devot.id) {
-    victim.underAttackBy = devot.id;
+  if (prey.underAttackBy !== devot.id) {
+    prey.underAttackBy = devot.id;
     result.triggers.push({
       kind: "threat",
-      devotId: victim.id,
+      devotId: prey.id,
       eventText: `${devot.name} is attacking you and draining your life! You lose HP every moment of contact. They are at x=${devot.pos.x.toFixed(1)}, z=${devot.pos.z.toFixed(1)}.`,
       createdAt: now,
     });
@@ -294,6 +318,19 @@ export function describeSurroundings(devot: DevotEntity, world: World): string {
     lines.push(`- and ${others.length - SEEN_DEVOTS_MAX} more devots, further off`);
   }
 
+  // A monster in view is the most consequential thing a devot can be told
+  // about: it is the only neighbour that will kill it for nothing in return.
+  for (const m of world
+    .aliveMonsters()
+    .filter((m) => dist2(devot.pos, m.pos) <= r2)
+    .sort((a, b) => dist2(devot.pos, a.pos) - dist2(devot.pos, b.pos))) {
+    const d = Math.sqrt(dist2(devot.pos, m.pos));
+    const hunting = m.targetId === devot.id ? " — HUNTING YOU" : "";
+    lines.push(
+      `- A MONSTER, ${m.name} (id "${m.id}"), ${d.toFixed(1)} away at x=${m.pos.x.toFixed(1)}, z=${m.pos.z.toFixed(1)}, carrying a hoard of ${Math.round(m.hoard)} taken from the dead${hunting}`,
+    );
+  }
+
   const foods = [...world.food.values()]
     .filter((f) => dist2(devot.pos, f.pos) <= r2)
     .sort((a, b) => dist2(devot.pos, a.pos) - dist2(devot.pos, b.pos));
@@ -374,7 +411,8 @@ export function applyDecision(devot: DevotEntity, decision: Decision, world: Wor
       devot.utterance = decision.utterance ?? "";
       break;
     case "attack": {
-      const target = decision.targetId ? world.devots.get(decision.targetId) : undefined;
+      const id = decision.targetId;
+      const target = id ? (world.devots.get(id) ?? world.monsters.get(id)) : undefined;
       if (target && target.id !== devot.id && target.state !== "dead") {
         devot.currentGoal = { kind: "attack", targetId: target.id };
       }

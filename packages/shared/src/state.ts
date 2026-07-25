@@ -108,7 +108,7 @@ export class GodState extends Schema {
   declare id: string;
   declare name: string;
   declare color: string;
-  /** Autoritaire : le client n'affiche que le minuteur. */
+  /** Authoritative: the client only renders the countdown. */
   declare lastSpeakAt: number;
   declare connected: boolean;
 
@@ -129,22 +129,70 @@ defineTypes(GodState, {
   connected: "boolean",
 });
 
+/**
+ * A MONSTER, as the client needs to see it.
+ *
+ * No mind, no god, no identity. What it does carry is a HOARD: everything it
+ * has drained from the devots it killed. That hoard is the whole point — it is
+ * visible, it grows, and whoever brings the monster down takes it.
+ */
+export class MonsterState extends Schema {
+  declare id: string;
+  declare name: string;
+  declare x: number;
+  declare z: number;
+  declare hp: number;
+  declare hpMax: number;
+  /** What it has taken from the dead. A fat monster is a visible wager. */
+  declare hoard: number;
+  declare state: string;
+  /** Id of the devot it is currently hunting, empty if none. */
+  declare targetId: string;
+
+  constructor() {
+    super();
+    this.id = "";
+    this.name = "";
+    this.x = 0;
+    this.z = 0;
+    this.hp = 0;
+    this.hpMax = 0;
+    this.hoard = 0;
+    this.state = "alive";
+    this.targetId = "";
+  }
+}
+defineTypes(MonsterState, {
+  id: "string",
+  name: "string",
+  x: "number",
+  z: "number",
+  hp: "number",
+  hpMax: "number",
+  hoard: "number",
+  state: "string",
+  targetId: "string",
+});
+
 export class WorldState extends Schema {
   declare devots: MapSchema<DevotState>;
   declare food: MapSchema<FoodState>;
   declare gods: MapSchema<GodState>;
+  declare monsters: MapSchema<MonsterState>;
 
   constructor() {
     super();
     this.devots = new MapSchema<DevotState>();
     this.food = new MapSchema<FoodState>();
     this.gods = new MapSchema<GodState>();
+    this.monsters = new MapSchema<MonsterState>();
   }
 }
 defineTypes(WorldState, {
   devots: { map: DevotState },
   food: { map: FoodState },
   gods: { map: GodState },
+  monsters: { map: MonsterState },
 });
 
 // ── DTO des intentions client → serveur ─────────────────────────────────────
@@ -201,6 +249,14 @@ export interface JournalMsg {
 }
 
 // ── God mode (debug/creative, outside the rules of the game) ────────────────
+
+/** God mode: what the next click brings into the world. */
+export type SpawnKind = "devot" | "monster";
+
+export interface DebugSpawnMonsterMsg {
+  x?: number;
+  z?: number;
+}
 
 export interface DebugSpawnDevotMsg {
   x: number;

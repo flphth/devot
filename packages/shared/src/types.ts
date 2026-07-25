@@ -106,10 +106,31 @@ export interface DevotEntity {
   metDevots?: string[];
 }
 
+/**
+ * A MONSTER. The world's own predator: no god, no mind, no inference cost.
+ *
+ * It exists to make the world dangerous without making it expensive. Because it
+ * never thinks, it never pays — so it MUST pay some other way, or it would be a
+ * one-way drain that ends up holding everything. Hence a metabolism: a monster
+ * that stops hunting starves and dies, and its hoard returns to the world.
+ */
+export interface MonsterEntity {
+  id: string;
+  name: string;
+  pos: Vec3;
+  hp: number;
+  hpMax: number;
+  /** Everything drained from the devots it has killed. Its death releases it. */
+  hoard: number;
+  state: "alive" | "dead";
+  /** The devot it is hunting, if any. */
+  targetId?: string;
+}
+
 export interface FoodEntity {
   id: string;
   pos: Vec3;
-  type: "grain" | "fruit" | "manna" | "tainted";
+  type: "grain" | "fruit" | "manna" | "tainted" | "carrion";
   hpValue: number;
   source: "spawn" | "god";
 }

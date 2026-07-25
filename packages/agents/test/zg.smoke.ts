@@ -76,7 +76,10 @@ check("json_object fallback also yields a usable decision", (() => {
 })());
 
 // The prize asks for proof the inference really ran on 0G Compute.
-check("the response carries a verifiable TEE attestation", await broker.inference.processResponse(PROVIDER, strict.chatID));
+check(
+  "the response carries a verifiable TEE attestation",
+  (await broker.inference.processResponse(PROVIDER, strict.chatID)) === true,
+);
 
 // What a thought costs, in the units the economy will be denominated in.
 const u = strict.data.usage;

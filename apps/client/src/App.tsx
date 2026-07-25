@@ -4,6 +4,7 @@ import { CreationScreen } from "./creation/CreationScreen.js";
 import { Hud } from "./Hud.js";
 import { Scene } from "./Scene.js";
 import { useWorld } from "./useWorld.js";
+import type { SpawnKind } from "@devot/shared";
 import { LangPicker, useT } from "./i18n.js";
 
 function godNameFromUrl(): string {
@@ -23,6 +24,10 @@ export default function App() {
     useWorld(godName);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [godMode, setGodMode] = useState(false);
+  // What the next god-mode click brings into the world. Mirrored in a ref for
+  // the same reason as godMode: the R3F handler must not wait for a commit.
+  const [spawnKind, setSpawnKind] = useState<SpawnKind>("devot");
+  const spawnKindRef = useRef<SpawnKind>("devot");
   // Synchronous ref: R3F handlers read it without depending on the React<->canvas
   // bridge commit (which can delay a prop update by a frame).
   const godModeRef = useRef(false);
@@ -88,7 +93,11 @@ export default function App() {
           lastSmite={lastSmite}
           combats={combats}
           onSelect={setSelectedId}
-          onGroundClick={(x, z) => actions.debugSpawnDevot(x, z)}
+          onGroundClick={(x, z) =>
+            spawnKindRef.current === "monster"
+              ? actions.debugSpawnMonster(x, z)
+              : actions.debugSpawnDevot(x, z)
+          }
           onFoodMove={(foodId, x, z) => actions.debugMoveFood(foodId, x, z)}
         />
       </Canvas>
@@ -99,6 +108,11 @@ export default function App() {
         actions={actions}
         rejection={lastRejection}
         godMode={godMode}
+        spawnKind={spawnKind}
+        onSpawnKind={(k) => {
+          spawnKindRef.current = k;
+          setSpawnKind(k);
+        }}
         journal={selectedId ? (journals[selectedId] ?? []) : []}
         combats={combats}
       />
