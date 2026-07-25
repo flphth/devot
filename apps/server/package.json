@@ -1,0 +1,14 @@
+{
+  "name": "@devot/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "mortal-core": "tsx src/mortalCore.ts"
+  },
+  "dependencies": {
+    "@devot/agents": "workspace:*",
+    "@devot/shared": "workspace:*",
+    "@devot/sim": "workspace:*"
+  }
+}
