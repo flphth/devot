@@ -6,6 +6,7 @@ import {
   type JournalEntry,
 } from "@devot/shared";
 import type { CombatFx, DevotView, WorldActions, WorldSnapshot } from "./useWorld.js";
+import { useT } from "./i18n.js";
 
 const panel: React.CSSProperties = {
   position: "absolute",
@@ -35,6 +36,7 @@ function TraitPicker({
   selected: string[];
   onToggle: (t: string) => void;
 }) {
+  const { d } = useT();
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
       {TRAIT_POOL.map((t) => {
@@ -54,7 +56,7 @@ function TraitPicker({
               fontSize: 12,
             }}
           >
-            {t}
+            {d(t)}
           </button>
         );
       })}
@@ -63,6 +65,7 @@ function TraitPicker({
 }
 
 function Journal({ entries }: { entries: JournalEntry[] }) {
+  const { t } = useT();
   const items = [...entries].reverse(); // newest first
   return (
     <div
@@ -77,7 +80,7 @@ function Journal({ entries }: { entries: JournalEntry[] }) {
       }}
     >
       {items.length === 0 && (
-        <div style={{ opacity: 0.5 }}>No memory yet. They have not lived.</div>
+        <div style={{ opacity: 0.5 }}>{t("hud.no-memory")}</div>
       )}
       {items.map((e, i) => (
         <div
@@ -129,6 +132,7 @@ export function Hud({
   journal: JournalEntry[];
   combats: CombatFx[];
 }) {
+  const { t, d } = useT();
   const [text, setText] = useState("");
   const [now, setNow] = useState(Date.now());
   const [traits, setTraits] = useState<string[]>([]);
@@ -167,7 +171,7 @@ export function Hud({
         <div
           style={{
             ...panel,
-            top: 14,
+            top: 52,
             right: 14,
             borderColor: "#e0b34c",
             color: "#e0b34c",
@@ -175,8 +179,7 @@ export function Hud({
             letterSpacing: 1,
           }}
         >
-          ⚡ GOD MODE — click: spawn devot · drag food · fog off ·
-          press 1 to exit
+          {t("godmode.banner")}
         </div>
       )}
 
@@ -185,7 +188,7 @@ export function Hud({
       {/* Pantheon / creation */}
       <div style={{ ...panel, top: 14, left: 14, width: 250 }}>
         <div style={{ fontWeight: 700, marginBottom: 6 }}>
-          {god ? `⚡ ${god.name}` : "Connecting…"}
+          {god ? `⚡ ${god.name}` : t("pantheon.connecting")}
         </div>
         {/* Creation now lives in its own full-screen, centred view
             (CreationScreen): this panel is nothing but the pantheon. */}
@@ -196,7 +199,7 @@ export function Hud({
                 {d.state === "dead" ? "☠ " : d.thinking ? "💭 " : ""}
                 {d.name}
               </span>
-              <span style={{ opacity: 0.7 }}>{d.state}</span>
+              <span style={{ opacity: 0.7 }}>{t(`state.${d.state}`)}</span>
             </div>
             <div
               style={{
@@ -222,7 +225,7 @@ export function Hud({
               />
             </div>
             <div style={{ opacity: 0.6, fontSize: 11, marginTop: 2 }}>
-              {Math.round(d.hp)} / {d.hpMax} HP — ${(d.hp / 1e6).toFixed(4)} of thinking
+              {Math.round(d.hp)} / {d.hpMax} HP — ${(d.hp / 1e6).toFixed(4)} {t("hud.thinking")}
             </div>
           </div>
         ))}
@@ -232,9 +235,9 @@ export function Hud({
       {selected && (
         <div style={{ ...panel, top: 14, left: 280, width: 320 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-            <b>Esprit de {selected.name}</b>
+            <b>{t("hud.mind-of", { name: selected.name })}</b>
             <span style={{ opacity: 0.6, fontSize: 11 }}>
-              {selected.state}, {selected.age} cycles
+              {t(`state.${selected.state}`)}, {t("hud.cycles", { age: selected.age })}
             </span>
           </div>
           {selected.thought && (
@@ -252,7 +255,7 @@ export function Hud({
           <div style={{ marginBottom: 6 }}>
             <b>{selected.name}</b>{" "}
             <span style={{ opacity: 0.65 }}>
-              ({selected.state}
+              ({t(`state.${selected.state}`)}
               {selected.emotion ? `, ${selected.emotion}` : ""})
             </span>
           </div>
@@ -266,8 +269,8 @@ export function Hud({
                   onKeyDown={(e) => e.key === "Enter" && canSpeak && send()}
                   placeholder={
                     cooldownLeft > 0
-                      ? `Ta voix se repose (${Math.ceil(cooldownLeft / 1000)} s)…`
-                      : "Speak to your devot (140 characters, it will cost them their life)…"
+                      ? t("hud.speak-cooldown", { s: Math.ceil(cooldownLeft / 1000) })
+                      : t("hud.speak-placeholder")
                   }
                   disabled={!canSpeak}
                   style={{
@@ -296,7 +299,7 @@ export function Hud({
                 </button>
                 <button
                   onClick={() => actions.feed(selected.id)}
-                  title="Drop food near them"
+                  title={t("hud.feed-title")}
                   style={{
                     padding: "8px 12px",
                     borderRadius: 8,
@@ -316,7 +319,7 @@ export function Hud({
                       actions.smite(selected.id);
                       setConfirmSmite(false);
                     }}
-                    title="Smite your devot — their memory will be destroyed forever"
+                    title={t("hud.smite-title")}
                     style={{
                       padding: "8px 12px",
                       borderRadius: 8,
@@ -327,18 +330,18 @@ export function Hud({
                       cursor: "pointer",
                     }}
                   >
-                    {confirmSmite ? "Confirmer ⚡" : "⚡"}
+                    {confirmSmite ? t("hud.confirm") : "⚡"}
                   </button>
                 )}
               </div>
               <div style={{ opacity: 0.55, fontSize: 11, marginTop: 5 }}>
                 {confirmSmite
-                  ? "⚠ Smiting is irreversible: their mind will be erased forever."
-                  : `${text.length}/${DIVINE_MSG_MAX_CHARS} — one word per minute. Silence is sometimes the greatest gift of all.`}
+                  ? t("hud.smite-warning")
+                  : t("hud.speak-counter", { n: text.length, max: DIVINE_MSG_MAX_CHARS })}
               </div>
             </>
           ) : (
-            <div style={{ opacity: 0.65 }}>This devot belongs to another god.</div>
+            <div style={{ opacity: 0.65 }}>{t("hud.other-god")}</div>
           )}
         </div>
       )}
@@ -363,7 +366,7 @@ export function Hud({
 
 
 /**
- * LE JOURNAL DES COMBATS.
+ * THE COMBAT LOG.
  *
  * It does not merely list transfers: it says what they are. In this world HP
  * are the thinking budget — a devot spends its life every time it thinks. To
@@ -372,22 +375,22 @@ export function Hud({
  * not by reading the documentation.
  */
 function CombatLog({ combats, devots }: { combats: CombatFx[]; devots: DevotView[] }) {
+  const { t, lang } = useT();
   if (combats.length === 0) return null;
-  const nameOf = (id: string) => devots.find((d) => d.id === id)?.name ?? "a stranger";
+  const nameOf = (id: string) => devots.find((d) => d.id === id)?.name ?? t("combat.stranger");
   const recent = [...combats].slice(-6).reverse();
   const total = combats.reduce((sum, c) => sum + c.drained, 0);
 
   return (
     <div style={{ ...panel, bottom: 14, left: 14, width: 300 }}>
-      <div style={{ fontWeight: 700, marginBottom: 2 }}>⚔ Life theft</div>
+      <div style={{ fontWeight: 700, marginBottom: 2 }}>{t("combat.title")}</div>
       <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 8, lineHeight: 1.35 }}>
-        HP are the thinking budget. Taking a devot's life takes away their thinking time:
-        they think less, decide worse, then die.
+        {t("combat.explain")}
       </div>
       {recent.map((c) => (
         <div key={c.id} style={{ fontSize: 12, marginTop: 3 }}>
           <span style={{ color: c.lethal ? "#ff6b6b" : "#ffc76b", fontWeight: 700 }}>
-            {c.drained.toLocaleString("fr-FR")}
+            {c.drained.toLocaleString(lang)}
           </span>{" "}
           <span style={{ opacity: 0.85 }}>
             {nameOf(c.attackerId)} → {nameOf(c.victimId)}
@@ -396,7 +399,7 @@ function CombatLog({ combats, devots }: { combats: CombatFx[]; devots: DevotView
         </div>
       ))}
       <div style={{ fontSize: 11, opacity: 0.55, marginTop: 8 }}>
-        {total.toLocaleString("fr-FR")} HP changed hands before your eyes.
+        {t("combat.total", { n: total.toLocaleString(lang) })}
       </div>
     </div>
   );

@@ -25,6 +25,7 @@ import {
   type StatKey,
 } from "@devot/shared";
 import { DevotModel } from "./DevotModel.js";
+import { useT } from "../i18n.js";
 
 /**
  * THE CREATION SCREEN — the first contact with the game.
@@ -63,6 +64,7 @@ export function CreationScreen({
   rejection: string | null;
   onCreate: (result: CreationResult) => void;
 }) {
+  const { t } = useT();
   const [traits, setTraits] = useState<string[]>([]);
   const [soul, setSoul] = useState("");
   const [appearance, setAppearance] = useState<Appearance>({ ...DEFAULT_APPEARANCE });
@@ -115,11 +117,10 @@ export function CreationScreen({
               letterSpacing: 0.5,
             }}
           >
-            Shape your founder
+            {t("creation.title")}
           </div>
           <div style={{ color: "#7f8a9c", font: "13px system-ui, sans-serif", marginTop: 6 }}>
-            ⚡ {godName} — the first of your line. Everything you choose here follows them to the
-            grave, and passes on to their descendants.
+            {t("creation.subtitle", { god: godName })}
           </div>
         </div>
 
@@ -133,7 +134,7 @@ export function CreationScreen({
         >
           {/* ── Column 1: the soul ────────────────────────────────────────── */}
           <div style={CARD}>
-            <SectionTitle>Their soul</SectionTitle>
+            <SectionTitle>{t("creation.soul")}</SectionTitle>
             <Help>
               Two or three traits. They go literally into their head: these are what they will
               decide with.
@@ -146,7 +147,7 @@ export function CreationScreen({
               ))}
             </div>
 
-            <SectionTitle style={{ marginTop: 18 }}>What they believe they are</SectionTitle>
+            <SectionTitle style={{ marginTop: 18 }}>{t("creation.believe")}</SectionTitle>
             <Help>
               One sentence, written by you, that they will carry as a conviction. It will be in
               their prompt at every thought.
@@ -155,7 +156,7 @@ export function CreationScreen({
               value={soul}
               maxLength={SOUL_MAX_CHARS}
               onChange={(e) => setSoul(e.target.value)}
-              placeholder="&quot;I was born to protect my own&quot;"
+              placeholder={t("creation.soul-placeholder")}
               style={{
                 width: "100%",
                 marginTop: 8,
@@ -207,8 +208,7 @@ export function CreationScreen({
                 {signature}
               </div>
               <div style={{ color: "#7f8a9c", fontSize: 11, marginTop: 4 }}>
-                Their signature — derived from each of your choices. Change one thing and it
-                changes.
+                {t("creation.signature-help")}
               </div>
 
               {rejection && (
@@ -224,7 +224,7 @@ export function CreationScreen({
                   }}
                   data-testid="creation-rejection"
                 >
-                  The server refused: {rejection}
+                  {t("creation.refused", { reason: rejection })}
                 </div>
               )}
 
@@ -245,48 +245,47 @@ export function CreationScreen({
                 }}
               >
                 {traits.length < 2
-                  ? "Choose at least two traits"
+                  ? t("creation.need-traits")
                   : left !== 0
-                    ? `${left} point${Math.abs(left) > 1 ? "s" : ""} left to spend`
-                    : "Give them life"}
+                    ? t("creation.points-left", { n: left })
+                    : t("creation.give-life")}
               </button>
             </div>
           </div>
 
           {/* ── Column 3: the body ────────────────────────────────────────── */}
           <div style={CARD}>
-            <SectionTitle>Their look</SectionTitle>
-            <Row label="Hat">
+            <SectionTitle>{t("creation.look")}</SectionTitle>
+            <Row label={t("creation.hat")}>
               <Options values={HATS} value={appearance.hat} onPick={(v) => set("hat", v)} color={godColor} />
             </Row>
-            <Row label="Shirt">
+            <Row label={t("creation.shirt")}>
               <Swatches values={SHIRT_COLORS} value={appearance.shirt} onPick={(v) => set("shirt", v)} />
             </Row>
-            <Row label="Trousers">
+            <Row label={t("creation.trousers")}>
               <Swatches values={PANTS_COLORS} value={appearance.pants} onPick={(v) => set("pants", v)} />
             </Row>
-            <Row label="Skin">
+            <Row label={t("creation.skin")}>
               <Swatches values={SKIN_COLORS} value={appearance.skin} onPick={(v) => set("skin", v)} />
             </Row>
-            <Row label="Cape">
+            <Row label={t("creation.cape")}>
               <Options values={CAPES} value={appearance.cape} onPick={(v) => set("cape", v)} color={godColor} />
             </Row>
-            <Row label="Face">
+            <Row label={t("creation.face")}>
               <Options values={FACES} value={appearance.face} onPick={(v) => set("face", v)} color={godColor} />
             </Row>
-            <Row label="Build">
+            <Row label={t("creation.build")}>
               <Options values={BUILDS} value={appearance.build} onPick={(v) => set("build", v)} color={godColor} />
             </Row>
 
             <SectionTitle style={{ marginTop: 18 }}>
-              Their body —{" "}
+              {t("creation.body")} —{" "}
               <span style={{ color: left === 0 ? "#7dbc5e" : godColor }}>
-                {left} point{Math.abs(left) > 1 ? "s" : ""} to spend
+                {t("creation.to-spend", { n: left })}
               </span>
             </SectionTitle>
             <Help>
-              A fixed budget: what you give here, you take from somewhere else. There is no devot
-              who is good at everything.
+              {t("creation.budget-help")}
             </Help>
             <div style={{ marginTop: 10 }}>
               {STAT_KEYS.map((k) => (
@@ -392,11 +391,12 @@ function Options<T extends string>({
   onPick: (v: T) => void;
   color: string;
 }) {
+  const { d } = useT();
   return (
     <>
       {values.map((v) => (
         <Chip key={v} on={v === value} onClick={() => onPick(v)} color={color}>
-          {v}
+          {d(v)}
         </Chip>
       ))}
     </>

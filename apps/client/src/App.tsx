@@ -4,6 +4,7 @@ import { CreationScreen } from "./creation/CreationScreen.js";
 import { Hud } from "./Hud.js";
 import { Scene } from "./Scene.js";
 import { useWorld } from "./useWorld.js";
+import { LangPicker, useT } from "./i18n.js";
 
 function godNameFromUrl(): string {
   const fromUrl = new URLSearchParams(location.search).get("god");
@@ -16,6 +17,7 @@ function godNameFromUrl(): string {
 }
 
 export default function App() {
+  const { t } = useT();
   const godName = useMemo(godNameFromUrl, []);
   const { snapshot, godId, status, lastRejection, lastSmite, combats, journals, actions } =
     useWorld(godName);
@@ -75,6 +77,7 @@ export default function App() {
 
   return (
     <div style={{ position: "relative", height: "100%" }}>
+      <LangPicker />
       <Canvas camera={{ position: [0, 22, 26], fov: 50 }}>
         <Scene
           snapshot={snapshot}
@@ -126,9 +129,7 @@ export default function App() {
             background: "rgba(11,14,20,0.8)",
           }}
         >
-          {status === "connecting"
-            ? "Ascending into the world…"
-            : "The world is unreachable. Is the server running? (pnpm --filter @devot/server dev)"}
+          {t(status === "connecting" ? "app.connecting" : "app.unreachable")}
         </div>
       )}
     </div>
