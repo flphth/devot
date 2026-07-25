@@ -9,7 +9,7 @@ export type MindKind = "claude" | "api" | "mock";
 /**
  * Choice of mind backend:
  * - MIND=claude -> Claude Code subscription via the Agent SDK (no key, default)
- * - MIND=api    → Messages API pay-per-token (ANTHROPIC_API_KEY requis)
+ * - MIND=api    -> Messages API pay-per-token (ANTHROPIC_API_KEY required)
  * - MIND=mock   -> simulated minds, offline, zero spend
  * With no explicit MIND: an API key present -> api, otherwise -> claude.
  */
