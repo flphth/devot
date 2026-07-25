@@ -11,8 +11,18 @@ export const UTTERANCE_MAX_CHARS = 140;
 
 // Économie vie ↔ tokens.
 // HP exprimés en µ$ d'inférence : 1 HP = 1e-6 $ de pensée.
-// hp_max par défaut = 50 000 HP = 0,05 $ de budget cognitif.
-export const HP_MAX_DEFAULT = 50_000;
+//
+// hp_max par défaut = 150 000 HP = 0,15 $ de budget cognitif.
+//
+// Triplé depuis 50 000. Comme le prix d'une pensée est calculé sur l'usage RÉEL
+// de tokens, tripler la réserve triple littéralement le nombre de pensées d'une
+// vie : un devot vit trois fois plus longtemps ET réfléchit trois fois plus.
+//
+// Les grandeurs exprimées en FRACTION de hp_max suivent d'elles-mêmes (faim,
+// agonie, coûts de reproduction). Celles qui sont en HP ABSOLUS deviennent
+// mécaniquement trois fois moins lourdes par rapport à une vie entière — c'est
+// noté à chacune d'elles, car plusieurs y perdent une part de leur sens.
+export const HP_MAX_DEFAULT = 150_000;
 export const LETHALITY = 1e6; // usd → µ$ (HP)
 
 // Prix par 1M tokens (in / out), cf. PLAN.md §5.2
@@ -41,15 +51,23 @@ export const AGONIZING_THRESHOLD = 0.15;
 
 // Métabolisme passif : vivre coûte un peu, même sans penser (µ$/tick),
 // pour que l'inaction totale ne soit pas une stratégie dominante éternelle.
+//
+// ATTENTION : avec la réserve triplée, ce coût pèse trois fois moins sur une
+// vie, donc ne rien faire est devenu trois fois plus viable. L'argument
+// ci-dessus s'est affaibli d'autant.
 export const METABOLISM_HP_PER_TICK = 1;
 
 // Combat : prédation vitale (transfert de HP victime → agresseur).
 export const ATTACK_RADIUS = 1.5;
-export const ATTACK_DRAIN_PER_TICK = 150; // HP prélevés à la victime par tick
+// HP prélevés à la victime par tick. Valeur absolue : avec la réserve triplée,
+// tuer quelqu'un prend désormais trois fois plus longtemps.
+export const ATTACK_DRAIN_PER_TICK = 150;
 export const ATTACK_EFFICIENCY = 0.7; // part effectivement absorbée par l'agresseur
 
 // Reproduction : procréer épuise.
-export const REPRO_MIN_HP = 8_000; // en-dessous, trop faible pour procréer
+// En-dessous, trop faible pour procréer. Seuil absolu : il correspond maintenant
+// à 5 % d'une vie au lieu de 16 %, donc procréer est accessible bien plus tôt.
+export const REPRO_MIN_HP = 8_000;
 export const REPRO_SOLO_COST_FRACTION = 0.4; // bourgeonnement : 40% des HP courants
 export const REPRO_PAIR_COST_FRACTION = 0.3; // sexuée : 30% chacun
 export const REPRO_TRANSFER_EFFICIENCY = 0.8; // part du coût qui devient la vie de l'enfant

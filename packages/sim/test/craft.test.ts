@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CRAFT_HP_FLOOR,
+  HP_MAX_DEFAULT,
   MAX_CARRIED,
   RECIPES,
   canCraft,
@@ -122,11 +123,17 @@ describe("forger a des limites, et le serveur les tient", () => {
 });
 
 describe("le marché est réel", () => {
-  it("porter deux objets ampute une part sensible d'une vie", () => {
-    // C'est le sens du jalon : la puissance se paie en durée. On l'énonce en
-    // test pour que personne ne rende plus tard la forge indolore sans le voir.
+  it("porter deux objets coûte une part réelle, mais modeste, d'une vie", () => {
+    // Ce test dit la VÉRITÉ DU MOMENT, et c'est son intérêt : il se lit contre
+    // HP_MAX_DEFAULT, donc il change de sens dès qu'on touche à la réserve.
+    //
+    // Les coûts avaient été calibrés sur 50 000 PV (deux objets = 20 % d'une
+    // vie). La réserve a été triplée à 150 000 : la même paire ne pèse plus que
+    // 6,7 %. La puissance se paie toujours en durée, mais beaucoup moins cher.
     const total = RECIPES.lance.cost + RECIPES.bouclier.cost;
-    expect(total).toBeGreaterThan(50_000 * 0.15);
+    const part = total / HP_MAX_DEFAULT;
+    expect(part).toBeGreaterThan(0.05);
+    expect(part, `deux objets coûtent ${(part * 100).toFixed(1)} % d'une vie`).toBeLessThan(0.1);
   });
 
   it("les stats avec objets ne modifient jamais le corps d'origine", () => {

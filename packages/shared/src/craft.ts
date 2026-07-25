@@ -28,11 +28,17 @@ export interface Recipe {
 }
 
 /**
- * Quatre recettes, une par stat. Les coûts sont volontairement LOURDS : à
- * 6 000 PV sur une réserve de 50 000, forger un bouclier ampute un huitième
- * d'une vie entière. Un devot chargé de deux objets a sacrifié un quart de son
- * existence — il frappe mieux et meurt plus tôt, ce qui est exactement le
- * marché qu'on veut lui proposer.
+ * Quatre recettes, une par stat.
+ *
+ * Ces coûts ont été calibrés sur une réserve de 50 000 PV, où un bouclier
+ * amputait un huitième d'une vie entière. La réserve ayant été TRIPLÉE à
+ * 150 000, le même bouclier n'en coûte plus que 4 %, et deux objets 6,7 % au
+ * lieu de 20 %. Forger est donc devenu nettement plus facile — le marché
+ * « puissance contre durée » existe encore, mais il n'est plus cruel.
+ *
+ * C'est un arbitrage à trancher, pas un oubli : les tripler à leur tour
+ * rétablirait la difficulté d'origine, les laisser tels quels fait des objets
+ * une décision courante plutôt qu'un sacrifice.
  */
 export const RECIPES: Record<ItemKind, Recipe> = {
   lance: {
