@@ -107,6 +107,9 @@ function makeChild(
     profile: a.profile,
     traits,
     identityJson: encodeIdentity(identity),
+    // Un enfant naît les mains nues : un objet se forge au prix de SA vie,
+    // il ne se transmet pas (T6 traitera de ce qui tombe à la mort).
+    items: [],
     age: 0,
     thinking: false,
     utterance: "",

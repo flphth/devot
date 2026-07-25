@@ -2,7 +2,12 @@ import { Billboard, Grid, Html, OrbitControls } from "@react-three/drei";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { DEFAULT_APPEARANCE, PERCEPTION_RADIUS, decodeIdentity } from "@devot/shared";
+import {
+  DEFAULT_APPEARANCE,
+  PERCEPTION_RADIUS,
+  decodeIdentity,
+  type ItemKind,
+} from "@devot/shared";
 import type { CombatFx, DevotView, FoodView, SmiteFx, WorldSnapshot } from "./useWorld.js";
 import { CombatEffects, recentlyBitten } from "./CombatFx.js";
 import { DevotModel } from "./creation/DevotModel.js";
@@ -256,6 +261,8 @@ function VoxelDevot({
   // Une morsure fait virer le corps au rouge le temps d'un éclat : c'est ce
   // qui rend le vol de vie perceptible sans lire un chiffre.
   const struck = bitten;
+  // Ce que ce devot a forgé, donc payé de sa vie.
+  const carried = (devot.items ? devot.items.split(",") : []) as ItemKind[];
   // L'état vital délave les couleurs : un agonisant est visiblement éteint.
   const appearance =
     devot.state === "agonisant"
@@ -304,6 +311,7 @@ function VoxelDevot({
             }
             selected={selected}
             emissive={struck ? 0.7 : 0}
+            items={carried}
           />
         )}
       </group>

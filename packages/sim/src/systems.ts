@@ -10,7 +10,9 @@ import {
   METABOLISM_HP_PER_TICK,
   PERCEPTION_RADIUS,
   TICK_MS,
+  canCraft,
   describeIdentity,
+  recipeOf,
 } from "@devot/shared";
 import { drainOf, sightOf, speedOf } from "./stats.js";
 import { clampToWorld, dist2, World } from "./world.js";
@@ -249,6 +251,18 @@ export function perceptionSystem(world: World, now: number = Date.now()): Trigge
 export function applyDecision(devot: DevotEntity, decision: Decision, world: World): void {
   if (devot.state === "mort") return;
   switch (decision.action) {
+    case "craft": {
+      // FORGER : la matière première est la vie. Le coût est prélevé ici, une
+      // fois, et l'objet reste tant que le devot vit. Le refus est silencieux
+      // côté simulation ; c'est la salle qui explique au devot pourquoi.
+      const refusal = canCraft(decision.item, devot.hp, devot.items);
+      if (refusal) return;
+      const recipe = recipeOf(decision.item)!;
+      devot.hp -= recipe.cost;
+      devot.items = [...devot.items, recipe.kind];
+      devot.currentGoal = { kind: "idle" };
+      break;
+    }
     case "idle":
       devot.currentGoal = { kind: "idle" };
       break;

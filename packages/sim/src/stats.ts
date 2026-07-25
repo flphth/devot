@@ -7,6 +7,7 @@ import {
   decodeIdentity,
   statMultiplier,
   type DevotEntity,
+  statsWithItems,
   type Stats,
 } from "@devot/shared";
 
@@ -27,7 +28,8 @@ import {
  */
 const cache = new Map<string, Stats>();
 
-export function statsOf(devot: DevotEntity): Stats {
+/** Stats du CORPS seul, sans ce qu'il porte. */
+function bodyStatsOf(devot: DevotEntity): Stats {
   const raw = devot.identityJson;
   if (!raw) return DEFAULT_STATS;
   const hit = cache.get(raw);
@@ -39,6 +41,18 @@ export function statsOf(devot: DevotEntity): Stats {
   if (cache.size > 4096) cache.clear();
   cache.set(raw, stats);
   return stats;
+}
+
+/**
+ * Stats EFFECTIVES : le corps, plus ce qu'il a forgé.
+ *
+ * Un objet n'est pas un ornement : il déplace une stat, donc il change ce que
+ * le devot peut faire. Et comme il a été payé en PV, il a aussi raccourci sa
+ * vie — c'est le marché.
+ */
+export function statsOf(devot: DevotEntity): Stats {
+  const body = bodyStatsOf(devot);
+  return devot.items.length === 0 ? body : statsWithItems(body, devot.items);
 }
 
 /** Points de vie maximaux de ce devot. */

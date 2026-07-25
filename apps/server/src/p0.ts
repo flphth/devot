@@ -48,6 +48,7 @@ async function main(): Promise<void> {
     profile: "frugal",
     traits: ["curieux", "économe de ses pensées"],
     identityJson: "",
+    items: [],
     age: 0,
     thinking: false,
     utterance: "",

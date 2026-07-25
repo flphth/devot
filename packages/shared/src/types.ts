@@ -1,3 +1,4 @@
+import type { ItemKind } from "./craft.js";
 import type { ModelId } from "./constants.js";
 
 export type DevotLifeState = "vivant" | "affame" | "agonisant" | "mort";
@@ -18,6 +19,7 @@ export type DecisionAction =
   | "move"
   | "eat"
   | "attack"
+  | "craft"
   | "reproduce"
   | "speak"
   | "flee";
@@ -25,6 +27,8 @@ export type DecisionAction =
 export interface Decision {
   action: DecisionAction;
   targetId?: string;
+  /** Objet à forger si action="craft". */
+  item?: ItemKind;
   direction?: { x: number; z: number };
   utterance?: string;
   emotion?: string;
@@ -81,6 +85,8 @@ export interface DevotEntity {
    * sans repasser par la base à chaque tick.
    */
   identityJson: string;
+  /** Objets forgés et portés. Deux au plus (MAX_CARRIED). */
+  items: ItemKind[];
   age: number; // cycles vécus
   thinking: boolean; // une inférence est en vol
   utterance: string; // dernière parole (bulle)

@@ -257,6 +257,8 @@ export class WorldRoom extends Room<WorldState> {
       hp: hpMaxFor(identity.stats.vitality),
       hpMax: hpMaxFor(identity.stats.vitality),
       identityJson: encodeIdentity(identity),
+      // Un devot naît les mains nues : tout objet devra être forgé, et payé.
+      items: [],
       state: "vivant",
       profile: "frugal",
       traits: opts.traits,
@@ -547,6 +549,9 @@ export class WorldRoom extends Room<WorldState> {
       s.thinking = d.thinking;
       s.utterance = d.utterance;
       s.age = d.age;
+      // Les objets changent en cours de vie (une forge) : contrairement à
+      // l'identité, il faut les resynchroniser.
+      s.items = d.items.join(",");
     }
     for (const [id, f] of this.world.food) {
       let s = this.state.food.get(id);

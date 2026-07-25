@@ -18,6 +18,7 @@ function makeDevot(id: string, hp = 10_000): DevotEntity {
     profile: "frugal",
     traits: [],
     identityJson: "",
+    items: [],
     age: 0,
     thinking: false,
     utterance: "",

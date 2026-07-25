@@ -32,6 +32,8 @@ export interface DevotView {
   age: number;
   /** Identité figée : apparence, stats, âme, signature, en JSON. */
   identity: string;
+  /** Objets forgés, séparés par des virgules. */
+  items: string;
 }
 
 export interface FoodView {
@@ -154,6 +156,7 @@ export function useWorld(godName: string): WorldConnection {
               name: d.name,
               isFounder: d.isFounder,
               identity: d.identity ?? "",
+              items: d.items ?? "",
               x: d.x,
               y: d.y,
               z: d.z,

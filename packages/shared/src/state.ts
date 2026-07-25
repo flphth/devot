@@ -31,6 +31,8 @@ export class DevotState extends Schema {
    * champs synchronisés à chaque tick pour une valeur figée seraient du gâchis.
    */
   declare identity: string;
+  /** Objets forgés, séparés par des virgules. Change rarement. */
+  declare items: string;
 
   constructor() {
     super();
@@ -51,6 +53,7 @@ export class DevotState extends Schema {
     this.thought = "";
     this.age = 0;
     this.identity = "";
+    this.items = "";
   }
 }
 defineTypes(DevotState, {
@@ -71,6 +74,7 @@ defineTypes(DevotState, {
   thought: "string",
   age: "number",
   identity: "string",
+  items: "string",
 });
 
 export class FoodState extends Schema {

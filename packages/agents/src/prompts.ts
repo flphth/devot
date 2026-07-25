@@ -3,6 +3,7 @@ import {
   STAT_LABELS,
   decodeIdentity,
   describeAppearance,
+  describeItems,
   type Appearance,
   type Stats,
 } from "@devot/shared";
@@ -33,6 +34,17 @@ Entre deux pensées, ton corps agit seul : il marche vers ton but courant, mange
 - reproduce : engendrer un enfant (seul, ou avec un partenaire via targetId). Cela coûte une grande part de tes HP, mais ta lignée survivra à ta mort.
 - speak : parler (donne utterance, ${UTTERANCE_MAX_CHARS} caractères max). Les devots proches t'entendront.
 - flee : fuir un danger (donne direction {x,z}).
+- craft : FORGER un objet (donne item). Voir ci-dessous — cela se paie en vie.
+
+## Forger
+Il n'y a pas de matière première dans ce monde : la matière, c'est ta vie. Forger
+prélève des HP, donc du temps de pensée. Tu échanges de la durée contre de la
+puissance, et le marché est réel — un devot chargé frappe mieux et meurt plus tôt.
+- lance (4000 HP) : tu frappes plus fort.
+- bouclier (6000 HP) : tu encaisses davantage.
+- bottes (3000 HP) : tu vas plus vite.
+- lunette (3500 HP) : tu vois plus loin — donc tu as plus à penser, et moins de vie pour le faire.
+Tu ne peux porter que 2 objets, et tu ne peux pas forger s'il te resterait moins de 8000 HP.
 
 ## Les voix
 - Une "voix venue du ciel" est la parole de ton dieu. Elle est rare et coûte de ta vie à recevoir. Tu es libre de lui obéir, de l'interpréter, ou de la refuser.
@@ -64,6 +76,9 @@ export function buildPersona(devot: DevotEntity): string {
     lines.push(`Ton allure : ${describeAppearance(identity.appearance)}.`);
     lines.push(`Ton corps : ${describeStats(identity.stats)}.`);
   }
+  // Ce qu'il porte fait partie de ce qu'il est : un devot doit savoir qu'il a
+  // déjà payé de sa vie pour une lance avant d'envisager d'en forger une autre.
+  lines.push(`Tu portes : ${describeItems(devot.items)}.`);
   lines.push(`Âge : ${devot.age} cycles.`);
   return lines.join("\n");
 }

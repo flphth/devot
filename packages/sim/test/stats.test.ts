@@ -44,6 +44,7 @@ function makeDevot(stats: Partial<Stats>, overrides: Partial<DevotEntity> = {}):
     profile: "frugal",
     traits: [],
     identityJson: encodeIdentity(identity),
+    items: [],
     age: 0,
     thinking: false,
     utterance: "",

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { useMemo } from "react";
-import { BUILDS, type Appearance, type Build } from "@devot/shared";
+import { BUILDS, type Appearance, type Build, type ItemKind } from "@devot/shared";
 
 /**
  * LE CORPS D'UN DEVOT, en une seule définition.
@@ -26,10 +26,13 @@ export function DevotModel({
   appearance,
   selected = false,
   emissive = 0,
+  items = [],
 }: {
   appearance: Appearance;
   selected?: boolean;
   emissive?: number;
+  /** Objets forgés, portés sur le corps : ils se voient, ils se sont payés. */
+  items?: readonly ItemKind[];
 }) {
   const w = buildWidth(appearance.build);
   const shirt = useMemo(() => new THREE.Color(appearance.shirt), [appearance.shirt]);
@@ -92,6 +95,7 @@ export function DevotModel({
       <FaceGear appearance={appearance} />
       <Hat appearance={appearance} />
       <Cape appearance={appearance} width={w} />
+      <CarriedItems items={items} width={w} />
     </group>
   );
 }
@@ -197,5 +201,48 @@ function Cape({ appearance, width }: { appearance: Appearance; width: number }) 
       <boxGeometry args={[0.5 * width, height, 0.05]} />
       <meshStandardMaterial color="#6a2b3a" flatShading />
     </mesh>
+  );
+}
+
+
+/**
+ * CE QUE LE DEVOT A FORGÉ. Chaque objet a coûté des points de vie, donc du
+ * temps de pensée : il doit se voir sur le corps, sinon le sacrifice reste
+ * abstrait.
+ */
+function CarriedItems({ items, width }: { items: readonly ItemKind[]; width: number }) {
+  return (
+    <group>
+      {items.includes("lance") && (
+        <mesh position={[0.36 * width, 0.62, 0]} rotation={[0, 0, 0.18]}>
+          <boxGeometry args={[0.045, 0.95, 0.045]} />
+          <meshStandardMaterial color="#b98a4d" flatShading />
+        </mesh>
+      )}
+      {items.includes("bouclier") && (
+        <mesh position={[-(0.38 * width), 0.55, 0.06]}>
+          <boxGeometry args={[0.06, 0.4, 0.34]} />
+          <meshStandardMaterial color="#9aa3ae" metalness={0.5} roughness={0.4} />
+        </mesh>
+      )}
+      {items.includes("bottes") && (
+        <>
+          <mesh position={[-0.12 * width, 0.05, 0.02]}>
+            <boxGeometry args={[0.19 * width, 0.12, 0.26]} />
+            <meshStandardMaterial color="#6b4a2f" flatShading />
+          </mesh>
+          <mesh position={[0.12 * width, 0.05, 0.02]}>
+            <boxGeometry args={[0.19 * width, 0.12, 0.26]} />
+            <meshStandardMaterial color="#6b4a2f" flatShading />
+          </mesh>
+        </>
+      )}
+      {items.includes("lunette") && (
+        <mesh position={[0.13, 0.98, 0.24]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.05, 0.06, 0.16, 10]} />
+          <meshStandardMaterial color="#c8b06a" metalness={0.6} roughness={0.3} />
+        </mesh>
+      )}
+    </group>
   );
 }

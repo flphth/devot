@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { CognitionProfile, Decision, DevotEntity, InferenceUsage } from "@devot/shared";
-import { DECISION_SCHEMA, parseDecision } from "@devot/shared";
+import { DECISION_SCHEMA, ITEM_KINDS, parseDecision } from "@devot/shared";
 import type { StoredMessage } from "@devot/db";
 import { buildEventBlock, buildPersona, WORLD_RULES } from "./prompts.js";
 
@@ -117,6 +117,10 @@ export class MockMind implements MindProvider {
       ? {
           action: "idle",
           targetId: quotedId,
+          // Forger exige de nommer l'objet. Sans ce choix, un script « craft »
+          // produirait une décision incomplète que le monde refuserait, et le
+          // mode de développement ne pourrait jamais exercer la forge.
+          item: ITEM_KINDS[this.callCount % ITEM_KINDS.length],
           thought: "Je fais ce qui est écrit en moi.",
           ...scripted,
         }

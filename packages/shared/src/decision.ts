@@ -9,7 +9,7 @@ export const DECISION_SCHEMA = {
   properties: {
     action: {
       type: "string",
-      enum: ["idle", "move", "eat", "attack", "reproduce", "speak", "flee"],
+      enum: ["idle", "move", "eat", "attack", "reproduce", "speak", "flee", "craft"],
       description: "L'action choisie pour cette pensée.",
     },
     thought: {
@@ -20,6 +20,11 @@ export const DECISION_SCHEMA = {
     targetId: {
       type: "string",
       description: "Id du devot ou de la nourriture visé (eat/attack/reproduce).",
+    },
+    item: {
+      type: "string",
+      enum: ["lance", "bouclier", "bottes", "lunette"],
+      description: "Objet à forger si action=craft. Le coût en PV est prélevé sur ta vie.",
     },
     direction: {
       type: "object",
@@ -47,6 +52,7 @@ const ACTIONS: DecisionAction[] = [
   "reproduce",
   "speak",
   "flee",
+  "craft",
 ];
 
 /** Valide et normalise une décision brute (JSON parsé) ; jette si invalide. */
@@ -59,6 +65,9 @@ export function parseDecision(raw: unknown): Decision {
     throw new Error(`decision: invalid action ${String(d.action)}`);
   }
   const decision: Decision = { action: d.action as DecisionAction };
+  // L'objet demandé n'est pas validé ici : c'est le SERVEUR qui décide si la
+  // forge est possible, en connaissant les PV et ce que le devot porte déjà.
+  if (typeof d.item === "string") decision.item = d.item as Decision["item"];
   if (typeof d.targetId === "string") decision.targetId = d.targetId;
   if (
     typeof d.direction === "object" &&
