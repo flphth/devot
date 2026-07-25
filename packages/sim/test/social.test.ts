@@ -7,8 +7,9 @@ import {
   REPRO_PAIR_COST_FRACTION,
   REPRO_SOLO_COST_FRACTION,
   REPRO_TRANSFER_EFFICIENCY,
+  encodeIdentity,
 } from "@devot/shared";
-import { applyDecision, resolveReproduction, tick, World } from "../src/index.js";
+import { applyDecision, perceptionSystem, resolveReproduction, tick, World } from "../src/index.js";
 
 let seq = 0;
 function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
@@ -165,5 +166,56 @@ describe("reproduction", () => {
     world.devots.set(devot.id, devot);
     applyDecision(devot, { action: "reproduce", targetId: "autre" }, world);
     expect(devot.pendingReproduction).toEqual({ partnerId: "autre" });
+  });
+});
+
+describe("perception — l'allure pèse socialement", () => {
+  it("une rencontre décrit ce que l'autre PORTE, pas seulement son identifiant", () => {
+    // C'est tout l'enjeu de T2 : l'apparence choisie à la création doit arriver
+    // dans le prompt du voisin. Sans cela elle reste décorative.
+    const world = new World();
+    const royal = makeDevot({
+      name: "Roi",
+      pos: { x: 0, y: 0, z: 0 },
+      identityJson: encodeIdentity({
+        appearance: {
+          hat: "couronne",
+          shirt: "#e0b34c",
+          pants: "#5a3a4a",
+          cape: "longue",
+          face: "aucun",
+          skin: "#f0c9a4",
+          build: "massif",
+        },
+        stats: { vitality: 5, power: 4, speed: 2, sight: 1 },
+        soul: "",
+        signature: "DVT-000-0000",
+      }),
+    });
+    const gueux = makeDevot({ name: "Gueux", godId: "g2", pos: { x: 1, y: 0, z: 0 } });
+    world.devots.set(royal.id, royal);
+    world.devots.set(gueux.id, gueux);
+
+    const triggers = perceptionSystem(world);
+    const seen = triggers.find((t) => t.devotId === gueux.id);
+    expect(seen, "le gueux doit apercevoir le roi").toBeDefined();
+    expect(seen!.eventText).toContain("couronne");
+    expect(seen!.eventText).toContain("safran"); // la couleur nommée, pas le code hexadécimal
+    expect(seen!.eventText).toContain("cape longue");
+    expect(seen!.eventText).toContain("massif");
+    // Et jamais de code couleur brut : « #e0b34c » ne dit rien à un modèle.
+    expect(seen!.eventText).not.toContain("#");
+  });
+
+  it("un devot sans identité reste décrit, sans faire échouer la perception", () => {
+    // Un devot d'avant cette version, ou né en mode god, n'a pas d'identité.
+    const world = new World();
+    const a = makeDevot({ pos: { x: 0, y: 0, z: 0 }, identityJson: "" });
+    const b = makeDevot({ godId: "g2", pos: { x: 1, y: 0, z: 0 }, identityJson: "" });
+    world.devots.set(a.id, a);
+    world.devots.set(b.id, b);
+    const triggers = perceptionSystem(world);
+    expect(triggers.length).toBeGreaterThan(0);
+    expect(triggers[0]!.eventText).toContain("allure ordinaire");
   });
 });

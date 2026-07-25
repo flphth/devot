@@ -350,3 +350,51 @@ export function normalizeToBudget(values: readonly number[]): Stats {
   });
   return stats;
 }
+
+// ── Décrire une allure ──────────────────────────────────────────────────────
+
+/** Nom courant d'une couleur : « écarlate » parle au modèle, « #e0634c » non. */
+const COLOR_NAMES: Record<string, string> = {
+  "#e0634c": "écarlate",
+  "#e0b34c": "safran",
+  "#7dbc5e": "vert mousse",
+  "#4ca6e0": "bleu ciel",
+  "#9c4ce0": "violet",
+  "#e04c8f": "rose vif",
+  "#e8e4d8": "écru",
+  "#3a4150": "ardoise",
+  "#2f3542": "anthracite",
+  "#4a4f57": "gris fer",
+  "#6b5844": "brun",
+  "#3a5a40": "vert sombre",
+  "#5a3a4a": "prune",
+  "#8a8f98": "gris clair",
+};
+
+export function colorName(hex: string): string {
+  return COLOR_NAMES[hex] ?? "d'une teinte indéfinissable";
+}
+
+/**
+ * L'allure d'un devot, en français.
+ *
+ * Une SEULE formulation, utilisée pour ce qu'un devot sait de lui-même et pour
+ * ce que les autres perçoivent de lui. C'est ce qui donne son poids social à
+ * l'apparence : le modèle décide seul qui craindre ou qui suivre, sans qu'aucune
+ * règle ne l'impose — mais encore faut-il qu'il puisse le voir.
+ */
+export function describeAppearance(a: Appearance): string {
+  const parts: string[] = [`de corpulence ${a.build}`, `t-shirt ${colorName(a.shirt)}`];
+  if (a.hat !== "aucun") parts.push(`coiffé d'un chapeau ${a.hat}`);
+  if (a.cape !== "aucune") parts.push(`portant une cape ${a.cape}`);
+  if (a.face !== "aucun") {
+    parts.push(a.face === "lunettes" ? "des lunettes sur le nez" : `le visage barré d'un ${a.face}`);
+  }
+  return parts.join(", ");
+}
+
+/** Allure d'un devot dont on n'a que l'identité sérialisée. */
+export function describeIdentity(identityJson: string): string {
+  const identity = decodeIdentity(identityJson);
+  return identity ? describeAppearance(identity.appearance) : "d'allure ordinaire";
+}

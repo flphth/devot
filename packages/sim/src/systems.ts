@@ -10,6 +10,7 @@ import {
   METABOLISM_HP_PER_TICK,
   PERCEPTION_RADIUS,
   TICK_MS,
+  describeIdentity,
 } from "@devot/shared";
 import { clampToWorld, dist2, World } from "./world.js";
 
@@ -216,7 +217,11 @@ export function perceptionSystem(world: World, now: number = Date.now()): Trigge
         triggers.push({
           kind: "encounter",
           devotId: devot.id,
-          eventText: `Tu rencontres ${other.name} (id "${other.id}"), un devot ${sameGod ? "de ta propre lignée" : "d'une lignée rivale, veillé par un autre dieu"}. Il est en x=${other.pos.x.toFixed(1)}, z=${other.pos.z.toFixed(1)}.`,
+          // L'ALLURE entre dans la perception : c'est là que l'apparence
+          // choisie à la création cesse d'être décorative. Le modèle voit une
+          // silhouette avant de voir un identifiant, et décide seul de ce qu'il
+          // en fait — craindre, suivre, éviter. Aucune règle ne l'impose.
+          eventText: `Tu rencontres ${other.name} (id "${other.id}"), un devot ${sameGod ? "de ta propre lignée" : "d'une lignée rivale, veillé par un autre dieu"}, ${describeIdentity(other.identityJson)}. Il est en x=${other.pos.x.toFixed(1)}, z=${other.pos.z.toFixed(1)}.`,
           createdAt: now,
         });
       }

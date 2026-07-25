@@ -2,6 +2,7 @@ import {
   STAT_KEYS,
   STAT_LABELS,
   decodeIdentity,
+  describeAppearance,
   type Appearance,
   type Stats,
 } from "@devot/shared";
@@ -67,41 +68,13 @@ export function buildPersona(devot: DevotEntity): string {
   return lines.join("\n");
 }
 
-/**
- * L'allure en français, pour le prompt ET pour ce que les autres perçoivent.
- * Une seule formulation : un devot doit se décrire comme les autres le voient.
- */
-export function describeAppearance(a: Appearance): string {
-  const parts: string[] = [];
-  parts.push(`de corpulence ${a.build}`);
-  parts.push(`t-shirt ${colorName(a.shirt)}`);
-  if (a.hat !== "aucun") parts.push(`coiffé d'un chapeau ${a.hat}`);
-  if (a.cape !== "aucune") parts.push(`portant une cape ${a.cape}`);
-  if (a.face !== "aucun") parts.push(`le visage barré d'un ${a.face}`);
-  return parts.join(", ");
-}
-
+/** Ce qu'un devot sait de son propre corps : sa force et sa faiblesse. */
 function describeStats(s: Stats): string {
   const strongest = STAT_KEYS.reduce((a, b) => (s[a] >= s[b] ? a : b));
   const weakest = STAT_KEYS.reduce((a, b) => (s[a] <= s[b] ? a : b));
   return `fort en ${STAT_LABELS[strongest]}, faible en ${STAT_LABELS[weakest]}`;
 }
 
-/** Nom courant d'une couleur : « écarlate » parle au modèle, « #e0634c » non. */
-const COLOR_NAMES: Record<string, string> = {
-  "#e0634c": "écarlate",
-  "#e0b34c": "safran",
-  "#7dbc5e": "vert mousse",
-  "#4ca6e0": "bleu ciel",
-  "#9c4ce0": "violet",
-  "#e04c8f": "rose vif",
-  "#e8e4d8": "écru",
-  "#3a4150": "ardoise",
-};
-
-function colorName(hex: string): string {
-  return COLOR_NAMES[hex] ?? "d'une teinte indéfinissable";
-}
 
 /** Bloc événement courant, injecté en dernier tour utilisateur. */
 export function buildEventBlock(devot: DevotEntity, eventText: string): string {

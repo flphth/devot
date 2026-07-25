@@ -2,8 +2,9 @@ import { Billboard, Grid, Html, OrbitControls } from "@react-three/drei";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { PERCEPTION_RADIUS } from "@devot/shared";
+import { DEFAULT_APPEARANCE, PERCEPTION_RADIUS, decodeIdentity } from "@devot/shared";
 import type { DevotView, FoodView, SmiteFx, WorldSnapshot } from "./useWorld.js";
+import { DevotModel } from "./creation/DevotModel.js";
 
 const WORLD_HALF = 30;
 const GROUND_SIZE = 120;
@@ -244,14 +245,17 @@ function VoxelDevot({
     b.scale.setScalar(pulse);
   });
 
-  const base = new THREE.Color(color);
-  const bodyColor =
+  // L'apparence vient de l'identité figée à la naissance ; un devot d'avant
+  // cette version, ou né hors écran de création, retombe sur l'allure neutre.
+  const identity = decodeIdentity(devot.identity);
+  const look = identity?.appearance ?? DEFAULT_APPEARANCE;
+  // L'état vital délave les couleurs : un agonisant est visiblement éteint.
+  const appearance =
     devot.state === "agonisant"
-      ? base.clone().lerp(new THREE.Color("#444"), 0.5)
+      ? { ...look, shirt: fade(look.shirt, "#444444", 0.55), skin: fade(look.skin, "#444444", 0.45) }
       : devot.state === "affame"
-        ? base.clone().lerp(new THREE.Color("#888"), 0.3)
-        : base;
-  const headColor = bodyColor.clone().lerp(new THREE.Color("#ffffff"), 0.25);
+        ? { ...look, shirt: fade(look.shirt, "#888888", 0.3) }
+        : look;
   const ratio = devot.hpMax > 0 ? devot.hp / devot.hpMax : 0;
   const bubble = devot.thinking ? "…" : devot.utterance || "";
   const innerVoice = !devot.thinking && !devot.utterance ? devot.thought : "";
@@ -282,41 +286,10 @@ function VoxelDevot({
             </mesh>
           </group>
         ) : (
-          <group>
-            {/* corps */}
-            <mesh position={[0, 0.42, 0]}>
-              <boxGeometry args={[0.46, 0.5, 0.32]} />
-              <meshStandardMaterial
-                color={bodyColor}
-                flatShading
-                emissive={selected ? bodyColor : "#000000"}
-                emissiveIntensity={selected ? 0.45 : 0}
-              />
-            </mesh>
-            {/* tête */}
-            <mesh position={[0, 0.88, 0]}>
-              <boxGeometry args={[0.4, 0.36, 0.36]} />
-              <meshStandardMaterial color={headColor} flatShading />
-            </mesh>
-            {/* yeux */}
-            <mesh position={[-0.09, 0.9, 0.185]}>
-              <boxGeometry args={[0.07, 0.09, 0.02]} />
-              <meshStandardMaterial color="#1c2028" />
-            </mesh>
-            <mesh position={[0.09, 0.9, 0.185]}>
-              <boxGeometry args={[0.07, 0.09, 0.02]} />
-              <meshStandardMaterial color="#1c2028" />
-            </mesh>
-            {/* pieds */}
-            <mesh position={[-0.12, 0.08, 0]}>
-              <boxGeometry args={[0.16, 0.16, 0.2]} />
-              <meshStandardMaterial color={bodyColor.clone().multiplyScalar(0.7)} flatShading />
-            </mesh>
-            <mesh position={[0.12, 0.08, 0]}>
-              <boxGeometry args={[0.16, 0.16, 0.2]} />
-              <meshStandardMaterial color={bodyColor.clone().multiplyScalar(0.7)} flatShading />
-            </mesh>
-          </group>
+          // Le MÊME modèle que l'aperçu de l'écran de création : ce que le
+          // joueur a façonné est exactement ce qui vit ici. Deux modèles
+          // séparés auraient dérivé dès le premier chapeau ajouté.
+          <DevotModel appearance={appearance} selected={selected} />
         )}
       </group>
 
@@ -614,4 +587,9 @@ export function Scene({
       <CameraFollow snapshot={snapshot} selectedId={selectedId} />
     </>
   );
+}
+
+/** Délave une couleur vers une autre : l'état vital se lit sur le corps. */
+function fade(hex: string, towards: string, amount: number): string {
+  return "#" + new THREE.Color(hex).lerp(new THREE.Color(towards), amount).getHexString();
 }
