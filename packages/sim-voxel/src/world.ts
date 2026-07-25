@@ -77,6 +77,11 @@ export class VoxelWorld {
   readonly intentDir: Int8Array;
   readonly intentRepro: Uint8Array;
   readonly intentAttack: Uint8Array;
+  /** Morsures données et reçues : la prédation doit être observable. */
+  readonly bites: Uint16Array;
+  readonly bitten: Uint16Array;
+  /** L'organisme est-il né d'un croisement entre deux lignées ? */
+  readonly crossbred: Uint8Array;
 
   // ── Mesures par organisme (émergence, sans fitness imposée) ───────────────
   readonly bornTick: Int32Array;
@@ -175,6 +180,9 @@ export class VoxelWorld {
     this.intentDir = new Int8Array(MAX_ORGANISMS);
     this.intentRepro = new Uint8Array(MAX_ORGANISMS);
     this.intentAttack = new Uint8Array(MAX_ORGANISMS);
+    this.bites = new Uint16Array(MAX_ORGANISMS);
+    this.bitten = new Uint16Array(MAX_ORGANISMS);
+    this.crossbred = new Uint8Array(MAX_ORGANISMS);
     this.bornTick = new Int32Array(MAX_ORGANISMS);
     this.eaten = new Int32Array(MAX_ORGANISMS);
     this.distance = new Int32Array(MAX_ORGANISMS);

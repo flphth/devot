@@ -387,6 +387,48 @@ après `defineTypes`.
 
 ---
 
+### 6.5 Vie sociale (P5.4) — LIVRÉ
+
+**Prédation.** Un organisme dont le cerveau le décide arrache un voxel de tissu
+étranger au contact. La chair tombe au sol et devient de la biomasse : elle
+n'est PAS mangée sur le coup. Il faut donc mordre puis rester manger, ce qui
+expose le prédateur et laisse au mordu une chance de fuir avec sa chair. C'est
+ce qui distingue la prédation du vol, et c'est aussi ce qui garantit qu'une
+morsure ne crée pas d'énergie. La morsure vient avant le déplacement dans le
+tick : sinon un prédateur mordrait et fuirait sans jamais s'exposer.
+
+**Reproduction croisée.** Quand un organisme se reproduit au contact d'une
+lignée étrangère, l'enfant hérite du plan de corps de l'initiateur et d'un
+mélange des poids de cerveau des deux. Deux lignées échangent donc des
+comportements, pas des anatomies — mélanger deux morphologies produirait presque
+toujours un corps non connexe, que le monde refuserait.
+
+**SUZERAINETÉ** — la question ouverte du brief, tranchée : l'enfant appartient à
+la lignée de L'INITIATEUR, celui qui a payé le coût et cédé son énergie. L'autre
+parent ne paie rien et ne perd rien ; il ne peut donc rien revendiquer. C'est la
+seule règle qui ne crée pas d'incitation à squatter les lignées fécondes
+d'autrui.
+
+Mesuré sur un monde de 200 fondateurs : des morsures spontanées en moins de
+1 200 ticks, et des enfants croisés vivants en 1 500 ticks. Dans le monde commun,
+les pierres tombales portent « prédation » aussi souvent que « famine ».
+
+**Registre et pierres tombales.** Une lignée survit à ses individus : c'est la
+seule chose qu'un joueur possède vraiment. Chaque mort laisse une pierre —
+génération, durée de vie, ingéré, mordu, subi, croisé ou non, et la cause telle
+que le monde peut l'établir.
+
+**Pouvoirs divins.** Nourrir, protéger, foudroyer. Les cooldowns vivent sur le
+SERVEUR (8 s, 20 s, 12 s) : le client les affiche, il ne les décide pas. Et la
+portée d'un dieu est celle de son regard — on n'agit pas dans le brouillard,
+exactement comme on n'y voit pas.
+
+**Mode god** (touche 1) : poser du terrain, de la biomasse, faire naître.
+Désactivé par défaut et activé par variable d'environnement CÔTÉ SERVEUR — jamais
+par le client, qui pourrait simplement le demander.
+
+---
+
 ## 7. L'éveil (P5.5)
 
 Un organisme éveillé reçoit un esprit Claude via **`MIND=claude`** (Agent SDK sur
@@ -396,6 +438,26 @@ serveur détient les identifiants : un client ne peut pas piloter un esprit.
 L'usage réel de tokens est converti en dépense d'énergie, exactement comme le
 métabolisme d'un muscle. Un éveillé pense mieux et vit moins longtemps. Le verbe
 divin (140 caractères, une fois par minute) et la foudre s'appliquent à lui.
+**LIVRÉ.** Un éveillé pense toutes les 40 ticks, de façon asynchrone : une
+pensée prend une dizaine de secondes, le monde ne l'attend pas. Son cerveau de
+neurones continue de tourner — la pensée de Claude arrive PAR-DESSUS et penche
+son intention, elle ne la remplace pas. Un éveillé reste un corps qui décide.
+
+Coût mesuré sur une pensée réelle (`MIND=claude`, abonnement) : 3 tokens en
+entrée, 503 en sortie — le modèle réfléchit bien plus qu'il n'écrit — soit
+environ 6 000 d'énergie. Sur une capacité de 60 000, c'est un dixième de sa vie
+par pensée. **Être éveillé tue** : un organisme conscient doit manger beaucoup
+plus que ses congénères pour simplement durer. C'est la transposition littérale
+du principe fondateur, et c'est ce qui justifie qu'il y en ait peu — quatre au
+plus par monde.
+
+`MIND=api` est explicitement REFUSÉ pour l'éveil, avec repli sur `mock` : le
+projet n'admet aucune facturation au token, et un mode qui la produirait ne doit
+pas exister derrière un simple réglage.
+
+Un corps sans neurone ne peut pas être éveillé — cohérent avec la règle du
+noyau : sans système nerveux, il n'y a rien à réveiller.
+
 Peu d'éveillés simultanés : c'est un coût de quota et une latence de plusieurs
 secondes. `MIND=mock` reste le mode de développement.
 
@@ -436,8 +498,8 @@ pas à chaque tick. SQLite en proto, driver Drizzle échangeable vers Postgres.
 | **P5.1** ✅ | Génome, cerveau borné par les voxels neurone, sélection naturelle | run de N générations, amélioration mesurable, 2 graines rejouables |
 | **P5.2** ✅ | Laboratoire navigateur, CPU puis WebGPU | conformité CPU↔GPU vérifiée (`6e6fcf37` des deux côtés), UI x1→x1000 |
 | **P5.3** ✅ | Monde commun autoritaire, protocole dérivé, relâcher | salle en continu, brouillard côté serveur, 4,6 Ko/s mesurés, persistance et reprise |
-| **P5.4** | Vie sociale entre lignées, pouvoirs divins | prédation et reproduction croisée observables |
-| **P5.5** | Éveil (Claude) | un éveillé pense, ses tokens coûtent de l'énergie |
+| **P5.4** ✅ | Vie sociale entre lignées, pouvoirs divins | prédation et croisement observés en monde réel, cooldowns serveur, registre et pierres tombales |
+| **P5.5** ✅ | Éveil (Claude) | un éveillé pense sur l'abonnement, sa pensée lui coûte ~6 000 d'énergie |
 
 ---
 

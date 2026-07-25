@@ -156,6 +156,115 @@ export interface ReleaseResultMsg {
   receipt?: string;
 }
 
+// ── Pouvoirs divins (P5.4) ──────────────────────────────────────────────────
+
+/**
+ * Les trois gestes d'un dieu. Chacun a un COOLDOWN tenu par le serveur : le
+ * client peut afficher un compte à rebours, il ne peut pas s'en affranchir.
+ */
+export type DivinePower = "feed" | "protect" | "smite";
+
+export const DIVINE_COOLDOWN_MS: Record<DivinePower, number> = {
+  // Nourrir est le geste doux : on en abuserait pour rendre une lignée immortelle.
+  feed: 8_000,
+  // Protéger suspend la mort : plus rare encore.
+  protect: 20_000,
+  // Foudroyer détruit ; c'est le plus contraint, parce qu'il touche autrui.
+  smite: 12_000,
+};
+
+/** Durée d'une protection divine, en ticks du monde. */
+export const PROTECT_TICKS = 240;
+
+export interface DivineActMsg {
+  power: DivinePower;
+  /** Cible : un point du monde, ou un organisme. */
+  x?: number;
+  z?: number;
+  organismId?: number;
+}
+
+export interface DivineResultMsg {
+  ok: boolean;
+  power: DivinePower;
+  reason?: string;
+  /** Millisecondes restantes avant de pouvoir refaire ce geste. */
+  cooldownMs?: number;
+}
+
+/** Mode god : modifier le monde lui-même. Réservé, et tracé. */
+export interface GodModeMsg {
+  action: "terrain" | "biomass" | "spawn";
+  x: number;
+  y: number;
+  z: number;
+}
+
+/** Registre des lignées et cimetière, poussés à la demande. */
+export const MSG_REGISTRY = "registry";
+export interface RegistryMsg {
+  lineages: Array<{
+    id: string;
+    godId: string;
+    name: string;
+    born: number;
+    died: number;
+    maxGeneration: number;
+  }>;
+  tombstones: Array<{
+    organismId: number;
+    lineageId: string;
+    generation: number;
+    bornTick: number;
+    diedTick: number;
+    bodyVoxels: number;
+    eaten: number;
+    bites: number;
+    bitten: number;
+    crossbred: boolean;
+    cause: string;
+  }>;
+}
+
+// ── L'éveil (P5.5) ──────────────────────────────────────────────────────────
+
+/** Le dieu réveille un de ses organismes. Peu d'éveillés : c'est un coût. */
+export interface AwakenMsg {
+  organismId: number;
+  name?: string;
+}
+
+/** Le verbe divin : 140 caractères, une fois par minute. Comme dans Devot. */
+export const DIVINE_WORD_MAX_CHARS = 140;
+export const DIVINE_WORD_COOLDOWN_MS = 60_000;
+
+export interface DivineWordMsg {
+  organismId: number;
+  text: string;
+}
+
+/** Une pensée d'éveillé, poussée aux clients qui la voient. */
+export const MSG_THOUGHT = "thought";
+export interface ThoughtMsg {
+  organismId: number;
+  tick: number;
+  monologue: string;
+  intent: string;
+  /** Énergie prélevée par cette pensée. Penser coûte la vie. */
+  energyCost: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/** Le journal d'un éveillé, à la demande. (Le jeu LLM a le sien, d'où le nom.) */
+export const MSG_JOURNAL = "voxelJournal";
+export interface VoxelJournalMsg {
+  organismId: number;
+  entries: ThoughtMsg[];
+  alive: boolean;
+  mind: string;
+}
+
 /** Un chunk de terrain, en binaire brut (hors schéma). */
 export const MSG_CHUNK = "chunk";
 /** Un descripteur de corps, en binaire brut. */

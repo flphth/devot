@@ -1,4 +1,5 @@
 import {
+  CROSSOVER_WEIGHT_SHARE,
   BONE,
   EYE,
   MAX_BODY_VOXELS,
@@ -127,6 +128,38 @@ export function randomGenome(seed: number, size = 8): Genome {
   }
 
   return genomeFromPlan({ dx, dy, dz, type }, seed ^ 0x51ed);
+}
+
+/**
+ * CROISEMENT de deux génomes.
+ *
+ * Le plan de corps vient entièrement de l'initiateur : mélanger deux
+ * morphologies produirait presque toujours un corps non connexe, donc un enfant
+ * que le monde refuserait. Ce sont les POIDS DU CERVEAU qui se mêlent — poids
+ * par poids, la moitié tirée chez le partenaire quand les deux cerveaux ont la
+ * même taille, et un repli sur le parent seul sinon.
+ *
+ * Autrement dit, deux lignées échangent des comportements, pas des anatomies.
+ * C'est la seule forme de brassage qui reste toujours viable sans avoir à
+ * réparer l'enfant après coup.
+ */
+export function crossover(initiator: Genome, partner: Genome, seed: number): Genome {
+  if (partner.hiddenMax !== initiator.hiddenMax) return initiator;
+  if (partner.weights.length !== initiator.weights.length) return initiator;
+
+  const weights = new Int16Array(initiator.weights.length);
+  for (let k = 0; k < weights.length; k++) {
+    const roll = hash32(k, seed, 0x63e0) % 1000;
+    weights[k] = roll < CROSSOVER_WEIGHT_SHARE ? partner.weights[k]! : initiator.weights[k]!;
+  }
+  return {
+    body: initiator.body,
+    weights,
+    hiddenMax: initiator.hiddenMax,
+    // Le seuil de reproduction se moyenne : un trait quantitatif, pas un gène
+    // qu'on prendrait chez l'un ou chez l'autre.
+    reproThreshold: ((initiator.reproThreshold + partner.reproThreshold) / 2) | 0,
+  };
 }
 
 // ── Mutation ────────────────────────────────────────────────────────────────

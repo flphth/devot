@@ -1,5 +1,5 @@
 import { MAX_ORGANISMS } from "./constants.js";
-import { passBrain, passMove, passReproduce } from "./behaviour.js";
+import { passAttack, passBrain, passMove, passReproduce } from "./behaviour.js";
 import {
   applyEnergy,
   passConnectivity,
@@ -23,7 +23,7 @@ import { VoxelWorld } from "./world.js";
  * 7. mort et décomposition
  * 8. connexité — les blessures se règlent AVANT la réparation
  * 9. morphogenèse (croissance ou cicatrisation)
- * 10. déplacement, puis reproduction
+ * 10. prédation, puis déplacement, puis reproduction
  *
  * L'ordre 7 avant 8 est essentiel : dans l'autre sens, la cicatrisation
  * repousserait le voxel détruit dans le même tick et un membre ne serait
@@ -42,6 +42,10 @@ export function step(w: VoxelWorld): void {
   passDeath(w);
   passConnectivity(w);
   passGrowth(w);
+  // La morsure vient AVANT le déplacement : on mord ce qu'on touche à la fin du
+  // tick précédent, pas ce qu'on vient de rejoindre. Sinon un prédateur mordrait
+  // et fuirait dans le même tick, sans jamais s'exposer.
+  passAttack(w);
   passMove(w);
   passReproduce(w);
 

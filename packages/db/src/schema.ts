@@ -72,3 +72,44 @@ export const divineMsgs = sqliteTable("divine_msgs", {
   text: text("text").notNull(),
   sentAt: integer("sent_at").notNull(),
 });
+
+/**
+ * MONDE COMMUN VOXEL (P5.4) — le registre des lignées.
+ *
+ * Une lignée, c'est un génome relâché et toute sa descendance. Elle survit à
+ * ses individus : c'est elle qu'on suit, pas eux.
+ */
+export const voxelLineages = sqliteTable("voxel_lineages", {
+  id: text("id").primaryKey(),
+  godId: text("god_id").notNull(),
+  name: text("name").notNull(),
+  releasedAt: integer("released_at").notNull(),
+  releasedTick: integer("released_tick").notNull(),
+  /** Nombre total d'individus jamais nés dans cette lignée. */
+  born: integer("born").notNull().default(1),
+  died: integer("died").notNull().default(0),
+  /** Génération la plus lointaine atteinte. */
+  maxGeneration: integer("max_generation").notNull().default(0),
+});
+
+/**
+ * PIERRES TOMBALES. Ce qui reste d'un individu : ce qu'il a mangé, ce qu'il a
+ * mordu, combien de temps il a tenu. La mémoire du monde, comme dans le jeu
+ * d'origine — sauf qu'ici elle est peuplée par la simulation, pas par un LLM.
+ */
+export const voxelTombstones = sqliteTable("voxel_tombstones", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  organismId: integer("organism_id").notNull(),
+  lineageId: text("lineage_id").notNull().default(""),
+  godId: text("god_id").notNull().default(""),
+  generation: integer("generation").notNull().default(0),
+  bornTick: integer("born_tick").notNull().default(0),
+  diedTick: integer("died_tick").notNull().default(0),
+  bodyVoxels: integer("body_voxels").notNull().default(0),
+  eaten: integer("eaten").notNull().default(0),
+  bites: integer("bites").notNull().default(0),
+  bitten: integer("bitten").notNull().default(0),
+  crossbred: integer("crossbred", { mode: "boolean" }).notNull().default(false),
+  /** Ce qui l'a tué, tel que le monde peut l'établir. */
+  cause: text("cause").notNull().default("famine"),
+});

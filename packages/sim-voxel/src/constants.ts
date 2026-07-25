@@ -71,6 +71,26 @@ UPKEEP[EYE] = 4;
 UPKEEP[NEURON] = 8;
 
 /**
+ * PRÉDATION. Mordre coûte, et ne rend rien directement : le voxel arraché
+ * devient de la biomasse au sol, que n'importe quelle bouche peut manger — y
+ * compris celle du mordu. Le prédateur doit donc mordre PUIS rester manger, ce
+ * qui l'expose. C'est ce qui distingue la prédation du vol.
+ */
+export const ATTACK_COST = 120;
+
+/**
+ * REPRODUCTION CROISÉE. Quand un organisme se reproduit au contact d'une lignée
+ * étrangère, l'enfant hérite du plan de corps de l'initiateur et d'un mélange
+ * des poids de cerveau des deux — un croisement, pas une copie.
+ *
+ * SUZERAINETÉ : l'enfant appartient à la lignée de L'INITIATEUR, celui qui a
+ * payé le coût et cédé son énergie. L'autre parent ne paie rien et ne perd
+ * rien ; il ne peut donc pas revendiquer l'enfant. C'est la seule règle qui ne
+ * crée pas d'incitation à squatter les lignées fécondes d'autrui.
+ */
+export const CROSSOVER_WEIGHT_SHARE = 500; // ‰ des poids venant du partenaire
+
+/**
  * Surcoût d'une contraction musculaire (piloté par le cerveau).
  *
  * Ramené de 30 à 8 : à 30, chercher sa nourriture coûtait plus que la trouver,

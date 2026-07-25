@@ -1,11 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Client, type Room } from "colyseus.js";
 import {
+  DIVINE_WORD_MAX_CHARS,
   MSG_BODY,
   MSG_CHUNK,
+  MSG_JOURNAL,
+  MSG_REGISTRY,
+  MSG_THOUGHT,
   VOXEL_ROOM_NAME,
+  type DivinePower,
+  type DivineResultMsg,
   type LookAtMsg,
+  type RegistryMsg,
   type ReleaseResultMsg,
+  type ThoughtMsg,
+  type VoxelJournalMsg,
 } from "@devot/shared";
 import { CHUNK, SX, SZ, decodeBody, decodeChunk, type DecodedBody } from "@devot/sim-voxel";
 import { CHAMPION_KEY, type StoredChampion } from "../lab/useLab.js";
@@ -64,6 +73,24 @@ export interface VoxelWorldClient {
   bytesReceived: number;
   lookAt: (x: number, z: number) => void;
   release: () => void;
+
+  // ── P5.4 / P5.5 ───────────────────────────────────────────────────────────
+  selected: number;
+  select: (id: number) => void;
+  divine: (power: DivinePower, target?: { x?: number; z?: number; organismId?: number }) => void;
+  lastDivine: DivineResultMsg | null;
+  registry: RegistryMsg | null;
+  askRegistry: () => void;
+  awaken: (id: number, name?: string) => void;
+  lastAwaken: { ok: boolean; id?: number; reason?: string } | null;
+  thoughts: ThoughtMsg[];
+  journal: VoxelJournalMsg | null;
+  askJournal: (id: number) => void;
+  speak: (id: number, text: string) => void;
+  lastWord: { ok: boolean; reason?: string; cooldownMs?: number } | null;
+  godMode: boolean;
+  toggleGodMode: () => void;
+  godAct: (action: "terrain" | "biomass" | "spawn", x: number, y: number, z: number) => void;
 }
 
 const SERVER_URL =
@@ -82,6 +109,14 @@ export function useVoxelWorld(): VoxelWorldClient {
   const [bytesReceived, setBytesReceived] = useState(0);
   const [chunkRevision, setChunkRevision] = useState(0);
   const [champion, setChampion] = useState<StoredChampion | null>(null);
+  const [selected, setSelected] = useState(0);
+  const [lastDivine, setLastDivine] = useState<DivineResultMsg | null>(null);
+  const [registry, setRegistry] = useState<RegistryMsg | null>(null);
+  const [lastAwaken, setLastAwaken] = useState<VoxelWorldClient["lastAwaken"]>(null);
+  const [thoughts, setThoughts] = useState<ThoughtMsg[]>([]);
+  const [journal, setJournal] = useState<VoxelJournalMsg | null>(null);
+  const [lastWord, setLastWord] = useState<VoxelWorldClient["lastWord"]>(null);
+  const [godMode, setGodMode] = useState(false);
 
   const chunksRef = useRef(
     new Map<number, { cx: number; cy: number; cz: number; materials: Uint8Array }>(),
@@ -128,6 +163,15 @@ export function useVoxelWorld(): VoxelWorldClient {
         });
 
         room.onMessage("released", (msg: ReleaseResultMsg) => setLastRelease(msg));
+        room.onMessage("divineResult", (msg: DivineResultMsg) => setLastDivine(msg));
+        room.onMessage(MSG_REGISTRY, (msg: RegistryMsg) => setRegistry(msg));
+        room.onMessage("awakenResult", (msg: VoxelWorldClient["lastAwaken"]) => setLastAwaken(msg));
+        room.onMessage("divineWordResult", (msg: VoxelWorldClient["lastWord"]) => setLastWord(msg));
+        room.onMessage(MSG_THOUGHT, (msg: ThoughtMsg) =>
+          setThoughts((prev) => [...prev.slice(-30), msg]),
+        );
+        room.onMessage(MSG_JOURNAL, (msg: VoxelJournalMsg) => setJournal(msg));
+        room.onMessage("godResult", () => {});
 
         room.onStateChange((state: any) => {
           setAggregates({
@@ -197,6 +241,31 @@ export function useVoxelWorld(): VoxelWorldClient {
     roomRef.current?.send("release", { genome: champion.genome });
   }, [champion]);
 
+  const divine = useCallback(
+    (power: DivinePower, target?: { x?: number; z?: number; organismId?: number }) => {
+      roomRef.current?.send("divine", { power, ...target });
+    },
+    [],
+  );
+  const askRegistry = useCallback(() => roomRef.current?.send("registry", {}), []);
+  const awaken = useCallback(
+    (id: number, name?: string) => roomRef.current?.send("awaken", { organismId: id, name }),
+    [],
+  );
+  const askJournal = useCallback((id: number) => roomRef.current?.send("journal", id), []);
+  const speak = useCallback((id: number, text: string) => {
+    roomRef.current?.send("divineWord", {
+      organismId: id,
+      text: text.slice(0, DIVINE_WORD_MAX_CHARS),
+    });
+  }, []);
+  const godAct = useCallback(
+    (action: "terrain" | "biomass" | "spawn", x: number, y: number, z: number) => {
+      roomRef.current?.send("godMode", { action, x, y, z });
+    },
+    [],
+  );
+
   return {
     connected,
     error,
@@ -212,6 +281,22 @@ export function useVoxelWorld(): VoxelWorldClient {
     bytesReceived,
     lookAt,
     release,
+    selected,
+    select: setSelected,
+    divine,
+    lastDivine,
+    registry,
+    askRegistry,
+    awaken,
+    lastAwaken,
+    thoughts,
+    journal,
+    askJournal,
+    speak,
+    lastWord,
+    godMode,
+    toggleGodMode: () => setGodMode((g) => !g),
+    godAct,
   };
 }
 

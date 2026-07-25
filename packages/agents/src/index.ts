@@ -1,3 +1,4 @@
+export * from "./awakened.js";
 export * from "./agentSdkMind.js";
 export * from "./chronicler.js";
 export * from "./profiles.js";

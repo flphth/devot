@@ -69,6 +69,31 @@ CREATE TABLE IF NOT EXISTS divine_msgs (
   text TEXT NOT NULL,
   sent_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS voxel_lineages (
+  id TEXT PRIMARY KEY,
+  god_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  released_at INTEGER NOT NULL,
+  released_tick INTEGER NOT NULL,
+  born INTEGER NOT NULL DEFAULT 1,
+  died INTEGER NOT NULL DEFAULT 0,
+  max_generation INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS voxel_tombstones (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organism_id INTEGER NOT NULL,
+  lineage_id TEXT NOT NULL DEFAULT '',
+  god_id TEXT NOT NULL DEFAULT '',
+  generation INTEGER NOT NULL DEFAULT 0,
+  born_tick INTEGER NOT NULL DEFAULT 0,
+  died_tick INTEGER NOT NULL DEFAULT 0,
+  body_voxels INTEGER NOT NULL DEFAULT 0,
+  eaten INTEGER NOT NULL DEFAULT 0,
+  bites INTEGER NOT NULL DEFAULT 0,
+  bitten INTEGER NOT NULL DEFAULT 0,
+  crossbred INTEGER NOT NULL DEFAULT 0,
+  cause TEXT NOT NULL DEFAULT 'famine'
+);
 `;
 
 /** Ouvre (ou crée) la base. `:memory:` pour les tests. */

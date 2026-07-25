@@ -1,5 +1,6 @@
 import {
   ALIVE,
+  ATTACK_COST,
   BIOMASS,
   MIN_CHILD_ENERGY,
   MUSCLE_CONTRACTION_COST,
@@ -13,8 +14,16 @@ import {
   WATER,
 } from "./constants.js";
 import { MOVE_DX, MOVE_DZ, chosenDirection, sense, think } from "./brain.js";
-import { FP_ONE, OUT_ATTACK, OUT_REPRODUCE, mutate, mutationSeed } from "./genome.js";
+import {
+  FP_ONE,
+  OUT_ATTACK,
+  OUT_REPRODUCE,
+  crossover,
+  mutate,
+  mutationSeed,
+} from "./genome.js";
 import { NEIGHBOR_DX, NEIGHBOR_DY, NEIGHBOR_DZ, VoxelWorld } from "./world.js";
+import { damageVoxel } from "./passes.js";
 import { spawnFromGenome } from "./spawn.js";
 
 /** Seuils (en unités FP) au-delà desquels une sortie déclenche l'action. */
@@ -123,9 +132,69 @@ export function passMove(w: VoxelWorld): void {
 }
 
 /**
+ * PRÉDATION : un organisme qui le veut arrache un voxel de tissu ÉTRANGER au
+ * contact de son corps.
+ *
+ * Le voxel arraché devient de la biomasse au sol — il n'est pas mangé sur le
+ * coup. Le prédateur doit donc mordre puis rester manger, ce qui l'expose et
+ * laisse au mordu une chance de fuir avec sa chair. C'est aussi ce qui fait que
+ * mordre ne crée pas d'énergie : la chair vaut ce qu'elle valait.
+ *
+ * On mord le PREMIER voxel étranger trouvé dans l'ordre de voisinage fixe :
+ * comme partout ailleurs, aucune rupture d'égalité aléatoire.
+ */
+export function passAttack(w: VoxelWorld): void {
+  const count = w.aliveCount;
+  for (let a = 0; a < count; a++) {
+    const id = w.aliveIds[a]!;
+    if (w.orgState[id] !== ALIVE) continue;
+    if (w.intentAttack[id] === 0) continue;
+    if (w.energy[id]! <= ATTACK_COST) continue;
+
+    const target = firstForeignTissue(w, id);
+    if (target < 0) continue;
+
+    const victim = w.owner[target]!;
+    if (damageVoxel(w, target)) {
+      w.energy[id] = w.energy[id]! - ATTACK_COST;
+      w.bites[id] = w.bites[id]! + 1;
+      w.bitten[victim] = w.bitten[victim]! + 1;
+    }
+  }
+}
+
+/** Premier voxel de tissu appartenant à un AUTRE organisme, au contact. */
+function firstForeignTissue(w: VoxelWorld, id: number): number {
+  const base = w.bodySlot(id);
+  const len = w.bodyLen[id]!;
+  for (let k = 0; k < len; k++) {
+    const i = w.bodyList[base + k]!;
+    const x = w.xOf(i);
+    const y = w.yOf(i);
+    const z = w.zOf(i);
+    for (let d = 0; d < 6; d++) {
+      const nx = x + NEIGHBOR_DX[d]!;
+      const ny = y + NEIGHBOR_DY[d]!;
+      const nz = z + NEIGHBOR_DZ[d]!;
+      if (!w.inBounds(nx, ny, nz)) continue;
+      const ni = w.idx(nx, ny, nz);
+      const other = w.owner[ni]!;
+      if (other === NO_OWNER || other === id) continue;
+      if (!w.isTissue(ni)) continue;
+      return ni;
+    }
+  }
+  return -1;
+}
+
+/**
  * Reproduction : au-dessus de son seuil d'énergie et si son cerveau le veut,
  * un organisme engendre. Le génome de l'enfant est une copie MUTÉE, et une
  * part de l'énergie du parent passe dans l'enfant : procréer épuise.
+ *
+ * Au CONTACT D'UNE LIGNÉE ÉTRANGÈRE, l'enfant est un croisement : plan de corps
+ * de l'initiateur, poids de cerveau mêlés aux deux. L'initiateur reste le seul
+ * suzerain — c'est lui qui paie.
  */
 export function passReproduce(w: VoxelWorld): void {
   // On fige la liste : un enfant né pendant la passe ne se reproduit pas dans
@@ -151,7 +220,14 @@ export function passReproduce(w: VoxelWorld): void {
     // sans descendance, ce qui éteint la lignée au lieu de la propager.
     if (share < MIN_CHILD_ENERGY) continue;
 
-    const childGenome = mutate(g, mutationSeed(id, w.tick, w.seed));
+    // Un partenaire au contact ? Alors l'enfant croise les deux cerveaux.
+    const partner = firstForeignTissue(w, id);
+    const partnerId = partner >= 0 ? w.owner[partner]! : NO_OWNER;
+    const partnerGenome = partnerId !== NO_OWNER ? w.orgGenome[partnerId] : undefined;
+    const seedForChild = mutationSeed(id, w.tick, w.seed);
+    const childGenome = partnerGenome
+      ? mutate(crossover(g, partnerGenome, seedForChild), seedForChild ^ 0x5bf0)
+      : mutate(g, seedForChild);
     const childId = spawnFromGenome(
       w,
       childGenome,
@@ -164,6 +240,7 @@ export function passReproduce(w: VoxelWorld): void {
     if (childId === 0) continue;
 
     w.energy[id] = w.energy[id]! - REPRO_COST - share;
+    if (partnerGenome) w.crossbred[childId] = 1;
     // L'héritage n'est pas une entrée d'énergie : il sort du parent pour entrer
     // dans l'enfant. `spawnFromGenome` l'a compté comme une dotation, on défait
     // cette ligne — sinon le registre autoriserait le monde à grossir d'une

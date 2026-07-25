@@ -81,6 +81,9 @@ export function spawnFromGenome(
   w.intentDir[id] = -1;
   w.intentRepro[id] = 0;
   w.intentAttack[id] = 0;
+  w.bites[id] = 0;
+  w.bitten[id] = 0;
+  w.crossbred[id] = 0;
   w.refreshCapacity(id);
 
   // Le germe est le premier voxel du plan (offset 0,0,0 par convention).

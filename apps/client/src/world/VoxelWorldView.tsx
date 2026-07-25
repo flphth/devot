@@ -13,6 +13,18 @@ import { useVoxelWorld } from "./useVoxelWorld.js";
 export default function VoxelWorldView() {
   const world = useVoxelWorld();
 
+  // Touche 1 : mode god, comme dans le jeu d'origine. Le client bascule son
+  // interface ; c'est le SERVEUR qui autorise ou refuse chaque geste.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key === "1") world.toggleGodMode();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [world.toggleGodMode]);
+
   // Hooks de test pilotés (dev uniquement).
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -30,6 +42,22 @@ export default function VoxelWorldView() {
       lastRelease: world.lastRelease,
       lookAt: world.lookAt,
       release: world.release,
+      selected: world.selected,
+      select: world.select,
+      divine: world.divine,
+      lastDivine: world.lastDivine,
+      registry: world.registry,
+      askRegistry: world.askRegistry,
+      awaken: world.awaken,
+      lastAwaken: world.lastAwaken,
+      thoughts: world.thoughts,
+      journal: world.journal,
+      askJournal: world.askJournal,
+      speak: world.speak,
+      lastWord: world.lastWord,
+      godMode: world.godMode,
+      toggleGodMode: world.toggleGodMode,
+      godAct: world.godAct,
     };
   });
 
@@ -39,6 +67,24 @@ export default function VoxelWorldView() {
         <VoxelWorldScene world={world} />
       </Canvas>
       <VoxelWorldHud world={world} />
+      {world.godMode && (
+        <div
+          style={{
+            position: "absolute",
+            top: 60,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "rgba(224,179,76,0.92)",
+            color: "#10131a",
+            borderRadius: 999,
+            padding: "5px 14px",
+            font: "12px system-ui, sans-serif",
+            fontWeight: 700,
+          }}
+        >
+          MODE GOD — le serveur reste juge
+        </div>
+      )}
       {!world.aggregates && !world.error && (
         <div
           style={{
