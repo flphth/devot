@@ -4,9 +4,13 @@ import {
   ROOM_NAME,
   SERVER_PORT,
   type CreateFounderMsg,
+  type CombatFxMsg,
   type JournalEntry,
   type JournalMsg,
 } from "@devot/shared";
+
+/** Identifiant local d'un effet de combat : sert de clé de rendu. */
+let combatSeq = 0;
 
 /** Vue plate (côté client) de l'état synchronisé. */
 export interface DevotView {
@@ -52,6 +56,21 @@ export interface WorldSnapshot {
   gods: GodView[];
 }
 
+/**
+ * Un vol de vie observé. On en garde une file courte : plusieurs combats
+ * peuvent se dérouler en même temps, et chacun doit laisser sa trace à l'écran.
+ */
+export interface CombatFx {
+  id: number;
+  attackerId: string;
+  victimId: string;
+  drained: number;
+  x: number;
+  z: number;
+  lethal: boolean;
+  at: number;
+}
+
 export interface SmiteFx {
   devotId: string;
   x: number;
@@ -75,6 +94,8 @@ export interface WorldConnection {
   status: "connecting" | "connected" | "error";
   lastRejection: string | null;
   lastSmite: SmiteFx | null;
+  /** Combats récents, du plus ancien au plus récent. */
+  combats: CombatFx[];
   journals: Record<string, JournalEntry[]>;
   actions: WorldActions;
 }
@@ -87,6 +108,7 @@ export function useWorld(godName: string): WorldConnection {
   const [status, setStatus] = useState<WorldConnection["status"]>("connecting");
   const [lastRejection, setLastRejection] = useState<string | null>(null);
   const [lastSmite, setLastSmite] = useState<SmiteFx | null>(null);
+  const [combats, setCombats] = useState<CombatFx[]>([]);
   const [journals, setJournals] = useState<Record<string, JournalEntry[]>>({});
   const roomRef = useRef<Room | null>(null);
 
@@ -110,6 +132,14 @@ export function useWorld(godName: string): WorldConnection {
         });
         room.onMessage("smite", (msg: { devotId: string; x: number; z: number }) => {
           setLastSmite({ ...msg, at: Date.now() });
+        });
+        room.onMessage("combat", (msg: CombatFxMsg) => {
+          // File courte : plusieurs combats peuvent se dérouler en même temps,
+          // et l'affichage ne garde que les plus récents.
+          setCombats((prev) => [
+            ...prev.slice(-19),
+            { ...msg, id: combatSeq++, at: Date.now() },
+          ]);
         });
         room.onMessage("journal", (msg: JournalMsg) => {
           setJournals((prev) => ({ ...prev, [msg.devotId]: msg.entries }));
@@ -195,6 +225,7 @@ export function useWorld(godName: string): WorldConnection {
     status,
     lastRejection,
     lastSmite,
+    combats,
     journals,
     actions: {
       createFounder,

@@ -17,7 +17,7 @@ function godNameFromUrl(): string {
 
 export default function App() {
   const godName = useMemo(godNameFromUrl, []);
-  const { snapshot, godId, status, lastRejection, lastSmite, journals, actions } =
+  const { snapshot, godId, status, lastRejection, lastSmite, combats, journals, actions } =
     useWorld(godName);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [godMode, setGodMode] = useState(false);
@@ -43,6 +43,10 @@ export default function App() {
       creating,
       select: setSelectedId,
       createFounder: actions.createFounder,
+      combats,
+      // Actions du mode god, exposées pour le pilotage : c'est le seul moyen de
+      // provoquer une rencontre à volonté, le monde étant vaste et l'errance lente.
+      spawnAt: actions.debugSpawnDevot,
     };
   });
 
@@ -79,6 +83,7 @@ export default function App() {
           godMode={godMode}
           godModeRef={godModeRef}
           lastSmite={lastSmite}
+          combats={combats}
           onSelect={setSelectedId}
           onGroundClick={(x, z) => actions.debugSpawnDevot(x, z)}
           onFoodMove={(foodId, x, z) => actions.debugMoveFood(foodId, x, z)}
@@ -92,6 +97,7 @@ export default function App() {
         rejection={lastRejection}
         godMode={godMode}
         journal={selectedId ? (journals[selectedId] ?? []) : []}
+        combats={combats}
       />
       {creating && (
         <CreationScreen

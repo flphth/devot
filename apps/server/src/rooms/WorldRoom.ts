@@ -25,6 +25,7 @@ import {
   type Stats,
   WorldState,
   type ActionRejectedMsg,
+  type CombatFxMsg,
   type CreateFounderMsg,
   type DebugMoveFoodMsg,
   type DebugSpawnDevotMsg,
@@ -427,6 +428,18 @@ export class WorldRoom extends Room<WorldState> {
       if (this.tickCount % 8 === 0) {
         this.repos.events.record("combat", [attackerId, victimId], { drained });
       }
+      // Le combat se voit : on diffuse le transfert pour que le client trace le
+      // trait, fasse monter les chiffres et fasse clignoter la victime. Sans
+      // cela, le vol de vie — qui est le cœur du jeu — reste invisible.
+      const victim = this.world.devots.get(victimId);
+      this.broadcast("combat", {
+        attackerId,
+        victimId,
+        drained: Math.round(drained),
+        x: victim?.pos.x ?? 0,
+        z: victim?.pos.z ?? 0,
+        lethal: !!victim && victim.hp <= 0,
+      } satisfies CombatFxMsg);
     }
 
     // Naissances : consomme les intentions posées par les esprits.

@@ -157,6 +157,22 @@ export interface CreateFounderMsg {
   soul?: string;
 }
 
+/**
+ * Un vol de vie qui vient d'avoir lieu. Diffusé à tous : le combat est le
+ * moment le plus lisible du jeu, il ne doit pas rester une ligne de journal.
+ */
+export interface CombatFxMsg {
+  attackerId: string;
+  victimId: string;
+  /** PV réellement transférés ce tick. */
+  drained: number;
+  /** Position de la victime : c'est de là que jaillissent les chiffres. */
+  x: number;
+  z: number;
+  /** La victime en meurt-elle ? */
+  lethal: boolean;
+}
+
 export interface SmiteMsg {
   devotId: string;
 }

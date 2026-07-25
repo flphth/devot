@@ -5,7 +5,7 @@ import {
   TRAIT_POOL,
   type JournalEntry,
 } from "@devot/shared";
-import type { DevotView, WorldActions, WorldSnapshot } from "./useWorld.js";
+import type { CombatFx, DevotView, WorldActions, WorldSnapshot } from "./useWorld.js";
 
 const panel: React.CSSProperties = {
   position: "absolute",
@@ -118,6 +118,7 @@ export function Hud({
   rejection,
   godMode,
   journal,
+  combats,
 }: {
   snapshot: WorldSnapshot;
   godId: string | null;
@@ -126,6 +127,7 @@ export function Hud({
   rejection: string | null;
   godMode: boolean;
   journal: JournalEntry[];
+  combats: CombatFx[];
 }) {
   const [text, setText] = useState("");
   const [now, setNow] = useState(Date.now());
@@ -177,6 +179,8 @@ export function Hud({
           touche 1 pour sortir
         </div>
       )}
+
+      <CombatLog combats={combats} devots={snapshot.devots} />
 
       {/* Panthéon / création */}
       <div style={{ ...panel, top: 14, left: 14, width: 250 }}>
@@ -354,5 +358,46 @@ export function Hud({
         </div>
       )}
     </>
+  );
+}
+
+
+/**
+ * LE JOURNAL DES COMBATS.
+ *
+ * Il ne se contente pas de lister des transferts : il rappelle ce qu'ils sont.
+ * Dans ce monde, les PV sont le budget de pensée — un devot dépense sa vie
+ * chaque fois qu'il réfléchit. Voler la vie de quelqu'un, c'est donc lui voler
+ * du temps de réflexion : il pense moins, décide plus mal, et meurt. Le joueur
+ * doit comprendre cela en regardant, pas en lisant la documentation.
+ */
+function CombatLog({ combats, devots }: { combats: CombatFx[]; devots: DevotView[] }) {
+  if (combats.length === 0) return null;
+  const nameOf = (id: string) => devots.find((d) => d.id === id)?.name ?? "un inconnu";
+  const recent = [...combats].slice(-6).reverse();
+  const total = combats.reduce((sum, c) => sum + c.drained, 0);
+
+  return (
+    <div style={{ ...panel, bottom: 14, left: 14, width: 300 }}>
+      <div style={{ fontWeight: 700, marginBottom: 2 }}>⚔ Vols de vie</div>
+      <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 8, lineHeight: 1.35 }}>
+        Les PV sont le budget de pensée. Prendre la vie d'un devot, c'est lui prendre du temps
+        de réflexion : il pense moins, décide plus mal, puis meurt.
+      </div>
+      {recent.map((c) => (
+        <div key={c.id} style={{ fontSize: 12, marginTop: 3 }}>
+          <span style={{ color: c.lethal ? "#ff6b6b" : "#ffc76b", fontWeight: 700 }}>
+            {c.drained.toLocaleString("fr-FR")}
+          </span>{" "}
+          <span style={{ opacity: 0.85 }}>
+            {nameOf(c.attackerId)} → {nameOf(c.victimId)}
+          </span>
+          {c.lethal && <span style={{ color: "#ff6b6b" }}> ☠</span>}
+        </div>
+      ))}
+      <div style={{ fontSize: 11, opacity: 0.55, marginTop: 8 }}>
+        {total.toLocaleString("fr-FR")} PV ont changé de mains sous tes yeux.
+      </div>
+    </div>
   );
 }

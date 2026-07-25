@@ -3,7 +3,8 @@ import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { DEFAULT_APPEARANCE, PERCEPTION_RADIUS, decodeIdentity } from "@devot/shared";
-import type { DevotView, FoodView, SmiteFx, WorldSnapshot } from "./useWorld.js";
+import type { CombatFx, DevotView, FoodView, SmiteFx, WorldSnapshot } from "./useWorld.js";
+import { CombatEffects, recentlyBitten } from "./CombatFx.js";
 import { DevotModel } from "./creation/DevotModel.js";
 
 const WORLD_HALF = 30;
@@ -186,11 +187,14 @@ function VoxelDevot({
   devot,
   color,
   selected,
+  bitten,
   onSelect,
 }: {
   devot: DevotView;
   color: string;
   selected: boolean;
+  /** Vient d'être mordu : le corps se signale, il ne suffit pas que sa barre baisse. */
+  bitten: boolean;
   onSelect: (id: string) => void;
 }) {
   const group = useRef<THREE.Group>(null);
@@ -249,6 +253,9 @@ function VoxelDevot({
   // cette version, ou né hors écran de création, retombe sur l'allure neutre.
   const identity = decodeIdentity(devot.identity);
   const look = identity?.appearance ?? DEFAULT_APPEARANCE;
+  // Une morsure fait virer le corps au rouge le temps d'un éclat : c'est ce
+  // qui rend le vol de vie perceptible sans lire un chiffre.
+  const struck = bitten;
   // L'état vital délave les couleurs : un agonisant est visiblement éteint.
   const appearance =
     devot.state === "agonisant"
@@ -289,7 +296,15 @@ function VoxelDevot({
           // Le MÊME modèle que l'aperçu de l'écran de création : ce que le
           // joueur a façonné est exactement ce qui vit ici. Deux modèles
           // séparés auraient dérivé dès le premier chapeau ajouté.
-          <DevotModel appearance={appearance} selected={selected} />
+          <DevotModel
+            appearance={
+              struck
+                ? { ...appearance, shirt: "#ff5a4d", skin: "#ff9a8d" }
+                : appearance
+            }
+            selected={selected}
+            emissive={struck ? 0.7 : 0}
+          />
         )}
       </group>
 
@@ -490,6 +505,7 @@ export function Scene({
   godMode,
   godModeRef,
   lastSmite,
+  combats,
   onSelect,
   onGroundClick,
   onFoodMove,
@@ -500,6 +516,7 @@ export function Scene({
   godMode: boolean;
   godModeRef: React.RefObject<boolean>;
   lastSmite: SmiteFx | null;
+  combats: CombatFx[];
   onSelect: (id: string | null) => void;
   onGroundClick: (x: number, z: number) => void;
   onFoodMove: (foodId: string, x: number, z: number) => void;
@@ -568,6 +585,7 @@ export function Scene({
           devot={d}
           color={godColor(d.godId)}
           selected={d.id === selectedId}
+          bitten={recentlyBitten(combats, d.id)}
           onSelect={onSelect}
         />
       ))}
@@ -576,6 +594,7 @@ export function Scene({
       ))}
 
       {lastSmite && Date.now() - lastSmite.at < 600 && <LightningFx fx={lastSmite} />}
+      <CombatEffects combats={combats} devots={visibleDevots} />
 
       <OrbitControls
         makeDefault
