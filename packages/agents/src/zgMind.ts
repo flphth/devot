@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import type { Price, TokenUsage } from "@devot/shared";
 import { InferenceGate } from "./budget.ts";
 import { completeWithRepair, type CompleteFn } from "./structured.ts";
@@ -16,8 +18,18 @@ import type { MindMessage, MindProvider, TeeProof, ThinkRequest, ThinkResult } f
  * panel.
  */
 
+const nodeRequire = createRequire(import.meta.url);
+
 async function dynamicImport(spec: string): Promise<any> {
-  return import(spec);
+  // Resolve from THIS module (packages/agents) and load the package's CJS entry
+  // by file URL. The 0G SDK's ESM bundle trips tsx's loader ("does not provide
+  // an export named 'C'"), but its CJS build imports cleanly; falling back to a
+  // bare import covers the rest.
+  try {
+    return await import(pathToFileURL(nodeRequire.resolve(spec)).href);
+  } catch {
+    return import(spec);
+  }
 }
 
 /** Minimal shape of the on-chain service listing we depend on. */

@@ -11,7 +11,7 @@ function teeLine(entry: JournalEntry): string {
 /** The "panneau Esprit": one thought with its cost and its TEE proof. */
 export function renderThought(devot: Devot, entry: JournalEntry): string {
   const lines = [
-    `┌─ Esprit de ${devot.id} — pensée #${entry.age} [${devot.state}] ${devot.model}`,
+    `┌─ Esprit de ${devot.id} — pensée #${entry.age} [${devot.state}] ${entry.model}`,
     `│ Événement: ${entry.event}`,
     `│ Pensée   : ${entry.raw.replace(/\s+/g, " ").slice(0, 200)}`,
     `│ Décision : ${entry.action}${entry.emotion ? `  (${entry.emotion})` : ""}${entry.utterance ? `  « ${entry.utterance} »` : ""}${entry.repaired ? "  [réparé]" : ""}${entry.coerced ? "  [réaction imposée — interdit d'attendre]" : ""}`,

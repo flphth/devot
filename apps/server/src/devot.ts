@@ -8,6 +8,8 @@ export type DevotState = "vivant" | "affame" | "agonisant" | "mort";
 export interface JournalEntry {
   age: number;
   event: string;
+  /** The model that actually produced this thought (for 0G, the provider's). */
+  model: string;
   raw: string;
   action: string;
   emotion?: string;
@@ -105,6 +107,7 @@ export function applyThought(
   const entry: JournalEntry = {
     age: devot.age,
     event,
+    model: result.model,
     raw: result.raw,
     action: decision.action,
     emotion: decision.emotion,

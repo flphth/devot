@@ -1,15 +1,23 @@
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import type { TokenUsage } from "@devot/shared";
 import { anthropicPrice } from "../pricing.ts";
 import { completeWithRepair, type CompleteFn } from "../structured.ts";
 import type { MindProvider, ThinkRequest, ThinkResult } from "../types.ts";
 
+const nodeRequire = createRequire(import.meta.url);
+
 /**
- * Dynamic import through a variable specifier so `tsc` never tries to resolve
- * the optional SDK at build time (keeps typecheck green when it isn't
- * installed). Returns `any`; the shape is asserted at the call site.
+ * Dynamic import that resolves the optional SDK from THIS module and loads it by
+ * file URL (robust across the pnpm workspace + tsx). A variable specifier keeps
+ * `tsc` from resolving it at build time, so typecheck stays green without it.
  */
 async function dynamicImport(spec: string): Promise<any> {
-  return import(spec);
+  try {
+    return await import(pathToFileURL(nodeRequire.resolve(spec)).href);
+  } catch {
+    return import(spec);
+  }
 }
 
 function extractText(res: any): string {
