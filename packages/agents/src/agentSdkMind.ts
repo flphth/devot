@@ -14,6 +14,19 @@ import { buildEventBlock, buildPersona, WORLD_RULES } from "./prompts.js";
  * Chaque pensée est une session éphémère : l'historique du devot est rejoué
  * dans le prompt sous forme de transcript (sa mémoire vit dans notre base).
  */
+/**
+ * Environnement du sous-processus Claude Code, purgé des clés API : en mode
+ * abonnement, une ANTHROPIC_API_KEY résiduelle (shell, .env, placeholder)
+ * prendrait le dessus sur l'OAuth et provoquerait `invalid x-api-key`.
+ */
+function subscriptionEnv(): Record<string, string | undefined> {
+  return {
+    ...process.env,
+    ANTHROPIC_API_KEY: undefined,
+    ANTHROPIC_AUTH_TOKEN: undefined,
+  };
+}
+
 export class AgentSdkMind implements MindProvider {
   constructor(private modelOverride?: string) {}
 
@@ -36,6 +49,7 @@ export class AgentSdkMind implements MindProvider {
         model: this.modelOverride ?? profile.model,
         maxTurns: 1,
         allowedTools: [],
+        env: subscriptionEnv(),
         outputFormat: {
           type: "json_schema",
           schema: DECISION_SCHEMA as unknown as Record<string, unknown>,
@@ -83,6 +97,7 @@ export class AgentSdkChronicler implements Chronicler {
         model: "claude-haiku-4-5",
         maxTurns: 1,
         allowedTools: [],
+        env: subscriptionEnv(),
       },
     });
 

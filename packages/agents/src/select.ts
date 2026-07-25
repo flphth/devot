@@ -18,8 +18,14 @@ export function resolveMindKind(env: NodeJS.ProcessEnv = process.env): MindKind 
   if (explicit === "mock" || env.DEVOT_MOCK === "1") return "mock";
   if (explicit === "api") return "api";
   if (explicit === "claude") return "claude";
-  if (env.ANTHROPIC_API_KEY) return "api";
+  if (usableApiKey(env)) return "api";
   return "claude";
+}
+
+/** Ignore les clés vides ou le placeholder `sk-ant-...` copié du .env.example. */
+function usableApiKey(env: NodeJS.ProcessEnv): boolean {
+  const key = env.ANTHROPIC_API_KEY?.trim();
+  return !!key && key !== "sk-ant-..." && !key.endsWith("...");
 }
 
 export function createMind(env: NodeJS.ProcessEnv = process.env): {
@@ -37,6 +43,11 @@ export function createMind(env: NodeJS.ProcessEnv = process.env): {
     case "api":
       return { kind, mind: new AnthropicMind(), chronicler: new AnthropicChronicler() };
     case "claude":
+      if (env.ANTHROPIC_API_KEY) {
+        console.warn(
+          "[agents] MIND=claude : ANTHROPIC_API_KEY détectée mais ignorée — les esprits utilisent l'abonnement Claude Code (mets MIND=api pour utiliser la clé).",
+        );
+      }
       return {
         kind,
         mind: new AgentSdkMind(env.DEVOT_MODEL),
