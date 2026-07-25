@@ -466,6 +466,37 @@ function LightningFx({ fx }: { fx: SmiteFx }) {
   );
 }
 
+/**
+ * Suivi caméra : tant qu'un devot est sélectionné, la cible des OrbitControls
+ * glisse vers lui (amorti) et la caméra se déplace du même vecteur — l'angle
+ * et le zoom choisis par le joueur sont conservés, rotation/zoom restent libres.
+ */
+function CameraFollow({
+  snapshot,
+  selectedId,
+}: {
+  snapshot: WorldSnapshot;
+  selectedId: string | null;
+}) {
+  const controls = useThree((s) => s.controls) as unknown as {
+    target: THREE.Vector3;
+    object: THREE.Camera;
+    update: () => void;
+  } | null;
+
+  useFrame((_, dt) => {
+    if (!controls || !selectedId) return;
+    const devot = snapshot.devots.find((d) => d.id === selectedId);
+    if (!devot) return;
+    const desired = new THREE.Vector3(devot.x, 0.5, devot.z);
+    const step = desired.sub(controls.target).multiplyScalar(1 - Math.exp(-dt * 5));
+    controls.target.add(step);
+    controls.object.position.add(step);
+    controls.update();
+  });
+  return null;
+}
+
 /** Expose la caméra aux tests pilotés (dev uniquement). */
 function DevTestHooks() {
   const camera = useThree((s) => s.camera);
@@ -580,6 +611,7 @@ export function Scene({
         minDistance={8}
         maxDistance={70}
       />
+      <CameraFollow snapshot={snapshot} selectedId={selectedId} />
     </>
   );
 }
