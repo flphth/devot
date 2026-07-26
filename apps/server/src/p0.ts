@@ -91,7 +91,7 @@ async function main(): Promise<void> {
       applyDecision(d, decision, world);
       log(
         `${d.name} thought → ${decision.action}` +
-          (decision.utterance ? ` « ${decision.utterance} »` : "") +
+          (decision.utterance ? ` "${decision.utterance}"` : "") +
           ` | cost ${hpLoss.toFixed(0)} HP | ${Math.max(0, d.hp).toFixed(0)}/${d.hpMax} HP left`,
       );
       if (decision.utterance) d.utterance = decision.utterance;

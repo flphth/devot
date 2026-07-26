@@ -122,7 +122,7 @@ export class WorldRoom extends Room<WorldState> {
   private tickCount = 0;
   private foodSeq = 0;
   private devotSeq = 0;
-  /** sessionId → godId (un dieu peut se reconnecter). */
+  /** sessionId → godId (a god may reconnect). */
   private sessions = new Map<string, string>();
   /**
    * Monster histories live here, not in SQLite: a monster leaves no gravestone,
@@ -196,9 +196,9 @@ export class WorldRoom extends Room<WorldState> {
     const { kind, mind, chronicler } = createMind();
     this.chronicler = chronicler;
     console.log(
-      `[world] esprit : ${
+      `[world] mind: ${
         kind === "claude"
-          ? "abonnement Claude Code (Agent SDK)"
+          ? "Claude Code subscription (Agent SDK)"
           : kind === "api"
             ? "Claude Messages API (key)"
             : "MockMind (simulated)"
@@ -686,7 +686,7 @@ export class WorldRoom extends Room<WorldState> {
           birth.child.wallet = this.wallets.addressAt(this.walletSeq++);
         }
         console.log(
-          `[world] ✚ naissance de ${birth.child.name} (${birth.mode}, dieu ${birth.child.godId})`,
+          `[world] ✚ ${birth.child.name} is born (${birth.mode}, god ${birth.child.godId})`,
         );
         this.wake({
           kind: "idle_reflection",

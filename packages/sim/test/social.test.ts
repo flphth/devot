@@ -119,7 +119,7 @@ describe("reproduction", () => {
     const cost = 20_000 * REPRO_SOLO_COST_FRACTION;
     expect(parent.hp).toBeCloseTo(20_000 - cost, 5);
     expect(outcome.child.hp).toBeCloseTo(cost * REPRO_TRANSFER_EFFICIENCY, 5);
-    expect(outcome.mode).toBe("bourgeonnement");
+    expect(outcome.mode).toBe("budding");
     expect(outcome.child.isFounder).toBe(false);
     expect(outcome.child.godId).toBe(parent.godId);
   });
@@ -140,7 +140,7 @@ describe("reproduction", () => {
     expect(a.hp).toBeCloseTo(20_000 - costA, 5);
     expect(b.hp).toBeCloseTo(30_000 - costB, 5);
     expect(outcome.child.hp).toBeCloseTo((costA + costB) * REPRO_TRANSFER_EFFICIENCY, 5);
-    expect(outcome.mode).toBe("sexuee");
+    expect(outcome.mode).toBe("sexual");
     // Overlordship: the child is born under the initiator's god.
     expect(outcome.child.godId).toBe("g1");
   });

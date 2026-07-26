@@ -280,7 +280,7 @@ export interface SmiteMsg {
   devotId: string;
 }
 
-/** Journal d'un devot (panneau « Esprit »). */
+/** A devot's journal (the "Mind" panel). */
 export interface JournalRequestMsg {
   devotId: string;
 }

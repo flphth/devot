@@ -18,7 +18,7 @@ import { dist2, World } from "./world.js";
 export interface Birth {
   child: DevotEntity;
   parents: DevotEntity[];
-  mode: "bourgeonnement" | "sexuee";
+  mode: "budding" | "sexual";
 }
 
 export interface ReproFailure {
@@ -58,14 +58,14 @@ export function resolveReproduction(
     partner.hp -= costB;
     const childHp = (costA + costB) * REPRO_TRANSFER_EFFICIENCY;
     const child = makeChild(parent, partner, childHp, rng);
-    return { child, parents: [parent, partner], mode: "sexuee" };
+    return { child, parents: [parent, partner], mode: "sexual" };
   }
 
   // Budding: a mutated clone.
   const cost = parent.hp * REPRO_SOLO_COST_FRACTION;
   parent.hp -= cost;
   const child = makeChild(parent, undefined, cost * REPRO_TRANSFER_EFFICIENCY, rng);
-  return { child, parents: [parent], mode: "bourgeonnement" };
+  return { child, parents: [parent], mode: "budding" };
 }
 
 function makeChild(
@@ -140,6 +140,8 @@ function mutateTraits(traits: string[], rng: () => number): string[] {
 }
 
 function childName(a: DevotEntity, b: DevotEntity | undefined, rng: () => number): string {
-  const root = (b && rng() < 0.5 ? b : a).name.replace(/-(fils|fille) .*$/, "");
-  return `${root}-${rng() < 0.5 ? "fils" : "fille"} ${Math.floor(rng() * 900 + 100)}`;
+  // The suffix is stripped before being re-added, so a line does not accrete
+  // "-son 412-daughter 907" down the generations.
+  const root = (b && rng() < 0.5 ? b : a).name.replace(/-(son|daughter) .*$/, "");
+  return `${root}-${rng() < 0.5 ? "son" : "daughter"} ${Math.floor(rng() * 900 + 100)}`;
 }

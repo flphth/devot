@@ -97,7 +97,7 @@ async function main(): Promise<void> {
       state().devots.get(devotId).thought.length > 0,
   );
 
-  // 6. Journal du panneau « Esprit »
+  // 6. Journal of the "Mind" panel
   const journal: any = await new Promise((resolve) => {
     room.onMessage("journal", (m: any) => resolve(m));
     room.send("getJournal", { devotId });

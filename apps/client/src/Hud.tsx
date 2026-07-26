@@ -109,9 +109,9 @@ function Journal({ entries }: { entries: JournalEntry[] }) {
                 {e.emotion ? <span style={{ opacity: 0.65 }}> — {e.emotion}</span> : null}
               </div>
               {e.thought && (
-                <div style={{ fontStyle: "italic", color: "#aeb8c9" }}>« {e.thought} »</div>
+                <div style={{ fontStyle: "italic", color: "#aeb8c9" }}>“{e.thought}”</div>
               )}
-              {e.text && <div>🗣 « {e.text} »</div>}
+              {e.text && <div>🗣 “{e.text}”</div>}
             </div>
           )}
         </div>
@@ -284,7 +284,7 @@ export function Hud({
           </div>
           {selected.thought && (
             <div style={{ fontStyle: "italic", color: "#aeb8c9", marginTop: 4 }}>
-              « {selected.thought} »
+              “{selected.thought}”
             </div>
           )}
           <Journal entries={journal} />
