@@ -136,6 +136,21 @@ export const FOOD_TTL_JITTER = 0.35;
 // Combat: vital predation (balance transfer from victim to attacker).
 export const ATTACK_RADIUS = 1.5;
 /**
+ * HOW MUCH ROOM A BODY KEEPS FOR ITSELF.
+ *
+ * Nothing used to stop two creatures standing in the exact same spot. Bodies
+ * slid through one another, a fight looked like one model wearing another, and
+ * a crowd rendered as a single lump.
+ *
+ * Two radii, summed for any pair: a beast takes more room than a devot, which
+ * is also what it looks like on screen. Both must stay comfortably under
+ * ATTACK_RADIUS (1.5) — the point is that bodies do not INTERPENETRATE, not
+ * that they cannot reach each other. Push these past the attack radius and
+ * combat stops working entirely, because nothing could ever get in range.
+ */
+export const BODY_RADIUS_DEVOT = 0.35;
+export const BODY_RADIUS_MONSTER = 0.6;
+/**
  * HOW HARD A DEVOT BITES.
  *
  * Was 150, which meant a devot needed a hundred seconds of unbroken contact to

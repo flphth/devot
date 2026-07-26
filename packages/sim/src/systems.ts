@@ -1,6 +1,15 @@
-import type { Decision, DevotEntity, FoodEntity, Trigger, Vec3 } from "@devot/shared";
+import type {
+  Decision,
+  DevotEntity,
+  FoodEntity,
+  MonsterEntity,
+  Trigger,
+  Vec3,
+} from "@devot/shared";
 import {
   AGGRESSION_MEMORY_MS,
+  BODY_RADIUS_DEVOT,
+  BODY_RADIUS_MONSTER,
   AGONIZING_THRESHOLD,
   ATTACK_DRAIN_PER_TICK,
   ATTACK_EFFICIENCY,
@@ -67,6 +76,84 @@ export function legacyOf(devot: DevotEntity): number {
 }
 
 /**
+ * BODIES DO NOT SHARE A SPOT.
+ *
+ * Nothing stopped two creatures standing exactly on top of each other: they
+ * slid through one another, a fight looked like one model wearing another, and
+ * a crowd rendered as a single lump.
+ *
+ * This is the same idea as resolveRockCollisions, with one difference that
+ * matters: a boulder does not move, so a body is pushed the whole way out of
+ * it, while two bodies each give half the ground. That symmetry is what stops a
+ * pair from shoving each other across the map.
+ *
+ * Relaxed a few times rather than solved. Separating A from B can push A into
+ * C, and one pass leaves that overlap standing; three passes settle any crowd
+ * this world can hold. It is not exact and does not need to be — the next tick
+ * runs it again.
+ *
+ * Runs LAST, after every other system has finished moving things. Anywhere
+ * earlier and the movement that follows it would undo the work.
+ */
+const SEPARATION_PASSES = 3;
+
+function radiusOf(body: DevotEntity | MonsterEntity): number {
+  return "godId" in body ? BODY_RADIUS_DEVOT : BODY_RADIUS_MONSTER;
+}
+
+export function separateBodies(world: World): void {
+  // The dead do not take up room. A gravestone is scenery, and a battlefield
+  // full of them would otherwise become a wall the living cannot walk through.
+  const bodies: Array<DevotEntity | MonsterEntity> = [
+    ...world.aliveDevots(),
+    ...world.aliveMonsters(),
+  ];
+  if (bodies.length < 2) return;
+
+  for (let pass = 0; pass < SEPARATION_PASSES; pass++) {
+    let moved = false;
+    for (let i = 0; i < bodies.length; i++) {
+      for (let j = i + 1; j < bodies.length; j++) {
+        const a = bodies[i]!;
+        const b = bodies[j]!;
+        const min = radiusOf(a) + radiusOf(b);
+        let dx = b.pos.x - a.pos.x;
+        let dz = b.pos.z - a.pos.z;
+        let d = Math.hypot(dx, dz);
+        if (d >= min) continue;
+
+        if (d < 1e-6) {
+          // Exactly superposed: divide by zero here, and both bodies become
+          // NaN and vanish from the world for good. A fixed direction derived
+          // from the pair keeps it deterministic instead of random.
+          const angle = ((i * 7 + j * 13) % 360) * (Math.PI / 180);
+          dx = Math.cos(angle);
+          dz = Math.sin(angle);
+          d = 1;
+        }
+        const push = (min - d) / 2;
+        const ux = (dx / d) * push;
+        const uz = (dz / d) * push;
+        a.pos.x -= ux;
+        a.pos.z -= uz;
+        b.pos.x += ux;
+        b.pos.z += uz;
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+
+  // Whatever the shoving did, the world's own rules still hold: nobody ends up
+  // outside the map, inside a boulder, or floating above the ground.
+  for (const body of bodies) {
+    clampToWorld(body.pos, world.size);
+    resolveRockCollisions(body.pos);
+    body.pos.y = terrainHeight(body.pos.x, body.pos.z);
+  }
+}
+
+/**
  * Food rots. Runs before the bodies move, so a devot never gets to eat on the
  * exact tick a meal expires — the race would be invisible and maddening.
  */
@@ -110,6 +197,9 @@ export function tick(world: World, now: number = Date.now()): TickResult {
     hungerSystem(devot, world, result, now);
     deathSystem(devot, world, result, now);
   }
+
+  // Nobody stands inside anybody else. Last, after every body has moved.
+  separateBodies(world);
 
   // Reflexes run in their own pass, AFTER every blow of this tick has landed.
   // Folded into the loop above, whether a devot reacted depended on where it

@@ -22,7 +22,7 @@ import {
   type MonsterEntity,
   type Trigger,
 } from "@devot/shared";
-import { legacyOf, rememberAggressor, shouldAlert } from "./systems.js";
+import { legacyOf, rememberAggressor, separateBodies, shouldAlert } from "./systems.js";
 import { clampToWorld, dist2, World } from "./world.js";
 
 /**
@@ -223,6 +223,11 @@ export function monsterSystem(world: World, now: number = Date.now()): MonsterTi
       monster.targetId = undefined;
     }
   }
+
+  // Monsters move after the devots' tick has already separated everyone, so
+  // this phase tidies up after itself rather than leaving a beast standing
+  // inside its prey until the next frame.
+  separateBodies(world);
 
   return result;
 }
