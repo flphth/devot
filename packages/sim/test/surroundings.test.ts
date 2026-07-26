@@ -110,4 +110,12 @@ describe("describeSurroundings — the boundary of what a mind may know", () => 
     expect(text.split("\n").filter((l) => l.startsWith("- ")).length).toBeLessThanOrEqual(7);
     expect(text).toContain("more devots, further off");
   });
+
+  it("keeps the self block bounded too — it rides in every single prompt", () => {
+    const me = makeDevot();
+    me.hpAtLastThought = me.hp + 5000;
+    me.attackedBy = ["a", "b", "c", "d"];
+    const text = describeSurroundings(me, worldWith(me));
+    expect(text.split("\n").filter((l) => l.startsWith("· ")).length).toBeLessThanOrEqual(4);
+  });
 });

@@ -15,6 +15,7 @@ import {
   type MonsterEntity,
   type Trigger,
 } from "@devot/shared";
+import { rememberAggressor } from "./systems.js";
 import { clampToWorld, dist2, World } from "./world.js";
 
 /**
@@ -109,6 +110,7 @@ export function monsterSystem(world: World, now: number = Date.now()): MonsterTi
     // Told once per hunter, like devot predation: it is up to the prey to decide.
     if (prey.underAttackBy !== monster.id) {
       prey.underAttackBy = monster.id;
+      rememberAggressor(prey, monster.id);
       result.triggers.push({
         kind: "threat",
         devotId: prey.id,

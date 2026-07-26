@@ -102,6 +102,10 @@ export interface DevotEntity {
   pendingReproduction?: { partnerId?: string };
   /** Id of the last reported attacker (avoids re-triggering every tick). */
   underAttackBy?: string;
+  /** HP at the end of its previous thought, so it can feel a trend. */
+  hpAtLastThought?: number;
+  /** Everyone who has ever drawn its life. Capped; survives between thoughts. */
+  attackedBy?: string[];
   /** Devots already met (one encounter = a single trigger). */
   metDevots?: string[];
 }

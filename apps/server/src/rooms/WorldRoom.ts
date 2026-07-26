@@ -460,10 +460,12 @@ export class WorldRoom extends Room<WorldState> {
   private wake(trigger: Trigger): void {
     const devot = this.world.devots.get(trigger.devotId);
     if (!devot) return;
-    this.orchestrator.enqueue({
-      ...trigger,
-      eventText: `${trigger.eventText}\n\n${describeSurroundings(devot, this.world)}`,
-    });
+    const eventText = `${trigger.eventText}\n\n${describeSurroundings(devot, this.world)}`;
+    // Stamped here rather than when the decision lands: this is the moment the
+    // picture was taken, so the next thought's "since your last thought" is
+    // measured against exactly what this one was told.
+    devot.hpAtLastThought = devot.hp;
+    this.orchestrator.enqueue({ ...trigger, eventText });
   }
 
   // ── Simulation ───────────────────────────────────────────────────────────

@@ -190,6 +190,7 @@ function combatSystem(
   // (flee, strike back, beg, sacrifice themselves).
   if (prey.underAttackBy !== devot.id) {
     prey.underAttackBy = devot.id;
+    rememberAggressor(prey, devot.id);
     result.triggers.push({
       kind: "threat",
       devotId: prey.id,
@@ -347,7 +348,11 @@ export function nearestVisibleFood(world: World, from: Vec3, maxDist2: number) {
 const SEEN_DEVOTS_MAX = 6;
 const SEEN_FOOD_MAX = 4;
 
-export function describeSurroundings(devot: DevotEntity, world: World): string {
+export function describeSurroundings(
+  devot: DevotEntity,
+  world: World,
+  now: number = Date.now(),
+): string {
   const r2 = sightOf(devot) ** 2;
   const lines: string[] = [];
 
@@ -399,15 +404,88 @@ export function describeSurroundings(devot: DevotEntity, world: World): string {
     .sort((a, b) => dist2(devot.pos, a.pos) - dist2(devot.pos, b.pos));
   for (const f of foods.slice(0, SEEN_FOOD_MAX)) {
     const d = Math.sqrt(dist2(devot.pos, f.pos));
+    // Whether it will still be there is half the decision: a devot that walks
+    // slowly towards a meal about to rot has wasted the walk.
+    const left = f.ttlMs - (now - f.spawnedAt);
+    const spoiling = left < 12_000 ? ", ROTTING — it will be gone in seconds" : "";
     lines.push(
-      `- food (${f.type}, id "${f.id}"), ${d.toFixed(1)} away at x=${f.pos.x.toFixed(1)}, z=${f.pos.z.toFixed(1)}`,
+      `- food (${f.type}, id "${f.id}"), worth ${Math.round(f.hpValue)} HP, ${d.toFixed(1)} away at x=${f.pos.x.toFixed(1)}, z=${f.pos.z.toFixed(1)}${spoiling}`,
     );
   }
 
-  if (lines.length === 0) {
-    return "Around you, as far as you can see: nothing and no one.";
+  const body = lines.length
+    ? `Around you, as far as you can see (beyond this you know nothing):\n${lines.join("\n")}`
+    : "Around you, as far as you can see: nothing and no one.";
+
+  return `${describeSelf(devot, world)}\n\n${body}`;
+}
+
+/** A devot remembers who has hurt it, capped so the memory cannot grow forever. */
+export function rememberAggressor(victim: DevotEntity, attackerId: string): void {
+  const seen = victim.attackedBy ?? [];
+  if (seen.includes(attackerId)) return;
+  victim.attackedBy = [...seen, attackerId].slice(-4);
+}
+
+/**
+ * WHAT A DEVOT KNOWS ABOUT ITS OWN SITUATION.
+ *
+ * The panorama says what is out there; this says what it means for the devot
+ * looking at it. Without it a mind reads a list of neighbours with no sense of
+ * whether it is winning or dying, and every thought starts from zero.
+ */
+function describeSelf(devot: DevotEntity, world: World): string {
+  const lines: string[] = [];
+
+  // Am I gaining or bleeding? The single most decision-changing fact about
+  // oneself, and one a snapshot of current HP cannot convey.
+  if (devot.hpAtLastThought !== undefined) {
+    const delta = Math.round(devot.hp - devot.hpAtLastThought);
+    if (delta < -200) {
+      lines.push(`Since your last thought you have LOST ${-delta} HP. You are bleeding out.`);
+    } else if (delta > 200) {
+      lines.push(`Since your last thought you have gained ${delta} HP.`);
+    } else {
+      lines.push(`Since your last thought your life has barely moved (${delta >= 0 ? "+" : ""}${delta} HP).`);
+    }
   }
-  return `Around you, as far as you can see (beyond this you know nothing):\n${lines.join("\n")}`;
+
+  // Hunger is the reason predation exists. A starving devot that is never told
+  // its neighbours are made of the thing it needs will simply wander and die.
+  if (devot.state === "dying" || devot.state === "starving") {
+    lines.push(
+      "You are running out. Food is not the only life within reach: every devot and every monster around you is carrying some, and attacking takes it.",
+    );
+  }
+
+  // Who has already done this to me. Devots do not otherwise remember their
+  // aggressors from one thought to the next.
+  const enemies = (devot.attackedBy ?? [])
+    .map((id) => world.devots.get(id) ?? world.monsters.get(id))
+    .filter((e): e is NonNullable<typeof e> => !!e && e.state !== "dead");
+  if (enemies.length > 0) {
+    lines.push(`Has attacked you before: ${enemies.map((e) => e.name).join(", ")}.`);
+  }
+
+  // The ground is now a tactic: high ground sees, low ground hides.
+  const here = terrainHeight(devot.pos.x, devot.pos.z);
+  const around = [
+    terrainHeight(devot.pos.x + 6, devot.pos.z),
+    terrainHeight(devot.pos.x - 6, devot.pos.z),
+    terrainHeight(devot.pos.x, devot.pos.z + 6),
+    terrainHeight(devot.pos.x, devot.pos.z - 6),
+  ];
+  const mean = around.reduce((a, b) => a + b, 0) / around.length;
+  if (here - mean > 0.8) {
+    lines.push("You stand on high ground: you see further from here, and you are seen.");
+  } else if (mean - here > 0.8) {
+    lines.push("You are down in a hollow: the rises around you hide what lies beyond them, and hide you too.");
+  }
+
+  // A different bullet on purpose: the panorama's "- " lines are the capped
+  // list of neighbours, and this block must not be mistaken for one of them,
+  // by the model or by the test that guards against prompt bloat.
+  return lines.length ? `Your situation:\n${lines.map((l) => `· ${l}`).join("\n")}` : "";
 }
 
 /** Applies a mind's decision to the body (new goal, utterance, …). */
