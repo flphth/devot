@@ -1,7 +1,7 @@
 import { UTTERANCE_MAX_CHARS } from "./constants.js";
 import type { Decision, DecisionAction } from "./types.js";
 
-/** Schéma JSON de la sortie structurée d'une pensée (output_config.format). */
+/** JSON schema of a thought's structured output (output_config.format). */
 export const DECISION_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -10,31 +10,31 @@ export const DECISION_SCHEMA = {
     action: {
       type: "string",
       enum: ["idle", "move", "eat", "attack", "reproduce", "speak", "flee"],
-      description: "L'action choisie pour cette pensée.",
+      description: "The action chosen for this thought.",
     },
     thought: {
       type: "string",
       description:
-        "Ton monologue intérieur : une pensée intime à la première personne, une phrase, 140 caractères maximum. Elle aussi te coûte de la vie.",
+        "Your inner monologue: one intimate first-person sentence, 140 characters maximum. It costs you life too.",
     },
     targetId: {
       type: "string",
-      description: "Id du devot ou de la nourriture visé (eat/attack/reproduce).",
+      description: "Id of the targeted devot, monster or food (eat/attack/reproduce).",
     },
     direction: {
       type: "object",
       additionalProperties: false,
       required: ["x", "z"],
       properties: { x: { type: "number" }, z: { type: "number" } },
-      description: "Direction de déplacement (move/flee), vecteur unitaire approximatif.",
+      description: "Movement direction (move/flee), roughly a unit vector.",
     },
     utterance: {
       type: "string",
-      description: `Parole prononcée si action=speak, ${UTTERANCE_MAX_CHARS} caractères max.`,
+      description: `Words spoken if action=speak, ${UTTERANCE_MAX_CHARS} characters max.`,
     },
     emotion: {
       type: "string",
-      description: "Émotion dominante en un mot.",
+      description: "Dominant emotion, in a single word.",
     },
   },
 } as const;
@@ -49,7 +49,7 @@ const ACTIONS: DecisionAction[] = [
   "flee",
 ];
 
-/** Valide et normalise une décision brute (JSON parsé) ; jette si invalide. */
+/** Validates and normalises a raw decision (parsed JSON); throws if invalid. */
 export function parseDecision(raw: unknown): Decision {
   if (typeof raw !== "object" || raw === null) {
     throw new Error("decision: not an object");

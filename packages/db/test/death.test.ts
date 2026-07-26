@@ -11,7 +11,7 @@ function makeDevot(id: string): DevotEntity {
     pos: { x: 0, y: 0, z: 0 },
     hp: 1000,
     hpMax: 1000,
-    state: "vivant",
+    state: "alive",
     profile: "frugal",
     traits: [],
     age: 0,
@@ -21,8 +21,8 @@ function makeDevot(id: string): DevotEntity {
   };
 }
 
-describe("mort = destruction du contexte", () => {
-  it("supprime tous les messages du devot mais garde la pierre tombale", () => {
+describe("death = destruction of the context", () => {
+  it("deletes all the devot's messages but keeps the gravestone", () => {
     const db = openDb(":memory:");
     const repos = createRepos(db);
     const devot = makeDevot("devot-1");
@@ -32,20 +32,20 @@ describe("mort = destruction du contexte", () => {
     repos.messages.append("devot-1", "assistant", [{ type: "text", text: '{"action":"idle"}' }]);
     expect(repos.devots.contextSize("devot-1")).toBe(2);
 
-    repos.devots.kill("devot-1", "épuisement vital");
+    repos.devots.kill("devot-1", "vital exhaustion");
 
-    // Contexte effacé, définitivement.
+    // Context erased, for good.
     expect(repos.devots.contextSize("devot-1")).toBe(0);
     expect(repos.messages.history("devot-1")).toEqual([]);
 
-    // Pierre tombale : la ligne devot survit, marquée morte.
+    // Gravestone: the devot row survives, marked dead.
     const row = repos.devots.get("devot-1");
-    expect(row?.state).toBe("mort");
+    expect(row?.state).toBe("dead");
     expect(row?.diedAt).toBeTruthy();
     expect(row?.hp).toBe(0);
   });
 
-  it("ne touche pas au contexte des autres devots", () => {
+  it("does not touch the context of other devots", () => {
     const db = openDb(":memory:");
     const repos = createRepos(db);
     repos.devots.insertFromEntity(makeDevot("devot-a"));
@@ -59,7 +59,7 @@ describe("mort = destruction du contexte", () => {
     expect(repos.devots.contextSize("devot-b")).toBe(1);
   });
 
-  it("l'historique persiste et se relit dans l'ordre", () => {
+  it("the history persists and reads back in order", () => {
     const db = openDb(":memory:");
     const repos = createRepos(db);
     repos.devots.insertFromEntity(makeDevot("devot-1"));

@@ -2,7 +2,7 @@ import { Client, Room } from "colyseus.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ROOM_NAME, SERVER_PORT, type JournalEntry, type JournalMsg } from "@devot/shared";
 
-/** Vue plate (côté client) de l'état synchronisé. */
+/** Flat client-side view of the synced state. */
 export interface DevotView {
   id: string;
   godId: string;
@@ -147,7 +147,7 @@ export function useWorld(godName: string): WorldConnection {
         });
       })
       .catch((err) => {
-        console.error("[devot] connexion échouée", err);
+        console.error("[devot] connection failed", err);
         setStatus("error");
       });
 

@@ -1,12 +1,12 @@
 import { defineTypes, MapSchema, Schema } from "@colyseus/schema";
 
 /**
- * État autoritaire synchronisé (delta) vers les clients.
- * Le serveur est seul juge ; le client ne fait que rendre.
+ * Authoritative state, delta-synced to the clients.
+ * The server is the only judge; the client merely renders.
  *
- * API defineTypes (sans décorateurs) : les champs sont `declare` + initialisés
- * dans le constructeur pour passer par les accesseurs installés sur le
- * prototype, quel que soit le réglage useDefineForClassFields du bundler.
+ * defineTypes API (no decorators): fields are `declare` + initialised in the
+ * constructor so they go through the accessors installed on the prototype,
+ * whatever the bundler's useDefineForClassFields setting.
  */
 export class DevotState extends Schema {
   declare id: string;
@@ -37,7 +37,7 @@ export class DevotState extends Schema {
     this.z = 0;
     this.hp = 0;
     this.hpMax = 0;
-    this.state = "vivant";
+    this.state = "alive";
     this.profile = "frugal";
     this.thinking = false;
     this.utterance = "";
@@ -96,7 +96,7 @@ export class GodState extends Schema {
   declare id: string;
   declare name: string;
   declare color: string;
-  /** Autoritaire : le client n'affiche que le minuteur. */
+  /** Authoritative: the client only renders the countdown. */
   declare lastSpeakAt: number;
   declare connected: boolean;
 
@@ -135,11 +135,11 @@ defineTypes(WorldState, {
   gods: { map: GodState },
 });
 
-// ── DTO des intentions client → serveur ─────────────────────────────────────
+// ── DTOs for client → server intents ────────────────────────────────────────
 
 export interface CreateFounderMsg {
   name?: string;
-  /** 2 à 3 traits choisis dans TRAIT_POOL (validés côté serveur). */
+  /** 2 to 3 traits picked from TRAIT_POOL (validated server-side). */
   traits?: string[];
 }
 
@@ -147,7 +147,7 @@ export interface SmiteMsg {
   devotId: string;
 }
 
-/** Journal d'un devot (panneau « Esprit »). */
+/** A devot's journal (the "Mind" panel). */
 export interface JournalRequestMsg {
   devotId: string;
 }
@@ -166,7 +166,7 @@ export interface JournalMsg {
   entries: JournalEntry[];
 }
 
-// ── Mode god (debug/créatif, hors règles du jeu) ────────────────────────────
+// ── God mode (debug/creative, outside the rules of the game) ────────────────
 
 export interface DebugSpawnDevotMsg {
   x: number;
@@ -190,7 +190,7 @@ export interface FeedMsg {
   z?: number;
 }
 
-/** Réponse serveur aux intentions rejetées. */
+/** Server response to rejected intents. */
 export interface ActionRejectedMsg {
   action: "createFounder" | "speak" | "feed" | "smite";
   reason: string;

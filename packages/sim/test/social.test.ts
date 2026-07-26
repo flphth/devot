@@ -20,9 +20,9 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     pos: { x: 0, y: 0, z: 0 },
     hp: 20_000,
     hpMax: 50_000,
-    state: "vivant",
+    state: "alive",
     profile: "frugal",
-    traits: ["curieux"],
+    traits: ["curious"],
     age: 0,
     thinking: false,
     utterance: "",
@@ -31,8 +31,8 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
   };
 }
 
-describe("combat — prédation vitale", () => {
-  it("transfère les HP de la victime vers l'agresseur (avec perte)", () => {
+describe("combat — vital predation", () => {
+  it("transfers HP from the victim to the attacker (with loss)", () => {
     const world = new World();
     const attacker = makeDevot({ pos: { x: 0, y: 0, z: 0 } });
     const victim = makeDevot({ pos: { x: 0.5, y: 0, z: 0 } });
@@ -43,7 +43,7 @@ describe("combat — prédation vitale", () => {
     const result = tick(world);
 
     expect(result.combats).toHaveLength(1);
-    // Victime : -drain -métabolisme ; agresseur : +drain×efficacité -métabolisme.
+    // Victim: -drain -metabolism; attacker: +drain×efficiency -metabolism.
     expect(victim.hp).toBeCloseTo(20_000 - ATTACK_DRAIN_PER_TICK - 1, 5);
     expect(attacker.hp).toBeCloseTo(
       20_000 + ATTACK_DRAIN_PER_TICK * ATTACK_EFFICIENCY - 1,
@@ -51,7 +51,7 @@ describe("combat — prédation vitale", () => {
     );
   });
 
-  it("alerte la victime une seule fois (déclencheur threat)", () => {
+  it("alerts the victim only once (threat trigger)", () => {
     const world = new World();
     const attacker = makeDevot();
     const victim = makeDevot({ pos: { x: 0.5, y: 0, z: 0 } });
@@ -65,7 +65,7 @@ describe("combat — prédation vitale", () => {
     expect(r2.triggers.filter((t) => t.kind === "threat")).toHaveLength(0);
   });
 
-  it("l'agresseur poursuit une cible hors de portée", () => {
+  it("the attacker chases a target out of range", () => {
     const world = new World();
     const attacker = makeDevot();
     const victim = makeDevot({ pos: { x: 10, y: 0, z: 0 } });
@@ -79,7 +79,7 @@ describe("combat — prédation vitale", () => {
     expect(result.combats).toHaveLength(0); // pas encore au contact
   });
 
-  it("une victime tuée au combat meurt 'dévorée'", () => {
+  it("a victim killed in combat dies 'devoured'", () => {
     const world = new World();
     const attacker = makeDevot();
     const victim = makeDevot({ pos: { x: 0.5, y: 0, z: 0 }, hp: 100 });
@@ -89,10 +89,10 @@ describe("combat — prédation vitale", () => {
 
     const result = tick(world);
     expect(result.deaths).toHaveLength(1);
-    expect(result.deaths[0]!.cause).toContain("dévoré");
+    expect(result.deaths[0]!.cause).toContain("devoured");
   });
 
-  it("on ne peut pas s'attaquer soi-même", () => {
+  it("you cannot attack yourself", () => {
     const world = new World();
     const devot = makeDevot();
     world.devots.set(devot.id, devot);
@@ -102,9 +102,9 @@ describe("combat — prédation vitale", () => {
 });
 
 describe("reproduction", () => {
-  it("bourgeonnement : coût au parent, vie transmise à l'enfant, traits mutés", () => {
+  it("budding: cost to the parent, life passed to the child, mutated traits", () => {
     const world = new World();
-    const parent = makeDevot({ hp: 20_000, traits: ["curieux", "pieux"] });
+    const parent = makeDevot({ hp: 20_000, traits: ["curious", "pious"] });
     world.devots.set(parent.id, parent);
 
     const outcome = resolveReproduction(world, parent, undefined, () => 0.99);
@@ -114,12 +114,12 @@ describe("reproduction", () => {
     const cost = 20_000 * REPRO_SOLO_COST_FRACTION;
     expect(parent.hp).toBeCloseTo(20_000 - cost, 5);
     expect(outcome.child.hp).toBeCloseTo(cost * REPRO_TRANSFER_EFFICIENCY, 5);
-    expect(outcome.mode).toBe("bourgeonnement");
+    expect(outcome.mode).toBe("budding");
     expect(outcome.child.isFounder).toBe(false);
     expect(outcome.child.godId).toBe(parent.godId);
   });
 
-  it("sexuée : les deux parents paient, l'enfant cumule", () => {
+  it("sexual: both parents pay, the child accumulates", () => {
     const world = new World();
     const a = makeDevot({ hp: 20_000, godId: "g1" });
     const b = makeDevot({ hp: 30_000, godId: "g2", pos: { x: 1, y: 0, z: 0 } });
@@ -135,30 +135,30 @@ describe("reproduction", () => {
     expect(a.hp).toBeCloseTo(20_000 - costA, 5);
     expect(b.hp).toBeCloseTo(30_000 - costB, 5);
     expect(outcome.child.hp).toBeCloseTo((costA + costB) * REPRO_TRANSFER_EFFICIENCY, 5);
-    expect(outcome.mode).toBe("sexuee");
-    // Suzeraineté : l'enfant naît sous le dieu de l'initiateur.
+    expect(outcome.mode).toBe("sexual");
+    // Suzerainty: the child is born under the initiator's god.
     expect(outcome.child.godId).toBe("g1");
   });
 
-  it("refuse si le parent est trop faible", () => {
+  it("refuses if the parent is too weak", () => {
     const world = new World();
     const parent = makeDevot({ hp: REPRO_MIN_HP - 1 });
     world.devots.set(parent.id, parent);
     const outcome = resolveReproduction(world, parent, undefined);
-    expect(outcome).toEqual({ reason: "trop faible pour procréer" });
+    expect(outcome).toEqual({ reason: "too weak to procreate" });
   });
 
-  it("refuse si le partenaire est trop éloigné", () => {
+  it("refuses if the partner is too far away", () => {
     const world = new World();
     const a = makeDevot();
     const b = makeDevot({ pos: { x: 20, y: 0, z: 0 } });
     world.devots.set(a.id, a);
     world.devots.set(b.id, b);
     const outcome = resolveReproduction(world, a, b.id);
-    expect(outcome).toEqual({ reason: "partenaire trop éloigné" });
+    expect(outcome).toEqual({ reason: "partner too far away" });
   });
 
-  it("une décision reproduce pose une intention consommable", () => {
+  it("a reproduce decision records a consumable intent", () => {
     const world = new World();
     const devot = makeDevot();
     world.devots.set(devot.id, devot);

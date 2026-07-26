@@ -33,11 +33,11 @@ async function main(): Promise<void> {
   const room = await client.joinOrCreate(ROOM_NAME, { godName: "Progeniteur" });
   const state = () => room.state as any;
 
-  room.send("createFounder", { name: "Lilith", traits: ["curieux", "généreux"] });
+  room.send("createFounder", { name: "Lilith", traits: ["curious", "generous"] });
   await sleep(800);
   check("fondatrice née", state().devots.size >= 1);
 
-  // La pensée de naissance (scriptée "reproduce") déclenche un bourgeonnement.
+  // The birth thought (scripted "reproduce") triggers a budding.
   await sleep(3000);
   const count = state().devots.size;
   check(`descendance apparue (${count} devots)`, count >= 2);
@@ -50,7 +50,7 @@ async function main(): Promise<void> {
     "procréer a épuisé le parent (HP < hpMax)",
     founder && founder.hp < founder.hpMax * 0.75,
   );
-  check("l'enfant est vivant avec des HP", child && child.hp > 0 && child.state !== "mort");
+  check("l'enfant est vivant avec des HP", child && child.hp > 0 && child.state !== "dead");
 
   await room.leave();
   await gameServer.gracefullyShutdown(false);

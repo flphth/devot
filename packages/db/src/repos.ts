@@ -34,7 +34,7 @@ export class DevotRepo {
       .run();
   }
 
-  /** Snapshot périodique de l'état chaud (positions, HP, âge). */
+  /** Periodic snapshot of the hot state (positions, HP, age). */
   snapshot(e: DevotEntity): void {
     this.db
       .update(devots)
@@ -53,14 +53,14 @@ export class DevotRepo {
   }
 
   /**
-   * Mort : la ligne devot survit comme pierre tombale (died_at), donc le
-   * contexte est supprimé explicitement — le CASCADE ne couvre que le cas
-   * où la ligne devot elle-même serait supprimée.
+   * Death: the devot row survives as a gravestone (died_at), so the context is
+   * deleted explicitly — CASCADE only covers the case where the devot row
+   * itself would be deleted.
    */
   kill(devotId: string, cause: string): void {
     this.db
       .update(devots)
-      .set({ hp: 0, state: "mort", diedAt: Date.now() })
+      .set({ hp: 0, state: "dead", diedAt: Date.now() })
       .where(eq(devots.id, devotId))
       .run();
     this.db.delete(messages).where(eq(messages.devotId, devotId)).run();
@@ -119,7 +119,7 @@ export class MessageRepo {
       }));
   }
 
-  /** Historique daté, pour le journal du panneau « Esprit ». */
+  /** Time-stamped history, for the journal of the "Mind" panel. */
   journal(
     devotId: string,
     limit = 40,
@@ -136,10 +136,10 @@ export class MessageRepo {
     }));
   }
 
-  /** Remplace tout l'historique par un souvenir condensé (chroniqueur, P2). */
+  /** Replaces the whole history with a condensed memory (chronicler, P2). */
   replaceWithSummary(devotId: string, summary: string): void {
     this.db.delete(messages).where(eq(messages.devotId, devotId)).run();
-    this.append(devotId, "user", `[Souvenirs condensés de ta vie passée] ${summary}`);
+    this.append(devotId, "user", `[Condensed memories of your past life] ${summary}`);
   }
 }
 
@@ -183,5 +183,5 @@ export function createRepos(db: DevotDb): Repos {
   };
 }
 
-// Ré-export pour usage direct (profil de cognition sur la ligne devot)
+// Re-export for direct use (cognition profile on the devot row)
 export type { CognitionProfileName };

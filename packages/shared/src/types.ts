@@ -1,13 +1,13 @@
 import type { ModelId } from "./constants.js";
 
-export type DevotLifeState = "vivant" | "affame" | "agonisant" | "mort";
+export type DevotLifeState = "alive" | "starving" | "dying" | "dead";
 
-export type CognitionProfileName = "frugal" | "equilibre" | "prophete";
+export type CognitionProfileName = "frugal" | "balanced" | "prophet";
 
 export interface CognitionProfile {
   name: CognitionProfileName;
   model: ModelId;
-  /** Passé tel quel à l'API ; undefined = pas de thinking (Haiku). */
+  /** Passed through to the API as-is; undefined = no thinking (Haiku). */
   thinking?: { type: "adaptive" };
   effort?: "low" | "medium" | "high";
   maxTokens: number;
@@ -28,22 +28,22 @@ export interface Decision {
   direction?: { x: number; z: number };
   utterance?: string;
   emotion?: string;
-  /** Monologue intérieur : pensée intime, une phrase (≤140c). */
+  /** Inner monologue: one intimate sentence (≤140 chars). */
   thought?: string;
 }
 
 export type TriggerKind =
-  | "divine_message" // priorité max
-  | "threat" // combat / menace
-  | "survival" // HP bas
-  | "encounter" // rencontre significative
-  | "utterance_heard" // parole reçue d'un autre devot
-  | "idle_reflection"; // réflexion oisive
+  | "divine_message" // highest priority
+  | "threat" // combat / danger
+  | "survival" // low HP
+  | "encounter" // meaningful encounter
+  | "utterance_heard" // words from another devot
+  | "idle_reflection"; // idle musing
 
 export interface Trigger {
   kind: TriggerKind;
   devotId: string;
-  /** Description de l'événement, injectée dans le tour utilisateur. */
+  /** Description of the event, injected into the user turn. */
   eventText: string;
   createdAt: number;
 }
@@ -63,7 +63,7 @@ export interface Vec3 {
   z: number;
 }
 
-/** État "chaud" d'un devot dans la simulation (en mémoire). */
+/** A devot's "hot" state inside the simulation (in memory). */
 export interface DevotEntity {
   id: string;
   godId: string;
@@ -75,10 +75,10 @@ export interface DevotEntity {
   state: DevotLifeState;
   profile: CognitionProfileName;
   traits: string[];
-  age: number; // cycles vécus
-  thinking: boolean; // une inférence est en vol
-  utterance: string; // dernière parole (bulle)
-  /** But courant du corps (mouvement déterministe entre deux pensées). */
+  age: number; // cycles lived
+  thinking: boolean; // an inference is in flight
+  utterance: string; // last spoken words (bubble)
+  /** Current goal of the body (deterministic movement between two thoughts). */
   currentGoal:
     | { kind: "wander" }
     | { kind: "seek_food"; foodId: string }
@@ -86,18 +86,18 @@ export interface DevotEntity {
     | { kind: "flee"; from: Vec3 }
     | { kind: "attack"; targetId: string }
     | { kind: "idle" };
-  /** Posée par une décision "reproduce" ; consommée par le serveur. */
+  /** Set by a "reproduce" decision; consumed by the server. */
   pendingReproduction?: { partnerId?: string };
-  /** Id du dernier agresseur signalé (évite de re-déclencher chaque tick). */
+  /** Id of the last reported attacker (avoids re-triggering every tick). */
   underAttackBy?: string;
-  /** Devots déjà rencontrés (une rencontre = un seul déclencheur). */
+  /** Devots already met (one encounter = a single trigger). */
   metDevots?: string[];
 }
 
 export interface FoodEntity {
   id: string;
   pos: Vec3;
-  type: "grain" | "fruit" | "manne" | "corrompu";
+  type: "grain" | "fruit" | "manna" | "tainted";
   hpValue: number;
   source: "spawn" | "god";
 }

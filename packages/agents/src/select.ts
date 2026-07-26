@@ -7,11 +7,11 @@ import { AnthropicMind, MockMind, type MindProvider } from "./mind.js";
 export type MindKind = "claude" | "api" | "mock";
 
 /**
- * Choix du backend des esprits :
- * - MIND=claude → abonnement Claude Code via l'Agent SDK (aucune clé, défaut)
- * - MIND=api    → Messages API pay-per-token (ANTHROPIC_API_KEY requis)
- * - MIND=mock   → esprits simulés, hors-ligne, 0 dépense
- * Sans MIND explicite : une clé API présente → api, sinon → claude.
+ * Choice of mind backend:
+ * - MIND=claude → Claude Code subscription through the Agent SDK (no key, default)
+ * - MIND=api    → pay-per-token Messages API (ANTHROPIC_API_KEY required)
+ * - MIND=mock   → simulated minds, offline, zero spend
+ * With no explicit MIND: an API key present → api, otherwise → claude.
  */
 export function resolveMindKind(env: NodeJS.ProcessEnv = process.env): MindKind {
   const explicit = env.MIND ?? env.DEVOT_MIND;
@@ -22,7 +22,7 @@ export function resolveMindKind(env: NodeJS.ProcessEnv = process.env): MindKind 
   return "claude";
 }
 
-/** Ignore les clés vides ou le placeholder `sk-ant-...` copié du .env.example. */
+/** Ignores empty keys and the `sk-ant-...` placeholder copied from .env.example. */
 function usableApiKey(env: NodeJS.ProcessEnv): boolean {
   const key = env.ANTHROPIC_API_KEY?.trim();
   return !!key && key !== "sk-ant-..." && !key.endsWith("...");
@@ -45,7 +45,7 @@ export function createMind(env: NodeJS.ProcessEnv = process.env): {
     case "claude":
       if (env.ANTHROPIC_API_KEY) {
         console.warn(
-          "[agents] MIND=claude : ANTHROPIC_API_KEY détectée mais ignorée — les esprits utilisent l'abonnement Claude Code (mets MIND=api pour utiliser la clé).",
+          "[agents] MIND=claude: ANTHROPIC_API_KEY detected but ignored — the minds use the Claude Code subscription (set MIND=api to use the key).",
         );
       }
       return {

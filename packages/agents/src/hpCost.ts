@@ -2,9 +2,9 @@ import type { InferenceUsage, ModelId } from "@devot/shared";
 import { LETHALITY, PRICE_PER_MTOK } from "@devot/shared";
 
 /**
- * Cœur de l'économie : convertit l'usage réel d'une inférence en dégâts de HP.
- * Le thinking est facturé en sortie, donc compté dedans. Les tokens lus depuis
- * le cache coûtent ~0,1× le prix d'entrée.
+ * Heart of the economy: converts an inference's real usage into HP damage.
+ * Thinking is billed as output, so it is counted there. Tokens read from the
+ * cache cost ~0.1× the input price.
  */
 export function hpCost(usage: InferenceUsage, model: ModelId): number {
   const p = PRICE_PER_MTOK[model];

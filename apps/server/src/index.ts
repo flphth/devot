@@ -13,5 +13,5 @@ const gameServer = new Server({
 gameServer.define(ROOM_NAME, WorldRoom);
 
 void gameServer.listen(port).then(() => {
-  console.log(`[devot] serveur monde sur ws://localhost:${port}`);
+  console.log(`[devot] world server on ws://localhost:${port}`);
 });

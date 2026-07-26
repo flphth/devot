@@ -43,25 +43,25 @@ async function main(): Promise<void> {
 
   const state = () => room.state as any;
 
-  // 1. Création du fondateur — traits obligatoires (2 à 3, issus du pool)
+  // 1. Founder creation — traits mandatory (2 to 3, from the pool)
   room.send("createFounder", { name: "Sans-Traits" });
   await sleep(400);
   check("création sans traits rejetée", state().devots.size === 0);
-  room.send("createFounder", { name: "Ève", traits: ["curieux", "pieux", "inexistant"] });
+  room.send("createFounder", { name: "Ève", traits: ["curious", "pious", "inexistant"] });
   await sleep(400);
   check("création avec trait hors pool rejetée", state().devots.size === 0);
 
-  room.send("createFounder", { name: "Ève", traits: ["curieux", "pieux"] });
+  room.send("createFounder", { name: "Ève", traits: ["curious", "pious"] });
   await sleep(600);
   check("le fondateur apparaît dans l'état", state().devots.size === 1);
 
   const devotId: string = [...state().devots.keys()][0] as string;
   const devot = state().devots.get(devotId);
   check("le fondateur appartient au dieu", devot.godId === godId);
-  check("le fondateur est vivant avec des HP", devot.hp > 0 && devot.state !== "mort");
+  check("le fondateur est vivant avec des HP", devot.hp > 0 && devot.state !== "dead");
 
-  // 2. Un second fondateur est refusé tant que le premier vit
-  room.send("createFounder", { traits: ["prudent", "pieux"] });
+  // 2. A second founder is refused while the first lives
+  room.send("createFounder", { traits: ["cautious", "pious"] });
   await sleep(400);
   check("recréation refusée (fondateur vivant)", state().devots.size === 1);
 
@@ -82,13 +82,13 @@ async function main(): Promise<void> {
     rejections.length > before && rejections[rejections.length - 1]!.includes("reposer"),
   );
 
-  // 4. Nourrir : la nourriture "don" apparaît près du devot
+  // 4. Feeding: the "gift" food appears near the devot
   const foodBefore = state().food.size;
   room.send("feed", { devotId });
   await sleep(600);
   check("feed fait apparaître une nourriture 'god'", state().food.size > foodBefore);
 
-  // 5. Le devot pense (MockMind) : thinking repasse à false et l'état vit
+  // 5. The devot thinks (MockMind): thinking flips back to false and the state lives
   await sleep(2000);
   check("le devot n'est pas bloqué en 'thinking'", state().devots.get(devotId).thinking === false);
   check(
@@ -115,10 +115,10 @@ async function main(): Promise<void> {
   room.onMessage("smite", () => (smiteFx = true));
   room.send("smite", { devotId });
   await sleep(500);
-  check("le devot foudroyé est mort", state().devots.get(devotId).state === "mort");
+  check("le devot foudroyé est mort", state().devots.get(devotId).state === "dead");
   check("l'effet d'éclair est diffusé", smiteFx);
 
-  // 8. Mode god : spawn debug + déplacement de nourriture
+  // 8. God mode: debug spawn + moving food
   room.send("debugSpawnDevot", { x: 5, z: 5 });
   await sleep(500);
   check("debugSpawnDevot fait naître un devot", state().devots.size === 2);

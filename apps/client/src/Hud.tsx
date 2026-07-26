@@ -63,7 +63,7 @@ function TraitPicker({
 }
 
 function Journal({ entries }: { entries: JournalEntry[] }) {
-  const items = [...entries].reverse(); // du plus récent au plus ancien
+  const items = [...entries].reverse(); // newest first
   return (
     <div
       style={{
@@ -77,7 +77,7 @@ function Journal({ entries }: { entries: JournalEntry[] }) {
       }}
     >
       {items.length === 0 && (
-        <div style={{ opacity: 0.5 }}>Aucun souvenir encore. Il n'a pas vécu.</div>
+        <div style={{ opacity: 0.5 }}>No memories yet. They have not lived.</div>
       )}
       {items.map((e, i) => (
         <div
@@ -99,9 +99,9 @@ function Journal({ entries }: { entries: JournalEntry[] }) {
                 {e.emotion ? <span style={{ opacity: 0.65 }}> — {e.emotion}</span> : null}
               </div>
               {e.thought && (
-                <div style={{ fontStyle: "italic", color: "#aeb8c9" }}>« {e.thought} »</div>
+                <div style={{ fontStyle: "italic", color: "#aeb8c9" }}>“{e.thought}”</div>
               )}
-              {e.text && <div>🗣 « {e.text} »</div>}
+              {e.text && <div>🗣 “{e.text}”</div>}
             </div>
           )}
         </div>
@@ -141,12 +141,12 @@ export function Hud({
 
   const god = snapshot.gods.find((g) => g.id === godId);
   const myDevots = snapshot.devots.filter((d) => d.godId === godId);
-  const hasLiving = myDevots.some((d) => d.state !== "mort");
+  const hasLiving = myDevots.some((d) => d.state !== "dead");
   const cooldownLeft = god
     ? Math.max(0, DIVINE_MSG_COOLDOWN_MS - (now - god.lastSpeakAt))
     : 0;
   const canSpeak =
-    cooldownLeft === 0 && selected && selected.godId === godId && selected.state !== "mort";
+    cooldownLeft === 0 && selected && selected.godId === godId && selected.state !== "dead";
 
   const toggleTrait = (t: string) =>
     setTraits((prev) =>
@@ -173,20 +173,19 @@ export function Hud({
             letterSpacing: 1,
           }}
         >
-          ⚡ MODE GOD — clic : spawn devot · glisser la nourriture · brouillard off ·
-          touche 1 pour sortir
+          ⚡ GOD MODE — click: spawn devot · drag the food · fog off · press 1 to leave
         </div>
       )}
 
-      {/* Panthéon / création */}
+      {/* Pantheon / creation */}
       <div style={{ ...panel, top: 14, left: 14, width: 250 }}>
         <div style={{ fontWeight: 700, marginBottom: 6 }}>
-          {god ? `⚡ ${god.name}` : "Connexion…"}
+          {god ? `⚡ ${god.name}` : "Connecting…"}
         </div>
         {!hasLiving && (
           <>
             <div style={{ opacity: 0.75, fontSize: 12 }}>
-              Façonne ton fondateur : choisis 2 à 3 traits qui forgeront son âme.
+              Shape your founder: choose 2 to 3 traits that will forge their soul.
             </div>
             <TraitPicker selected={traits} onToggle={toggleTrait} />
             <button
@@ -204,7 +203,7 @@ export function Hud({
                 cursor: traits.length >= 2 ? "pointer" : "default",
               }}
             >
-              Façonner ton devot fondateur
+              Shape your founder devot
             </button>
           </>
         )}
@@ -212,7 +211,7 @@ export function Hud({
           <div key={d.id} style={{ marginTop: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span>
-                {d.state === "mort" ? "☠ " : d.thinking ? "💭 " : ""}
+                {d.state === "dead" ? "☠ " : d.thinking ? "💭 " : ""}
                 {d.name}
               </span>
               <span style={{ opacity: 0.7 }}>{d.state}</span>
@@ -241,31 +240,31 @@ export function Hud({
               />
             </div>
             <div style={{ opacity: 0.6, fontSize: 11, marginTop: 2 }}>
-              {Math.round(d.hp)} / {d.hpMax} HP — {(d.hp / 1e6).toFixed(4)} $ de pensée
+              {Math.round(d.hp)} / {d.hpMax} HP — ${(d.hp / 1e6).toFixed(4)} of thought
             </div>
           </div>
         ))}
       </div>
 
-      {/* Panneau Esprit : la vie intérieure du devot sélectionné */}
+      {/* Mind panel: the inner life of the selected devot */}
       {selected && (
         <div style={{ ...panel, top: 14, left: 280, width: 320 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-            <b>Esprit de {selected.name}</b>
+            <b>Mind of {selected.name}</b>
             <span style={{ opacity: 0.6, fontSize: 11 }}>
               {selected.state}, {selected.age} cycles
             </span>
           </div>
           {selected.thought && (
             <div style={{ fontStyle: "italic", color: "#aeb8c9", marginTop: 4 }}>
-              « {selected.thought} »
+              “{selected.thought}”
             </div>
           )}
           <Journal entries={journal} />
         </div>
       )}
 
-      {/* Devot sélectionné : verbe divin + nourrir + foudroyer */}
+      {/* Selected devot: divine word + feed + smite */}
       {selected && (
         <div style={{ ...panel, bottom: 14, left: "50%", transform: "translateX(-50%)", width: 470 }}>
           <div style={{ marginBottom: 6 }}>
@@ -285,8 +284,8 @@ export function Hud({
                   onKeyDown={(e) => e.key === "Enter" && canSpeak && send()}
                   placeholder={
                     cooldownLeft > 0
-                      ? `Ta voix se repose (${Math.ceil(cooldownLeft / 1000)} s)…`
-                      : "Parle à ton devot (140 caractères, il t'en coûtera sa vie)…"
+                      ? `Your voice is resting (${Math.ceil(cooldownLeft / 1000)} s)…`
+                      : "Speak to your devot (140 characters, it will cost them life)…"
                   }
                   disabled={!canSpeak}
                   style={{
@@ -315,7 +314,7 @@ export function Hud({
                 </button>
                 <button
                   onClick={() => actions.feed(selected.id)}
-                  title="Déposer de la nourriture près de lui"
+                  title="Drop food near them"
                   style={{
                     padding: "8px 12px",
                     borderRadius: 8,
@@ -328,14 +327,14 @@ export function Hud({
                 >
                   🍞
                 </button>
-                {selected.state !== "mort" && (
+                {selected.state !== "dead" && (
                   <button
                     onClick={() => {
                       if (!confirmSmite) return setConfirmSmite(true);
                       actions.smite(selected.id);
                       setConfirmSmite(false);
                     }}
-                    title="Foudroyer ton devot — sa mémoire sera détruite à jamais"
+                    title="Strike down your devot — their memory will be destroyed forever"
                     style={{
                       padding: "8px 12px",
                       borderRadius: 8,
@@ -346,18 +345,18 @@ export function Hud({
                       cursor: "pointer",
                     }}
                   >
-                    {confirmSmite ? "Confirmer ⚡" : "⚡"}
+                    {confirmSmite ? "Confirm ⚡" : "⚡"}
                   </button>
                 )}
               </div>
               <div style={{ opacity: 0.55, fontSize: 11, marginTop: 5 }}>
                 {confirmSmite
-                  ? "⚠ Foudroyer est irréversible : son esprit sera effacé pour toujours."
-                  : `${text.length}/${DIVINE_MSG_MAX_CHARS} — une parole par minute. Le silence est parfois le plus grand des cadeaux.`}
+                  ? "⚠ Striking down is irreversible: their mind will be erased forever."
+                  : `${text.length}/${DIVINE_MSG_MAX_CHARS} — one word per minute. Silence is sometimes the greatest gift.`}
               </div>
             </>
           ) : (
-            <div style={{ opacity: 0.65 }}>Ce devot appartient à un autre dieu.</div>
+            <div style={{ opacity: 0.65 }}>This devot belongs to another god.</div>
           )}
         </div>
       )}

@@ -20,13 +20,13 @@ export default function App() {
     useWorld(godName);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [godMode, setGodMode] = useState(false);
-  // Ref synchrone : les handlers R3F la lisent sans dépendre du commit du
-  // pont React↔canvas (qui peut retarder d'une frame la mise à jour des props).
+  // Synchronous ref: the R3F handlers read it without depending on the
+  // React↔canvas bridge commit (which can delay prop updates by a frame).
   const godModeRef = useRef(false);
 
   const selected = snapshot.devots.find((d) => d.id === selectedId) ?? null;
 
-  // Hooks de test pilotés (dev uniquement) : état + sélection programmable.
+  // Driven test hooks (dev only): state + programmable selection.
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     (window as unknown as Record<string, unknown>).__devot = {
@@ -37,7 +37,7 @@ export default function App() {
     };
   });
 
-  // Touche 1 : mode god (debug/créatif) — ignorée quand on tape du texte.
+  // Key 1: god mode (debug/creative) — ignored while typing text.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "1") return;
@@ -52,7 +52,7 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Journal du devot sélectionné : chargé à la sélection puis rafraîchi.
+  // Journal of the selected devot: loaded on selection, then refreshed.
   useEffect(() => {
     if (!selectedId) return;
     actions.getJournal(selectedId);
@@ -97,8 +97,8 @@ export default function App() {
           }}
         >
           {status === "connecting"
-            ? "Ascension vers le monde…"
-            : "Le monde est inaccessible. Le serveur tourne-t-il ? (pnpm --filter @devot/server dev)"}
+            ? "Ascending to the world…"
+            : "The world is unreachable. Is the server running? (pnpm --filter @devot/server dev)"}
         </div>
       )}
     </div>

@@ -12,7 +12,7 @@ import { dist2, World } from "./world.js";
 export interface Birth {
   child: DevotEntity;
   parents: DevotEntity[];
-  mode: "bourgeonnement" | "sexuee";
+  mode: "budding" | "sexual";
 }
 
 export interface ReproFailure {
@@ -22,9 +22,9 @@ export interface ReproFailure {
 let childSeq = 0;
 
 /**
- * Concrétise une décision de reproduction (mécanique pure, 0 token).
- * L'héritage de contexte (chroniqueur) est fait ensuite par l'appelant.
- * `rng` injectable pour des tests déterministes.
+ * Carries out a reproduction decision (pure mechanics, 0 tokens).
+ * Context inheritance (the chronicler) is done afterwards by the caller.
+ * `rng` is injectable for deterministic tests.
  */
 export function resolveReproduction(
   world: World,
@@ -32,19 +32,19 @@ export function resolveReproduction(
   partnerId: string | undefined,
   rng: () => number = Math.random,
 ): Birth | ReproFailure {
-  if (parent.state === "mort") return { reason: "mort" };
+  if (parent.state === "dead") return { reason: "dead" };
   if (parent.hp < REPRO_MIN_HP) {
-    return { reason: "trop faible pour procréer" };
+    return { reason: "too weak to procreate" };
   }
 
   const partner = partnerId ? world.devots.get(partnerId) : undefined;
 
   if (partner && partner.id !== parent.id) {
-    // Reproduction sexuée — y compris entre lignées de dieux différents.
-    if (partner.state === "mort") return { reason: "partenaire mort" };
-    if (partner.hp < REPRO_MIN_HP) return { reason: "partenaire trop faible" };
+    // Sexual reproduction — including across the lineages of different gods.
+    if (partner.state === "dead") return { reason: "partner is dead" };
+    if (partner.hp < REPRO_MIN_HP) return { reason: "partner too weak" };
     if (dist2(parent.pos, partner.pos) > REPRO_RADIUS * REPRO_RADIUS) {
-      return { reason: "partenaire trop éloigné" };
+      return { reason: "partner too far away" };
     }
     const costA = parent.hp * REPRO_PAIR_COST_FRACTION;
     const costB = partner.hp * REPRO_PAIR_COST_FRACTION;
@@ -52,14 +52,14 @@ export function resolveReproduction(
     partner.hp -= costB;
     const childHp = (costA + costB) * REPRO_TRANSFER_EFFICIENCY;
     const child = makeChild(parent, partner, childHp, rng);
-    return { child, parents: [parent, partner], mode: "sexuee" };
+    return { child, parents: [parent, partner], mode: "sexual" };
   }
 
-  // Bourgeonnement : clone muté.
+  // Budding: a mutated clone.
   const cost = parent.hp * REPRO_SOLO_COST_FRACTION;
   parent.hp -= cost;
   const child = makeChild(parent, undefined, cost * REPRO_TRANSFER_EFFICIENCY, rng);
-  return { child, parents: [parent], mode: "bourgeonnement" };
+  return { child, parents: [parent], mode: "budding" };
 }
 
 function makeChild(
@@ -72,8 +72,8 @@ function makeChild(
     b ? mixTraits(a.traits, b.traits, rng) : [...a.traits],
     rng,
   );
-  // Suzeraineté (question ouverte du design) : l'enfant naît sous le dieu
-  // du parent initiateur — son allégeance réelle reste un ressort narratif.
+  // Suzerainty (an open design question): the child is born under the god of
+  // the initiating parent — its real allegiance stays a narrative device.
   return {
     id: `devot-child-${Date.now()}-${childSeq++}`,
     godId: a.godId,
@@ -86,7 +86,7 @@ function makeChild(
     },
     hp,
     hpMax: Math.max(a.hpMax, b?.hpMax ?? 0),
-    state: "vivant",
+    state: "alive",
     profile: a.profile,
     traits,
     age: 0,
@@ -114,6 +114,6 @@ function mutateTraits(traits: string[], rng: () => number): string[] {
 }
 
 function childName(a: DevotEntity, b: DevotEntity | undefined, rng: () => number): string {
-  const root = (b && rng() < 0.5 ? b : a).name.replace(/-(fils|fille) .*$/, "");
-  return `${root}-${rng() < 0.5 ? "fils" : "fille"} ${Math.floor(rng() * 900 + 100)}`;
+  const root = (b && rng() < 0.5 ? b : a).name.replace(/-(son|daughter) .*$/, "");
+  return `${root}-${rng() < 0.5 ? "son" : "daughter"} ${Math.floor(rng() * 900 + 100)}`;
 }

@@ -9,7 +9,7 @@ const WORLD_HALF = 30;
 const GROUND_SIZE = 120;
 const GRASS_COUNT = 900;
 
-// Palette prairie / voxel, couleurs plates.
+// Meadow / voxel palette, flat colours.
 const GRASS_LIT = new THREE.Color("#69a84f");
 const GRASS_DARK = new THREE.Color("#1c2c1e");
 const TUFT_LIT = new THREE.Color("#7dbc5e");
@@ -18,8 +18,8 @@ const TUFT_DARK = new THREE.Color("#243526");
 const FOOD_COLORS: Record<string, string> = {
   grain: "#e8c95c",
   fruit: "#e0634c",
-  manne: "#9fe8ff",
-  corrompu: "#9c4ce0",
+  manna: "#9fe8ff",
+  tainted: "#9c4ce0",
 };
 
 type VisionCircle = { x: number; z: number };
@@ -34,7 +34,7 @@ function isVisible(x: number, z: number, vision: VisionCircle[], godMode: boolea
   });
 }
 
-// ── Sol prairie avec brouillard de guerre (shader) ──────────────────────────
+// ── Meadow ground with fog of war (shader) ──────────────────────────────────
 
 const MAX_VISION = 16;
 
@@ -84,7 +84,7 @@ function PrairieGround({
           }
 
           void main() {
-            // Variation de teinte façon patchwork de prairie (aplats, pas de bruit fin).
+            // Meadow-patchwork hue variation (flat areas, no fine noise).
             float n = hash(floor(vWorld * 0.8));
             vec3 grass = uLit * (0.92 + 0.16 * n);
 
@@ -124,7 +124,7 @@ function PrairieGround({
   );
 }
 
-// ── Touffes d'herbe instanciées ─────────────────────────────────────────────
+// ── Instanced grass tufts ───────────────────────────────────────────────────
 
 function GrassTufts({ vision, godMode }: { vision: VisionCircle[]; godMode: boolean }) {
   const ref = useRef<THREE.InstancedMesh>(null);
@@ -160,7 +160,7 @@ function GrassTufts({ vision, godMode }: { vision: VisionCircle[]; godMode: bool
     mesh.instanceMatrix.needsUpdate = true;
   }, [tufts]);
 
-  // Les touffes hors de vue s'assombrissent comme le sol.
+  // Tufts out of sight darken like the ground.
   useEffect(() => {
     const mesh = ref.current;
     if (!mesh) return;
@@ -179,7 +179,7 @@ function GrassTufts({ vision, godMode }: { vision: VisionCircle[]; godMode: bool
   );
 }
 
-// ── Devot voxel ─────────────────────────────────────────────────────────────
+// ── Voxel devot ─────────────────────────────────────────────────────────────
 
 function VoxelDevot({
   devot,
@@ -196,7 +196,7 @@ function VoxelDevot({
   const bodyGroup = useRef<THREE.Group>(null);
   const target = useRef(new THREE.Vector3(devot.x, 0, devot.z));
   const heading = useRef(0);
-  const dead = devot.state === "mort";
+  const dead = devot.state === "dead";
 
   target.current.set(devot.x, 0, devot.z);
 
@@ -205,14 +205,14 @@ function VoxelDevot({
     const b = bodyGroup.current;
     if (!g || !b) return;
 
-    // Interpolation : plus aucune téléportation entre deux patches réseau.
+    // Interpolation: no more teleporting between two network patches.
     const before = g.position.clone();
     g.position.lerp(target.current, 1 - Math.exp(-dt * 7));
     const delta = g.position.clone().sub(before);
     const speed = delta.length() / Math.max(dt, 1e-4);
     const moving = speed > 0.15 && !dead;
 
-    // Orientation vers la direction de déplacement (amortie).
+    // Facing the direction of travel (damped).
     if (moving) {
       const desired = Math.atan2(delta.x, delta.z);
       let diff = desired - heading.current;
@@ -229,12 +229,12 @@ function VoxelDevot({
       b.scale.setScalar(1);
       return;
     }
-    // Marche : bob + balancement. Faim : tremblement. Pensée : pulsation.
+    // Walking: bob + sway. Hunger: trembling. Thinking: pulsing.
     const bob = moving ? Math.abs(Math.sin(t * 9)) * 0.07 : 0;
     const tremble =
-      devot.state === "agonisant"
+      devot.state === "dying"
         ? Math.sin(t * 40) * 0.02
-        : devot.state === "affame"
+        : devot.state === "starving"
           ? Math.sin(t * 25) * 0.01
           : 0;
     b.position.y = bob;
@@ -246,9 +246,9 @@ function VoxelDevot({
 
   const base = new THREE.Color(color);
   const bodyColor =
-    devot.state === "agonisant"
+    devot.state === "dying"
       ? base.clone().lerp(new THREE.Color("#444"), 0.5)
-      : devot.state === "affame"
+      : devot.state === "starving"
         ? base.clone().lerp(new THREE.Color("#888"), 0.3)
         : base;
   const headColor = bodyColor.clone().lerp(new THREE.Color("#ffffff"), 0.25);
@@ -266,7 +266,7 @@ function VoxelDevot({
         }}
       >
         {dead ? (
-          // Pierre tombale voxel.
+          // Voxel gravestone.
           <group>
             <mesh position={[0, 0.3, 0]}>
               <boxGeometry args={[0.5, 0.6, 0.18]} />
@@ -283,7 +283,7 @@ function VoxelDevot({
           </group>
         ) : (
           <group>
-            {/* corps */}
+            {/* body */}
             <mesh position={[0, 0.42, 0]}>
               <boxGeometry args={[0.46, 0.5, 0.32]} />
               <meshStandardMaterial
@@ -293,12 +293,12 @@ function VoxelDevot({
                 emissiveIntensity={selected ? 0.45 : 0}
               />
             </mesh>
-            {/* tête */}
+            {/* head */}
             <mesh position={[0, 0.88, 0]}>
               <boxGeometry args={[0.4, 0.36, 0.36]} />
               <meshStandardMaterial color={headColor} flatShading />
             </mesh>
-            {/* yeux */}
+            {/* eyes */}
             <mesh position={[-0.09, 0.9, 0.185]}>
               <boxGeometry args={[0.07, 0.09, 0.02]} />
               <meshStandardMaterial color="#1c2028" />
@@ -307,7 +307,7 @@ function VoxelDevot({
               <boxGeometry args={[0.07, 0.09, 0.02]} />
               <meshStandardMaterial color="#1c2028" />
             </mesh>
-            {/* pieds */}
+            {/* feet */}
             <mesh position={[-0.12, 0.08, 0]}>
               <boxGeometry args={[0.16, 0.16, 0.2]} />
               <meshStandardMaterial color={bodyColor.clone().multiplyScalar(0.7)} flatShading />
@@ -369,7 +369,7 @@ function VoxelDevot({
   );
 }
 
-// ── Nourriture voxel ────────────────────────────────────────────────────────
+// ── Voxel food ──────────────────────────────────────────────────────────────
 
 function VoxelFood({
   food,
@@ -388,7 +388,7 @@ function VoxelFood({
     const g = ref.current;
     if (!g) return;
     g.position.lerp(target.current, 1 - Math.exp(-dt * 10));
-    if (food.kind === "manne") {
+    if (food.kind === "manna") {
       g.rotation.y = clock.elapsedTime * 1.2;
       g.position.y = 0.15 + Math.sin(clock.elapsedTime * 2) * 0.08;
     }
@@ -416,7 +416,7 @@ function VoxelFood({
             <meshStandardMaterial color="#4c8a3f" flatShading />
           </mesh>
         </group>
-      ) : food.kind === "manne" ? (
+      ) : food.kind === "manna" ? (
         <mesh position={[0, 0.2, 0]}>
           <octahedronGeometry args={[0.22]} />
           <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.7} flatShading />
@@ -437,7 +437,7 @@ function VoxelFood({
   );
 }
 
-// ── Foudre divine ───────────────────────────────────────────────────────────
+// ── Divine lightning ────────────────────────────────────────────────────────
 
 function LightningFx({ fx }: { fx: SmiteFx }) {
   const ref = useRef<THREE.Group>(null);
@@ -466,7 +466,7 @@ function LightningFx({ fx }: { fx: SmiteFx }) {
   );
 }
 
-/** Expose la caméra aux tests pilotés (dev uniquement). */
+/** Exposes the camera to driven tests (dev only). */
 function DevTestHooks() {
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
@@ -477,7 +477,7 @@ function DevTestHooks() {
   return null;
 }
 
-// ── Scène ───────────────────────────────────────────────────────────────────
+// ── Scene ───────────────────────────────────────────────────────────────────
 
 export function Scene({
   snapshot,
@@ -506,9 +506,9 @@ export function Scene({
   const godColor = (id: string): string =>
     snapshot.gods.find((g) => g.id === id)?.color ?? "#cccccc";
 
-  // Brouillard de guerre : le monde n'est net qu'autour de mes devots vivants.
+  // Fog of war: the world is only sharp around my living devots.
   const vision: VisionCircle[] = snapshot.devots
-    .filter((d) => d.godId === godId && d.state !== "mort")
+    .filter((d) => d.godId === godId && d.state !== "dead")
     .map((d) => ({ x: d.x, z: d.z }));
 
   const visibleDevots = snapshot.devots.filter(
@@ -518,7 +518,7 @@ export function Scene({
 
   const handleGroundClick = (e: ThreeEvent<MouseEvent>) => {
     if (draggingFood) return;
-    // godModeRef, pas la prop : le commit R3F peut retarder d'une frame.
+    // godModeRef, not the prop: the R3F commit can lag by a frame.
     if (godModeRef.current) {
       onGroundClick(e.point.x, e.point.z);
     } else {
@@ -549,7 +549,7 @@ export function Scene({
         onPointerUp={() => setDraggingFood(null)}
       />
       <GrassTufts vision={vision} godMode={godMode} />
-      {/* Le maillage reste visible par-dessus la prairie — choix de style. */}
+      {/* The grid stays visible over the meadow — a style choice. */}
       <Grid
         args={[GROUND_SIZE, GROUND_SIZE]}
         position={[0, 0.02, 0]}

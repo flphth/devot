@@ -7,17 +7,18 @@ import type { MindProvider, ThoughtResult } from "./mind.js";
 import { buildEventBlock, buildPersona, WORLD_RULES } from "./prompts.js";
 
 /**
- * Esprits animés par l'abonnement Claude Code (Agent SDK) : aucune clé API
- * pay-per-token — chaque pensée passe par les identifiants Claude Code de la
- * machine. L'usage réel (tokens) est toujours converti en dégâts de HP.
+ * Minds powered by the Claude Code subscription (Agent SDK): no pay-per-token
+ * API key — every thought goes through the machine's Claude Code credentials.
+ * Real usage (tokens) is still converted into HP damage.
  *
- * Chaque pensée est une session éphémère : l'historique du devot est rejoué
- * dans le prompt sous forme de transcript (sa mémoire vit dans notre base).
+ * Each thought is an ephemeral session: the devot's history is replayed into
+ * the prompt as a transcript (its memory lives in our database).
  */
+
 /**
- * Environnement du sous-processus Claude Code, purgé des clés API : en mode
- * abonnement, une ANTHROPIC_API_KEY résiduelle (shell, .env, placeholder)
- * prendrait le dessus sur l'OAuth et provoquerait `invalid x-api-key`.
+ * Environment of the Claude Code subprocess, stripped of API keys: in
+ * subscription mode a leftover ANTHROPIC_API_KEY (shell, .env, placeholder)
+ * would take precedence over OAuth and cause `invalid x-api-key`.
  */
 function subscriptionEnv(): Record<string, string | undefined> {
   return {
@@ -39,7 +40,7 @@ export class AgentSdkMind implements MindProvider {
     const userTurn = buildEventBlock(devot, eventText);
     const transcript = renderTranscript(history);
     const prompt = transcript
-      ? `## Ta mémoire (vécue jusqu'ici)\n${transcript}\n\n## Maintenant\n${userTurn}`
+      ? `## Your memory (lived so far)\n${transcript}\n\n## Now\n${userTurn}`
       : userTurn;
 
     const q = query({
@@ -60,7 +61,7 @@ export class AgentSdkMind implements MindProvider {
     for await (const message of q) {
       if (message.type !== "result") continue;
       if (message.subtype !== "success") {
-        throw new Error(`agent-sdk: pensée échouée (${message.subtype})`);
+        throw new Error(`agent-sdk: thought failed (${message.subtype})`);
       }
       const decision = parseDecision(
         message.structured_output ?? JSON.parse(message.result),
@@ -72,11 +73,11 @@ export class AgentSdkMind implements MindProvider {
         userTurn,
       };
     }
-    throw new Error("agent-sdk: aucun résultat");
+    throw new Error("agent-sdk: no result");
   }
 }
 
-/** Chroniqueur sur abonnement : condense les mémoires via une session Haiku. */
+/** Chronicler on the subscription: condenses memories through a Haiku session. */
 export class AgentSdkChronicler implements Chronicler {
   async chronicle(
     histories: Array<{ name: string; history: StoredMessage[] }>,
@@ -84,16 +85,16 @@ export class AgentSdkChronicler implements Chronicler {
   ): Promise<ChronicleResult> {
     const instruction =
       purpose === "aging"
-        ? "Condense la vie de ce devot en un souvenir à la première personne (« je me souviens... »), 150 mots maximum. Garde l'essentiel : événements marquants, relations, leçons, peurs et espoirs."
-        : "Fusionne les vies de ces parents en un héritage de souvenirs pour leur enfant, à la première personne (« je me souviens d'une vie que je n'ai pas vécue... »), 150 mots maximum.";
+        ? "Condense this devot's life into a first-person memory (\"I remember…\"), 150 words maximum. Keep what matters: defining events, relationships, lessons, fears and hopes."
+        : "Merge these parents' lives into an inheritance of memories for their child, in the first person (\"I remember a life I did not live…\"), 150 words maximum.";
 
     const q = query({
       prompt: `${instruction}\n\n${histories
-        .map((h) => `### Vie de ${h.name}\n${renderTranscript(h.history)}`)
+        .map((h) => `### Life of ${h.name}\n${renderTranscript(h.history)}`)
         .join("\n\n")}`,
       options: {
         systemPrompt:
-          "Tu es le chroniqueur d'un monde où des créatures pensantes vivent et meurent. Tu condenses leurs mémoires. Réponds uniquement par le souvenir condensé, sans préambule.",
+          "You are the chronicler of a world where thinking creatures live and die. You condense their memories. Answer only with the condensed memory, with no preamble.",
         model: "claude-haiku-4-5",
         maxTurns: 1,
         allowedTools: [],
@@ -104,11 +105,11 @@ export class AgentSdkChronicler implements Chronicler {
     for await (const message of q) {
       if (message.type !== "result") continue;
       if (message.subtype !== "success") {
-        throw new Error(`agent-sdk: chronique échouée (${message.subtype})`);
+        throw new Error(`agent-sdk: chronicle failed (${message.subtype})`);
       }
       return { summary: message.result.trim(), usage: toUsage(message.usage) };
     }
-    throw new Error("agent-sdk: aucun résultat");
+    throw new Error("agent-sdk: no result");
   }
 }
 
@@ -117,7 +118,7 @@ function renderTranscript(history: StoredMessage[]): string {
     .map((m) => {
       const content =
         typeof m.content === "string" ? m.content : JSON.stringify(m.content);
-      return `${m.role === "user" ? "[événement]" : "[ta décision]"} ${content.slice(0, 500)}`;
+      return `${m.role === "user" ? "[event]" : "[your decision]"} ${content.slice(0, 500)}`;
     })
     .join("\n");
 }

@@ -4,9 +4,8 @@ import type { DevotEntity } from "@devot/shared";
 import { resolveReproduction, World, type Birth } from "@devot/sim";
 
 /**
- * Consomme les intentions de reproduction posées par les esprits et
- * concrétise les naissances : mécanique (sim) + héritage de contexte
- * (chroniqueur) + persistance.
+ * Consumes the reproduction intents recorded by the minds and carries out the
+ * births: mechanics (sim) + context inheritance (chronicler) + persistence.
  */
 export async function processReproductions(
   world: World,
@@ -39,8 +38,8 @@ export async function processReproductions(
       traits: child.traits,
     });
 
-    // L'enfant naît avec des souvenirs : les vies de ses parents,
-    // condensées par le chroniqueur en un héritage cohérent.
+    // The child is born with memories: its parents' lives, condensed by the
+    // chronicler into a coherent inheritance.
     try {
       const { summary } = await chronicler.chronicle(
         parents.map((p) => ({ name: p.name, history: repos.messages.history(p.id) })),
@@ -50,11 +49,11 @@ export async function processReproductions(
         repos.messages.append(
           child.id,
           "user",
-          `[Souvenirs hérités de ${parents.map((p) => p.name).join(" et ")}] ${summary}`,
+          `[Memories inherited from ${parents.map((p) => p.name).join(" and ")}] ${summary}`,
         );
       }
     } catch (err) {
-      console.error(`[lifecycle] héritage échoué pour ${child.id}:`, err);
+      console.error(`[lifecycle] inheritance failed for ${child.id}:`, err);
     }
 
     births.push(outcome);
@@ -64,9 +63,9 @@ export async function processReproductions(
   return births;
 }
 
-/** Un dieu peut refaçonner un fondateur ssi tous ses devots sont morts. */
+/** A god may shape a new founder iff all their devots are dead. */
 export function canRecreateFounder(world: World, godId: string): boolean {
   return ![...world.devots.values()].some(
-    (d: DevotEntity) => d.godId === godId && d.state !== "mort",
+    (d: DevotEntity) => d.godId === godId && d.state !== "dead",
   );
 }
