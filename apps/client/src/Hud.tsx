@@ -6,7 +6,13 @@ import {
   type JournalEntry,
   type SpawnKind,
 } from "@devot/shared";
-import type { CombatFx, DevotView, WorldActions, WorldSnapshot } from "./useWorld.js";
+import type {
+  CombatFx,
+  DevotView,
+  FeedEntry,
+  WorldActions,
+  WorldSnapshot,
+} from "./useWorld.js";
 import { useT } from "./i18n.js";
 
 const panel: React.CSSProperties = {
@@ -125,6 +131,7 @@ export function Hud({
   onSpawnKind,
   journal,
   combats,
+  thoughtFeed,
 }: {
   snapshot: WorldSnapshot;
   godId: string | null;
@@ -136,6 +143,7 @@ export function Hud({
   onSpawnKind: (k: SpawnKind) => void;
   journal: JournalEntry[];
   combats: CombatFx[];
+  thoughtFeed: FeedEntry[];
 }) {
   const { t, d } = useT();
   const [text, setText] = useState("");
@@ -217,6 +225,7 @@ export function Hud({
       )}
 
       <CombatLog combats={combats} devots={snapshot.devots} />
+      <ThoughtFeed entries={thoughtFeed} />
 
       {/* Pantheon / creation */}
       <div style={{ ...panel, top: 14, left: 14, width: 250 }}>
@@ -407,6 +416,59 @@ export function Hud({
  * less, decide worse, and die. The player must understand that by watching,
  * not by reading the documentation.
  */
+/**
+ * THE WORLD'S INNER LIFE, AS IT HAPPENS.
+ *
+ * Every monologue and every word spoken, from every creature at once. This is
+ * what the game is actually made of — until now a player could only read one
+ * devot at a time, in a panel they had to click into.
+ */
+function ThoughtFeed({ entries }: { entries: FeedEntry[] }) {
+  const { t } = useT();
+  const newestFirst = [...entries].reverse();
+
+  return (
+    <div
+      style={{
+        ...panel,
+        top: 62,
+        right: 14,
+        width: 320,
+        maxHeight: "calc(100vh - 90px)",
+        overflowY: "auto",
+        display: "flex",
+        flexDirection: "column",
+        gap: 7,
+      }}
+    >
+      <div style={{ fontWeight: 700 }}>{t("feed.title")}</div>
+      {newestFirst.length === 0 && (
+        <div style={{ opacity: 0.5, fontSize: 12 }}>{t("feed.empty")}</div>
+      )}
+      {newestFirst.map((e) => (
+        <div key={e.id} style={{ borderLeft: `3px solid ${e.color}`, paddingLeft: 8 }}>
+          <div style={{ fontSize: 11, opacity: 0.6 }}>
+            {e.monster ? "🩸 " : ""}
+            {e.who}
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              lineHeight: 1.35,
+              // A spoken word is public and plain; a thought is private and
+              // italic. The difference matters: one of them can be a lie.
+              fontStyle: e.kind === "thought" ? "italic" : "normal",
+              color: e.kind === "thought" ? "#aeb8c9" : "#dde3ee",
+            }}
+          >
+            {e.kind === "speech" ? `🗣 “${e.text}”` : `“${e.text}”`}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function CombatLog({ combats, devots }: { combats: CombatFx[]; devots: DevotView[] }) {
   const { t, lang } = useT();
   if (combats.length === 0) return null;

@@ -48,6 +48,8 @@ export interface FoodView {
 
 /** A monster, as the client draws it. Its hoard is the part that matters. */
 export interface MonsterView {
+  thought: string;
+  utterance: string;
   id: string;
   name: string;
   x: number;
@@ -109,8 +111,28 @@ export interface WorldActions {
   debugSpawnMonster: (x: number, z: number) => void;
 }
 
+/**
+ * ONE LINE OF THE WORLD'S INNER LIFE.
+ *
+ * These sentences are the actual content of this game — a devot deciding
+ * whether to run, a monster weighing which of two lives to take. They used to
+ * be buried in a side panel that showed one creature at a time.
+ */
+export interface FeedEntry {
+  id: number;
+  at: number;
+  who: string;
+  /** Colour of the god who watches them; monsters get their own. */
+  color: string;
+  kind: "thought" | "speech";
+  text: string;
+  monster: boolean;
+}
+
 export interface WorldConnection {
   snapshot: WorldSnapshot;
+  /** The world's monologues, newest last. Capped. */
+  thoughtFeed: FeedEntry[];
   godId: string | null;
   status: "connecting" | "connected" | "error";
   lastRejection: string | null;
@@ -121,10 +143,18 @@ export interface WorldConnection {
   actions: WorldActions;
 }
 
+/** How many lines of the world's inner life are kept on screen. */
+const FEED_MAX = 60;
+
 const EMPTY: WorldSnapshot = { worldMs: 0, devots: [], food: [], gods: [], monsters: [] };
 
 export function useWorld(godName: string): WorldConnection {
   const [snapshot, setSnapshot] = useState<WorldSnapshot>(EMPTY);
+  const [thoughtFeed, setThoughtFeed] = useState<FeedEntry[]>([]);
+  // What each creature was last heard saying or thinking. A ref, not state:
+  // it is compared on every patch and must never trigger a render itself.
+  const lastHeard = useRef(new Map<string, string>());
+  const feedSeq = useRef(0);
   const [godId, setGodId] = useState<string | null>(null);
   const [status, setStatus] = useState<WorldConnection["status"]>("connecting");
   const [lastRejection, setLastRejection] = useState<string | null>(null);
@@ -224,6 +254,8 @@ export function useWorld(godName: string): WorldConnection {
               hoard: m.hoard,
               state: m.state,
               targetId: m.targetId ?? "",
+              thought: m.thought ?? "",
+              utterance: m.utterance ?? "",
             });
           });
           setSnapshot({ worldMs: state.worldMs ?? 0, devots, food, gods, monsters });
@@ -268,6 +300,7 @@ export function useWorld(godName: string): WorldConnection {
 
   return {
     snapshot,
+    thoughtFeed,
     godId,
     status,
     lastRejection,

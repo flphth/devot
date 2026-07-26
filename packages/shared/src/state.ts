@@ -181,6 +181,9 @@ export class MonsterState extends Schema {
   declare state: string;
   /** Id of the devot it is currently hunting, empty if none. */
   declare targetId: string;
+  /** Its last inner monologue, and its last growl. */
+  declare thought: string;
+  declare utterance: string;
 
   constructor() {
     super();
@@ -193,6 +196,8 @@ export class MonsterState extends Schema {
     this.hoard = 0;
     this.state = "alive";
     this.targetId = "";
+    this.thought = "";
+    this.utterance = "";
   }
 }
 defineTypes(MonsterState, {
@@ -205,6 +210,8 @@ defineTypes(MonsterState, {
   hoard: "number",
   state: "string",
   targetId: "string",
+  thought: "string",
+  utterance: "string",
 });
 
 export class WorldState extends Schema {

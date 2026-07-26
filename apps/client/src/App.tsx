@@ -20,8 +20,17 @@ function godNameFromUrl(): string {
 export default function App() {
   const { t } = useT();
   const godName = useMemo(godNameFromUrl, []);
-  const { snapshot, godId, status, lastRejection, lastSmite, combats, journals, actions } =
-    useWorld(godName);
+  const {
+    snapshot,
+    thoughtFeed,
+    godId,
+    status,
+    lastRejection,
+    lastSmite,
+    combats,
+    journals,
+    actions,
+  } = useWorld(godName);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [godMode, setGodMode] = useState(false);
   // What the next god-mode click brings into the world. Mirrored in a ref for
@@ -114,6 +123,7 @@ export default function App() {
           setSpawnKind(k);
         }}
         journal={selectedId ? (journals[selectedId] ?? []) : []}
+        thoughtFeed={thoughtFeed}
         combats={combats}
       />
       {creating && (

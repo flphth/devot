@@ -198,6 +198,8 @@ export class WorldRoom extends Room<WorldState> {
         const monster = this.world.monsters.get(devotId);
         if (!monster) return;
         applyMonsterDecision(monster, decision, this.world);
+        const ms = this.state.monsters.get(devotId);
+        if (ms && decision.thought) ms.thought = decision.thought;
         if (decision.action === "speak" && decision.utterance) {
           this.onMonsterSpoke(monster, decision.utterance);
         }
@@ -883,6 +885,7 @@ export class WorldRoom extends Room<WorldState> {
       s.hoard = m.hoard;
       s.state = m.state;
       s.targetId = m.targetId ?? "";
+      s.utterance = m.utterance;
     }
     for (const [id, f] of this.world.food) {
       let s = this.state.food.get(id);
