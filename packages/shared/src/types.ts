@@ -131,6 +131,47 @@ export interface MonsterEntity {
   state: "alive" | "dead";
   /** The devot it is hunting, if any. */
   targetId?: string;
+  age: number;
+  /** An inference is in flight for this monster. */
+  thinking: boolean;
+  /** Growls and threats. Devots nearby hear them, and understand them. */
+  utterance: string;
+  /**
+   * What its mind last decided. Absent means the body hunts on instinct, which
+   * is what it did before it had a mind at all — and still does when the
+   * inference budget is spent.
+   */
+  intent?: { kind: "hunt"; targetId: string } | { kind: "flee"; from: Vec3 } | { kind: "lurk" };
+  /** When its mind last ran. The cadence guard lives on this field. */
+  lastThoughtAt: number;
+}
+
+/** What kind of creature a mind belongs to. They do not read the same rules. */
+export type CreatureKind = "devot" | "monster";
+
+/**
+ * The read-only view of a creature that its mind is given, built fresh for
+ * every thought.
+ *
+ * This is what makes the cognition layer polymorphic: a devot and a monster are
+ * very different things in the simulation, but a thought only ever needs this
+ * much of either.
+ */
+export interface ThoughtSubject {
+  id: string;
+  kind: CreatureKind;
+  name: string;
+  pos: Vec3;
+  hp: number;
+  hpMax: number;
+  state: string;
+  age: number;
+  traits: string[];
+  isFounder: boolean;
+  identityJson: string;
+  items: ItemKind[];
+  /** Monsters only: what it has taken from the dead. */
+  hoard?: number;
 }
 
 export type FoodType = "grain" | "fruit" | "manna" | "tainted" | "carrion";

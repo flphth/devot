@@ -4,6 +4,7 @@
  */
 import { AgentSdkMind, PROFILES } from "@devot/agents";
 import type { DevotEntity } from "@devot/shared";
+import { devotSubject } from "@devot/shared";
 
 const devot: DevotEntity = {
   id: "devot-smoke",
@@ -27,7 +28,7 @@ const devot: DevotEntity = {
 const mind = new AgentSdkMind();
 const started = Date.now();
 const result = await mind.think(
-  devot,
+  devotSubject(devot),
   PROFILES.frugal,
   [],
   'You spot food (grain, id "food-7") not far from you, toward x=3.0, z=1.5.',

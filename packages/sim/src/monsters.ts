@@ -1,3 +1,4 @@
+import type { Decision } from "@devot/shared";
 import {
   ATTACK_RADIUS,
   MONSTER_ABSORB,
@@ -47,6 +48,11 @@ export function spawnMonster(world: World, x: number, z: number): MonsterEntity 
     hpMax: MONSTER_HP_MAX,
     hoard: 0,
     state: "alive",
+    age: 0,
+    thinking: false,
+    utterance: "",
+    // Staggered, so a pack that arrives together does not think in lockstep.
+    lastThoughtAt: Date.now() - Math.floor(Math.random() * 6000),
   };
   world.monsters.set(monster.id, monster);
   return monster;
@@ -79,7 +85,32 @@ export function monsterSystem(world: World, now: number = Date.now()): MonsterTi
       continue;
     }
 
-    const prey = acquireTarget(monster, world);
+    monster.age += 1;
+
+    // A mind that chose to break off or to lie in wait is obeyed. With no
+    // intent — never thought, or the budget was spent — the body hunts on
+    // instinct exactly as it did before monsters had minds at all.
+    if (monster.intent?.kind === "lurk") {
+      monster.targetId = undefined;
+      continue;
+    }
+    if (monster.intent?.kind === "flee") {
+      const dx = monster.pos.x - monster.intent.from.x;
+      const dz = monster.pos.z - monster.intent.from.z;
+      const len = Math.hypot(dx, dz) || 1;
+      const step = MONSTER_SPEED * dt;
+      monster.pos.x += (dx / len) * step;
+      monster.pos.z += (dz / len) * step;
+      clampToWorld(monster.pos, world.size);
+      resolveRockCollisions(monster.pos);
+      monster.pos.y = terrainHeight(monster.pos.x, monster.pos.z);
+      monster.targetId = undefined;
+      continue;
+    }
+
+    const chosen =
+      monster.intent?.kind === "hunt" ? world.devots.get(monster.intent.targetId) : undefined;
+    const prey = chosen && chosen.state !== "dead" ? chosen : acquireTarget(monster, world);
     monster.targetId = prey?.id;
     if (!prey) continue;
 
@@ -154,4 +185,87 @@ function acquireTarget(monster: MonsterEntity, world: World) {
     }
   }
   return best;
+}
+
+/**
+ * Applies a monster's decision to its body. It cannot reproduce, ever, and it
+ * cannot graze: everything it does comes down to whose life it takes next.
+ */
+export function applyMonsterDecision(
+  monster: MonsterEntity,
+  decision: Decision,
+  world: World,
+): void {
+  if (monster.state === "dead") return;
+  switch (decision.action) {
+    case "attack":
+    case "eat": {
+      // Both mean the same thing to a predator: go and take that life.
+      const prey = decision.targetId ? world.devots.get(decision.targetId) : undefined;
+      if (prey && prey.state !== "dead") {
+        monster.intent = { kind: "hunt", targetId: prey.id };
+      }
+      break;
+    }
+    case "flee":
+      if (decision.direction) {
+        monster.intent = {
+          kind: "flee",
+          from: {
+            x: monster.pos.x - decision.direction.x,
+            y: 0,
+            z: monster.pos.z - decision.direction.z,
+          },
+        };
+      }
+      break;
+    case "idle":
+      monster.intent = { kind: "lurk" };
+      break;
+    case "move":
+      // A monster that wants to be elsewhere simply stops hunting and drifts;
+      // its instinct will pick up whatever it runs into.
+      monster.intent = undefined;
+      break;
+    case "speak":
+      monster.utterance = decision.utterance ?? "";
+      break;
+    default:
+      // reproduce, craft: there will be no others like it, and it forges nothing.
+      break;
+  }
+}
+
+/**
+ * WHAT A MONSTER CAN SEE.
+ *
+ * Its own panorama, not the devots': a predator does not care about lines,
+ * gods or flowers. It needs to know what is close, how weak it is, and whether
+ * anything nearby is coming for it.
+ */
+export function describeMonsterSurroundings(monster: MonsterEntity, world: World): string {
+  const sight = MONSTER_SIGHT * monsterSightMultiplier(world.worldMs);
+  const r2 = sight * sight;
+
+  const prey = world
+    .aliveDevots()
+    .filter((d) => dist2(monster.pos, d.pos) <= r2 && hasLineOfSight(monster.pos, d.pos))
+    .sort((a, b) => dist2(monster.pos, a.pos) - dist2(monster.pos, b.pos))
+    .slice(0, 5);
+
+  if (prey.length === 0) return "Nothing living is in sight.";
+
+  const lines = prey.map((d) => {
+    const dist = Math.sqrt(dist2(monster.pos, d.pos));
+    const share = Math.round((d.hp / d.hpMax) * 100);
+    // Whether it is coming for you is the fact that decides everything.
+    const coming =
+      d.currentGoal.kind === "attack" && d.currentGoal.targetId === monster.id
+        ? " — COMING FOR YOU"
+        : "";
+    const condition = d.state === "dying" ? ", dying" : d.state === "starving" ? ", starving" : "";
+    return `- ${d.name} (id "${d.id}"), ${dist.toFixed(1)} away, at ${share}% of its life${condition}${coming}`;
+  });
+
+  return `Living things within reach:\n${lines.join("\n")}`;
 }

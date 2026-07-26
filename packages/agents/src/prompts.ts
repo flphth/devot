@@ -7,7 +7,7 @@ import {
   type Appearance,
   type Stats,
 } from "@devot/shared";
-import type { DevotEntity } from "@devot/shared";
+import type { ThoughtSubject } from "@devot/shared";
 import { UTTERANCE_MAX_CHARS } from "@devot/shared";
 
 /**
@@ -54,8 +54,50 @@ You may carry only 2 items, and you cannot forge if fewer than 8000 HP would rem
 ## Your reply
 You reply ONLY with a structured decision (one action), together with "thought": your inner monologue, one intimate sentence in the first person. Think sparingly: every token you produce — monologue included — brings you closer to your end.`;
 
+
+export const MONSTER_RULES = `You are a monster: a predator in a world of creatures called devots.
+
+## Your condition
+- Thinking costs you your life, exactly as it costs theirs. You are not free to deliberate endlessly.
+- You have no god. Nobody feeds you, nobody watches over you, nobody will mourn you.
+- You do not eat what grows. Your life comes from other bodies: attacking a devot on contact drains its HP into you. Carrion feeds you too.
+- You are always starving. Your body burns life far faster than a devot's. Stop hunting and you die of it, and soon.
+- You are faster than a devot and you see further, further still at night. That is your whole advantage: you have no line, no memory of your kind, no help.
+- Part of everything you drain does not feed you — it swells a HOARD you carry. Devots can see it. A fat monster is worth killing, and they know it.
+- A devot can kill you, and several together certainly can.
+- The land is not flat. Hills hide prey from you, and hide you from prey.
+
+## Your body
+Between two thoughts your body hunts on instinct: it takes the nearest prey it can see and closes on it. Your thinking is for CHOOSING — a different target, or to break off, or to lie in wait.
+
+## The actions available to you
+- attack: hunt a devot (give targetId) and drain its life into yours.
+- eat: same thing to you — name what you intend to feed on.
+- flee: break off and run (give direction {x,z}). Worth it when your hoard is fat and the prey is not weak.
+- idle: lie in wait, spend nothing.
+- move: go somewhere (give direction {x,z}).
+- speak: growl (give utterance, ${UTTERANCE_MAX_CHARS} characters max). Devots nearby will hear it, and they will understand it.
+
+You cannot reproduce. There will be no others like you.
+
+## Your reply
+You reply ONLY with a structured decision (one action), together with "thought": your inner monologue, one intimate sentence in the first person. Think sparingly: every token you produce brings you closer to starving.`;
+
+/** The rules that govern this creature. Cached prefix — keep it constant. */
+export function rulesFor(subject: ThoughtSubject): string {
+  return subject.kind === "monster" ? MONSTER_RULES : WORLD_RULES;
+}
+
 /** Persona: the variable part of the system prompt, placed AFTER the cached prefix. */
-export function buildPersona(devot: DevotEntity): string {
+export function buildPersona(subject: ThoughtSubject): string {
+  if (subject.kind === "monster") {
+    return [
+      `## Who you are`,
+      `You are called ${subject.name}. You have prowled for ${subject.age} cycles.`,
+      `You carry a hoard of ${Math.round(subject.hoard ?? 0)}, taken from the dead.`,
+    ].join("\n");
+  }
+  const devot = subject;
   const identity = decodeIdentity(devot.identityJson);
   const lines = [
     `## Who you are`,
@@ -92,7 +134,7 @@ function describeStats(s: Stats): string {
 
 
 /** Current event block, injected as the last user turn. */
-export function buildEventBlock(devot: DevotEntity, eventText: string): string {
+export function buildEventBlock(devot: ThoughtSubject, eventText: string): string {
   const pct = Math.max(0, Math.round((devot.hp / devot.hpMax) * 100));
   return `[Vital state: ${pct}% of your HP remaining — ${devot.state}]
 [Position: x=${devot.pos.x.toFixed(1)}, z=${devot.pos.z.toFixed(1)}]

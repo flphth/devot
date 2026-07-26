@@ -1,5 +1,12 @@
 import { Client, Room } from "@colyseus/core";
-import { CognitionOrchestrator, createMind, type Chronicler } from "@devot/agents";
+import {
+  CognitionOrchestrator,
+  EphemeralMemory,
+  PROFILES,
+  createMind,
+  type Chronicler,
+  type Thinker,
+} from "@devot/agents";
 import { createRepos, openDb, type Repos } from "@devot/db";
 import { FreeStubProvider, type PaymentProvider } from "@devot/onchain";
 import {
@@ -13,6 +20,7 @@ import {
   PATCH_RATE_MS,
   PERCEPTION_RADIUS,
   TICK_MS,
+  MONSTER_THINK_INTERVAL_MS,
   SOUL_MAX_CHARS,
   statMultiplier,
   FOOD_SPAWN_CHANCE_PER_TICK,
@@ -23,6 +31,8 @@ import {
   FOOD_TTL_MS,
   TRAIT_POOL,
   defaultIdentity,
+  devotSubject,
+  monsterSubject,
   resolveRockCollisions,
   terrainHeight,
   type Vec3,
@@ -41,6 +51,7 @@ import {
   type DebugSpawnDevotMsg,
   type DebugSpawnMonsterMsg,
   type DevotEntity,
+  type MonsterEntity,
   type FeedMsg,
   type FoodEntity,
   type FoodType,
@@ -53,6 +64,8 @@ import {
 } from "@devot/shared";
 import {
   applyDecision,
+  applyMonsterDecision,
+  describeMonsterSurroundings,
   describeSurroundings,
   dist2,
   monsterSystem,
@@ -103,6 +116,38 @@ export class WorldRoom extends Room<WorldState> {
   private devotSeq = 0;
   /** sessionId → godId (un dieu peut se reconnecter). */
   private sessions = new Map<string, string>();
+  /**
+   * Monster histories live here, not in SQLite: a monster leaves no gravestone,
+   * and the messages table only accepts rows belonging to a devot.
+   */
+  private monsterMemory = new EphemeralMemory();
+
+  /**
+   * Hands the orchestrator whatever thinks under this id, devot or monster.
+   * Monsters run on the frugal tier: their choices are few, and they draw from
+   * the same budget the devots do.
+   */
+  private thinkerOf(id: string): Thinker | undefined {
+    const devot = this.world.devots.get(id);
+    if (devot) {
+      return {
+        entity: devot,
+        subject: devotSubject(devot),
+        profile: PROFILES[devot.profile],
+        memory: this.repos.messages,
+      };
+    }
+    const monster = this.world.monsters.get(id);
+    if (monster) {
+      return {
+        entity: monster,
+        subject: monsterSubject(monster),
+        profile: PROFILES.frugal,
+        memory: this.monsterMemory,
+      };
+    }
+    return undefined;
+  }
 
   onCreate(): void {
     this.setState(new WorldState());
@@ -125,19 +170,27 @@ export class WorldRoom extends Room<WorldState> {
 
     this.orchestrator = new CognitionOrchestrator(
       mind,
-      this.repos,
-      (id) => this.world.devots.get(id),
+      (id) => this.thinkerOf(id),
       ({ devotId, decision }) => {
         const devot = this.world.devots.get(devotId);
-        if (!devot) return;
-        applyDecision(devot, decision, this.world);
-        const s = this.state.devots.get(devotId);
-        if (s) {
-          if (decision.emotion) s.emotion = decision.emotion;
-          if (decision.thought) s.thought = decision.thought;
+        if (devot) {
+          applyDecision(devot, decision, this.world);
+          const s = this.state.devots.get(devotId);
+          if (s) {
+            if (decision.emotion) s.emotion = decision.emotion;
+            if (decision.thought) s.thought = decision.thought;
+          }
+          if (decision.action === "speak" && decision.utterance) {
+            this.onDevotSpoke(devot, decision.utterance);
+          }
+          return;
         }
+
+        const monster = this.world.monsters.get(devotId);
+        if (!monster) return;
+        applyMonsterDecision(monster, decision, this.world);
         if (decision.action === "speak" && decision.utterance) {
-          this.onDevotSpoke(devot, decision.utterance);
+          this.onMonsterSpoke(monster, decision.utterance);
         }
       },
       undefined,
@@ -585,7 +638,53 @@ export class WorldRoom extends Room<WorldState> {
       for (const d of this.world.devots.values()) this.repos.devots.snapshot(d);
     }
 
+    this.wakeMonsters();
     this.syncState();
+  }
+
+  /**
+   * A monster's mind on a leash: it may think at most once every
+   * MONSTER_THINK_INTERVAL_MS. A predator that can see prey is in an
+   * interesting situation on every single tick, so without this it would think
+   * four times a second and spend the whole budget between them.
+   */
+  private wakeMonsters(): void {
+    const now = Date.now();
+    for (const monster of this.world.aliveMonsters()) {
+      if (monster.thinking) continue;
+      if (now - monster.lastThoughtAt < MONSTER_THINK_INTERVAL_MS) continue;
+      monster.lastThoughtAt = now;
+
+      const prey = monster.targetId ? this.world.devots.get(monster.targetId) : undefined;
+      const ratio = Math.round((monster.hp / monster.hpMax) * 100);
+      this.orchestrator.enqueue({
+        kind: prey ? "threat" : "idle_reflection",
+        devotId: monster.id,
+        eventText: [
+          describeSky(this.world.worldMs),
+          prey
+            ? `Your instinct has fastened on ${prey.name} (id "${prey.id}"), ${Math.sqrt(dist2(monster.pos, prey.pos)).toFixed(1)} away, at ${Math.round((prey.hp / prey.hpMax) * 100)}% of its life. You are at ${ratio}% of yours, and it is draining. Press this hunt, take something else, or break off.`
+            : `You have found nothing to kill. You are at ${ratio}% of your life and it is draining while you prowl.`,
+          describeMonsterSurroundings(monster, this.world),
+        ].join("\n\n"),
+        createdAt: now,
+      });
+    }
+  }
+
+  private onMonsterSpoke(monster: MonsterEntity, utterance: string): void {
+    monster.utterance = utterance;
+    const now = Date.now();
+    for (const devot of this.world.aliveDevots()) {
+      if (dist2(devot.pos, monster.pos) <= PERCEPTION_RADIUS * PERCEPTION_RADIUS) {
+        this.wake({
+          kind: "utterance_heard",
+          devotId: devot.id,
+          eventText: `The monster ${monster.name} makes a sound you understand: "${utterance}"`,
+          createdAt: now,
+        });
+      }
+    }
   }
 
   private onDevotSpoke(speaker: DevotEntity, utterance: string): void {

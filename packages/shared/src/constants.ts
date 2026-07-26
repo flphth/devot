@@ -127,3 +127,10 @@ export const MONSTER_SPEED = 2.4;
 export const MONSTER_SIGHT = 14;
 /** Share of what it drains that it actually absorbs; the rest swells the hoard. */
 export const MONSTER_ABSORB = 0.35;
+/**
+ * A monster's mind runs at most this often — the real cost guard, and it has to
+ * hold at every point that can wake one. A predator that can see prey is in an
+ * interesting situation on every tick; without a leash it thinks four times a
+ * second and starves on its own deliberation.
+ */
+export const MONSTER_THINK_INTERVAL_MS = 15_000;

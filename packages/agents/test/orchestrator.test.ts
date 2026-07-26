@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { DevotEntity } from "@devot/shared";
-import { THOUGHT_COST_FLOOR_HP } from "@devot/shared";
+import { THOUGHT_COST_FLOOR_HP, devotSubject } from "@devot/shared";
 import { createRepos, openDb } from "@devot/db";
 import { MockMind } from "../src/mind.js";
+import { PROFILES } from "../src/profiles.js";
 import { CognitionOrchestrator, type AppliedThought } from "../src/orchestrator.js";
 
 function makeDevot(id: string, hp = 10_000): DevotEntity {
@@ -34,8 +35,17 @@ function setup(devots: DevotEntity[], mind = new MockMind()) {
   const applied: AppliedThought[] = [];
   const orchestrator = new CognitionOrchestrator(
     mind,
-    repos,
-    (id) => map.get(id),
+    (id) => {
+      const d = map.get(id);
+      return d
+        ? {
+            entity: d,
+            subject: devotSubject(d),
+            profile: PROFILES[d.profile],
+            memory: repos.messages,
+          }
+        : undefined;
+    },
     (a) => applied.push(a),
     () => {},
   );
