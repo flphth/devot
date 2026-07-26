@@ -29,6 +29,10 @@ const EN: Dict = {
   "hud.treasury-devots": "({n} devot(s) affordable)",
 
   "creation.paying": "Paying the deposit on chain…",
+  "wallet.connect": "Connect a wallet to pay the deposit",
+  "wallet.none": "No wallet found in this browser. MetaMask or any injected wallet will do.",
+  "wallet.connected": "Paying from {a}",
+  "wallet.wrong-chain": "wrong network",
 
   "feed.title": "The world thinks",
   "feed.empty": "Nobody has thought anything yet.",
@@ -100,6 +104,10 @@ const FR: Dict = {
   "hud.treasury-devots": "({n} devot(s) finançable(s))",
 
   "creation.paying": "Paiement du dépôt sur la chaîne…",
+  "wallet.connect": "Connecte un wallet pour payer le dépôt",
+  "wallet.none": "Aucun wallet dans ce navigateur. MetaMask ou tout wallet injecté fait l'affaire.",
+  "wallet.connected": "Paiement depuis {a}",
+  "wallet.wrong-chain": "mauvais réseau",
 
   "feed.title": "Le monde pense",
   "feed.empty": "Personne n'a encore pensé quoi que ce soit.",

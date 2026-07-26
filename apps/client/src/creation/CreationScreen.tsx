@@ -26,6 +26,7 @@ import {
 } from "@devot/shared";
 import { DevotModel } from "./DevotModel.js";
 import { useT } from "../i18n.js";
+import type { Wallet } from "../wallet.js";
 
 /**
  * THE CREATION SCREEN — the first contact with the game.
@@ -53,23 +54,42 @@ const CARD: React.CSSProperties = {
   padding: 18,
 };
 
+/** An address nobody reads in full. */
+function short(a: string): string {
+  return `${a.slice(0, 6)}…${a.slice(-4)}`;
+}
+
+/**
+ * What went wrong, in words a player can act on. A rejected signature is the
+ * normal case, not an error worth a stack trace.
+ */
+function reason(err: unknown): string {
+  const e = err as { code?: number | string; shortMessage?: string; message?: string };
+  if (e?.code === 4001 || e?.code === "ACTION_REJECTED") return "You refused the transaction.";
+  return e?.shortMessage ?? e?.message ?? "The wallet refused.";
+}
+
 export function CreationScreen({
   godName,
   godColor,
   rejection,
   onCreate,
   paying,
+  wallet,
 }: {
   godName: string;
   godColor: string;
   rejection: string | null;
-  onCreate: (result: CreationResult) => void;
+  onCreate: (result: CreationResult) => void | Promise<void>;
   /** A birth is a real transaction; while it is in flight the screen says so. */
   paying: boolean;
+  /** The god's own wallet: nothing can be created until it has paid. */
+  wallet: Wallet;
 }) {
   const { t } = useT();
   const [traits, setTraits] = useState<string[]>([]);
   const [soul, setSoul] = useState("");
+  const [walletError, setWalletError] = useState<string | null>(null);
   const [appearance, setAppearance] = useState<Appearance>({ ...DEFAULT_APPEARANCE });
   const [stats, setStats] = useState<Stats>({ ...DEFAULT_STATS });
 
@@ -231,10 +251,40 @@ export function CreationScreen({
                 </div>
               )}
 
+              {wallet.state.kind === "unavailable" && (
+                <div style={{ fontSize: 12, color: "#ffb3a7", marginTop: 10 }}>
+                  {t("wallet.none")}
+                </div>
+              )}
+              {wallet.state.kind === "connected" && (
+                <div style={{ fontSize: 11, opacity: 0.6, marginTop: 10 }}>
+                  {t("wallet.connected", { a: short(wallet.state.address) })}
+                  {!wallet.state.onRightChain && ` — ${t("wallet.wrong-chain")}`}
+                </div>
+              )}
+              {walletError && (
+                <div style={{ fontSize: 12, color: "#ffb3a7", marginTop: 8 }}>{walletError}</div>
+              )}
+
               <button
                 data-testid="create-founder"
-                onClick={() => onCreate({ traits, appearance, stats, soul: soul.trim() })}
-                disabled={!ready || paying}
+                onClick={() => {
+                  setWalletError(null);
+                  if (wallet.state.kind !== "connected") {
+                    // Connecting is its own step: a player who has never seen
+                    // this chain gets asked to add it before anything is signed.
+                    void wallet.connect().catch((e) => setWalletError(reason(e)));
+                    return;
+                  }
+                  void Promise.resolve(
+                    onCreate({ traits, appearance, stats, soul: soul.trim() }),
+                  ).catch((e) => setWalletError(reason(e)));
+                }}
+                disabled={
+                  wallet.state.kind === "unavailable" ||
+                  paying ||
+                  (wallet.state.kind === "connected" && !ready)
+                }
                 style={{
                   width: "100%",
                   marginTop: 12,
@@ -249,6 +299,8 @@ export function CreationScreen({
               >
                 {paying
                   ? t("creation.paying")
+                  : wallet.state.kind !== "connected"
+                  ? t("wallet.connect")
                   : traits.length < 2
                   ? t("creation.need-traits")
                   : left !== 0

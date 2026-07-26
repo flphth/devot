@@ -32,6 +32,15 @@ export interface MintedDevot {
   txHash: string;
 }
 
+/** A birth the player paid for, as the chain describes it — not as they do. */
+export interface VerifiedMint {
+  tokenId: bigint;
+  deposit: bigint;
+  /** Who actually paid, taken from the event. Lower-cased. */
+  god: string;
+  txHash: string;
+}
+
 export interface VaultConfig {
   rpcUrl: string;
   privateKey: string;
@@ -116,6 +125,58 @@ export class LifeVaultClient {
       }
     }
     throw new Error(`createDevot produced no DevotCreated event (tx ${tx.hash})`);
+  }
+
+  /**
+   * VERIFIES A BIRTH THE PLAYER PAID FOR THEMSELVES.
+   *
+   * When the god signs in their own wallet, the server never sees the money
+   * move — it is handed a transaction hash and has to decide whether to believe
+   * it. So it believes nothing the client says: it reads the receipt from the
+   * chain, checks the log came from OUR vault, and takes the payer and the
+   * amount from the event rather than from the request.
+   *
+   * A transaction hash is a bearer token until it is spent, which is why the
+   * caller must also refuse one it has already honoured.
+   */
+  async verifyMint(txHash: string, minimumWei: bigint): Promise<VerifiedMint> {
+    if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
+      throw new Error("that is not a transaction hash");
+    }
+    const provider = this.wallet.provider!;
+    const receipt = await provider.getTransactionReceipt(txHash);
+    if (!receipt) throw new Error("no such transaction on this chain");
+    if (receipt.status !== 1) throw new Error("that transaction failed");
+
+    const vaultAddress = this.config.vaultAddress.toLowerCase();
+    for (const log of receipt.logs) {
+      // The log must come from OUR vault. Without this check a lookalike
+      // contract could emit a DevotCreated of its own and mint devots for free.
+      if (log.address.toLowerCase() !== vaultAddress) continue;
+      try {
+        const parsed = this.vault.interface.parseLog({
+          topics: [...log.topics],
+          data: log.data,
+        });
+        if (parsed?.name !== "DevotCreated") continue;
+        const deposit = parsed.args.deposit as bigint;
+        if (deposit < minimumWei) {
+          throw new Error(
+            `the deposit was ${deposit} wei; a devot costs ${minimumWei}`,
+          );
+        }
+        return {
+          tokenId: parsed.args.tokenId as bigint,
+          deposit,
+          god: (parsed.args.god as string).toLowerCase(),
+          txHash,
+        };
+      } catch (err) {
+        if (err instanceof Error && err.message.startsWith("the deposit")) throw err;
+        // A log we cannot parse. Not ours.
+      }
+    }
+    throw new Error("that transaction did not create a devot");
   }
 
   /** What the chain says a devot holds. The server's own number should match. */

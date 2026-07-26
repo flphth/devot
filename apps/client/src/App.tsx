@@ -1,6 +1,7 @@
 import { Canvas } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CreationScreen } from "./creation/CreationScreen.js";
+import { useWallet } from "./wallet.js";
 import { Hud } from "./Hud.js";
 import { Scene } from "./Scene.js";
 import { useWorld } from "./useWorld.js";
@@ -19,6 +20,7 @@ function godNameFromUrl(): string {
 
 export default function App() {
   const { t } = useT();
+  const wallet = useWallet();
   const godName = useMemo(godNameFromUrl, []);
   const {
     snapshot,
@@ -154,14 +156,20 @@ export default function App() {
           godName={god?.name ?? godName}
           godColor={god?.color ?? "#4ca6e0"}
           rejection={lastRejection}
-          onCreate={(r) =>
+          wallet={wallet}
+          onCreate={async (r) => {
+            // The god signs the deposit themselves; the server is handed a hash
+            // and goes and checks it. A refusal in the wallet stops here, and
+            // the screen stays exactly where it was.
+            const txHash = await wallet.payForDevot(`${godName}:${Date.now()}`);
             actions.createFounder({
               traits: r.traits,
               appearance: r.appearance,
               stats: r.stats,
               soul: r.soul,
-            })
-          }
+              txHash,
+            });
+          }}
         />
       )}
       {status !== "connected" && (

@@ -11,7 +11,7 @@ import { createRepos, openDb, type Repos } from "@devot/db";
 import {
   LifeVaultClient,
   vaultConfigFromEnv,
-  type MintedDevot,
+  type VerifiedMint,
   FreeStubProvider,
   LifeLedger,
   LocalSettler,
@@ -168,6 +168,10 @@ export class WorldRoom extends Room<WorldState> {
    * than quietly handing out devots for nothing.
    */
   private vault?: LifeVaultClient;
+  /** What a birth costs on chain, read once from the same config as the vault. */
+  private vaultDepositWei = 0n;
+  /** Deposits already honoured. A hash is a bearer token until it is spent. */
+  private spentTx = new Set<string>();
   /** Funds riding on relics, so what rots away is burned rather than lost track of. */
   private rottedFunds = new Map<string, number>();
   private ledger = new LifeLedger(
@@ -217,6 +221,7 @@ export class WorldRoom extends Room<WorldState> {
     const vaultConfig = vaultConfigFromEnv();
     if (vaultConfig) {
       this.vault = new LifeVaultClient(vaultConfig);
+      this.vaultDepositWei = vaultConfig.depositWei;
       void this.vault.funds().then((f) =>
         console.log(
           `[world] ⛓ births are paid on-chain from ${this.vault!.address} (${f} OG left)`,
@@ -378,26 +383,42 @@ export class WorldRoom extends Room<WorldState> {
     // simulation never blocks on a network. A birth is the exception: it is the
     // one moment the god actually pays, and paying is not something to assume
     // and reconcile afterwards. If the chain refuses, no devot is born.
-    let minted: MintedDevot | undefined;
+    let minted: VerifiedMint | undefined;
     if (this.vault) {
+      // THE GOD PAID, AND THE SERVER CHECKS RATHER THAN TRUSTS.
+      //
+      // The client signs in its own wallet and hands us a hash. Everything
+      // that matters — who paid, how much, which devot — is read back off the
+      // chain from the event, never taken from the request.
+      if (!msg.txHash) {
+        return this.reject(
+          client,
+          "createFounder",
+          "A devot has to be paid for. Connect a wallet and sign the deposit.",
+        );
+      }
+      // A transaction hash is a bearer token until it is spent: without this,
+      // one payment would mint devots forever.
+      if (this.spentTx.has(msg.txHash.toLowerCase())) {
+        return this.reject(client, "createFounder", "That deposit has already been used.");
+      }
       client.send("creating", { stage: "paying" } satisfies CreatingMsg);
       try {
-        minted = await this.vault.createDevot(`${godId}:${Date.now()}`);
+        minted = await this.vault.verifyMint(msg.txHash, this.vaultDepositWei);
+        this.spentTx.add(minted.txHash.toLowerCase());
         console.log(
-          `[world] ⛓ devot #${minted.tokenId} minted for ${godId} — ${minted.deposit} wei, tx ${minted.txHash}`,
+          `[world] ⛓ devot #${minted.tokenId} paid for by ${minted.god} — ${minted.deposit} wei, tx ${minted.txHash}`,
         );
         this.repos.events.record("devot_minted", [godId], {
           tokenId: minted.tokenId.toString(),
           deposit: minted.deposit.toString(),
+          god: minted.god,
           tx: minted.txHash,
         });
       } catch (err) {
-        console.error("[world] ⛓ the deposit failed:", err);
-        return this.reject(
-          client,
-          "createFounder",
-          "The chain refused the deposit. No devot was born.",
-        );
+        const why = err instanceof Error ? err.message : "the chain refused it";
+        console.error("[world] ⛓ deposit rejected:", why);
+        return this.reject(client, "createFounder", `No devot was born: ${why}.`);
       }
     }
 

@@ -32,6 +32,9 @@ importers:
       colyseus.js:
         specifier: ^0.16.22
         version: 0.16.22
+      ethers:
+        specifier: ^6.17.0
+        version: 6.17.0
       react:
         specifier: ^19.0.0
         version: 19.2.8

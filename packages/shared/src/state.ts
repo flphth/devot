@@ -269,6 +269,12 @@ export interface CreateFounderMsg {
   stats?: unknown;
   /** Free text: what the devot believes itself to be. Enters its prompt. */
   soul?: string;
+  /**
+   * The transaction in which the god paid for this devot, signed in their own
+   * wallet. The server verifies it against the chain and believes nothing else
+   * about it — not the amount, not even who paid.
+   */
+  txHash?: string;
 }
 
 /**

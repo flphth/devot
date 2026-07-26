@@ -15,7 +15,8 @@
     "colyseus.js": "^0.16.22",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "three": "^0.180.0"
+    "three": "^0.180.0",
+    "ethers": "^6.17.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
