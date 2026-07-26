@@ -70,7 +70,6 @@ function reason(err: unknown): string {
 }
 
 export function CreationScreen({
-  godName,
   godColor,
   rejection,
   onCreate,
@@ -79,7 +78,6 @@ export function CreationScreen({
   dismissible = false,
   onClose,
 }: {
-  godName: string;
   godColor: string;
   rejection: string | null;
   onCreate: (result: CreationResult) => void | Promise<void>;
@@ -148,7 +146,7 @@ export function CreationScreen({
             {t("creation.title")}
           </div>
           <div style={{ color: "#7f8a9c", font: "13px system-ui, sans-serif", marginTop: 6 }}>
-            {t("creation.subtitle", { god: godName })}
+            {t("creation.subtitle")}
           </div>
         </div>
 

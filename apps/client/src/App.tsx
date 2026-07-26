@@ -178,7 +178,6 @@ export default function App() {
           dismissible={hasLiving}
           onClose={() => setCreationAsked(false)}
           paying={creatingStage === "paying"}
-          godName={god?.name ?? godName}
           godColor={god?.color ?? "#4ca6e0"}
           rejection={lastRejection}
           wallet={wallet}

@@ -65,7 +65,7 @@ const EN: Dict = {
 
   "creation.title": "Create your Devot",
   "creation.subtitle":
-    "⚡ {god} — everything you choose here follows them to the grave, and passes on to their descendants.",
+    "Everything you choose here follows them to the grave, and passes on to their descendants.",
   "creation.soul": "Their soul",
   "creation.believe": "What they believe they are",
   "creation.soul-placeholder": '"I was born to protect my own"',
@@ -143,7 +143,7 @@ const FR: Dict = {
 
   "creation.title": "Crée ton Devot",
   "creation.subtitle":
-    "⚡ {god} — tout ce que tu choisis ici le suivra jusqu'à la tombe, et passera à ses descendants.",
+    "Tout ce que tu choisis ici le suivra jusqu'à la tombe, et passera à ses descendants.",
   "creation.soul": "Son âme",
   "creation.believe": "Ce qu'il croit être",
   "creation.soul-placeholder": '"Je suis né pour protéger les miens"',
