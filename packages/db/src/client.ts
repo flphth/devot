@@ -69,6 +69,13 @@ CREATE TABLE IF NOT EXISTS food (
   spawned_at INTEGER NOT NULL,
   consumed_by TEXT
 );
+CREATE TABLE IF NOT EXISTS mint_receipts (
+  tx_hash TEXT PRIMARY KEY,
+  token_id TEXT NOT NULL,
+  god TEXT NOT NULL,
+  deposit TEXT NOT NULL,
+  used_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS divine_msgs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   god_id TEXT NOT NULL,
@@ -85,6 +92,14 @@ function addColumnIfMissing(db: Sqlite, table: string, column: string, ddl: stri
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   if (columns.some((c) => c.name === column)) return;
   db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`);
+}
+
+/** Renames a column only when the old one is still there — safe to re-run. */
+function renameColumnIfPresent(db: Sqlite, table: string, from: string, to: string): void {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  const names = new Set(columns.map((c) => c.name));
+  if (!names.has(from) || names.has(to)) return;
+  db.exec(`ALTER TABLE ${table} RENAME COLUMN ${from} TO ${to}`);
 }
 
 function renameValues(db: Sqlite, column: string, pairs: Array<[string, string]>): void {
@@ -119,6 +134,13 @@ const MIGRATIONS: Array<(db: Sqlite) => void> = [
 
   // 4 — Every devot is a wallet: its address, derived at birth.
   (db) => addColumnIfMissing(db, "devots", "wallet", "TEXT NOT NULL DEFAULT ''"),
+
+  // 5 — HP is gone: the treasury IS the life. The columns follow the rename,
+  //     values and all, because hp and balance were always the same number.
+  (db) => {
+    renameColumnIfPresent(db, "devots", "hp", "balance");
+    renameColumnIfPresent(db, "devots", "hp_max", "capacity");
+  },
 ];
 
 function migrate(db: Sqlite): void {

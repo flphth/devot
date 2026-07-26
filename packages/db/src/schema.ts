@@ -69,6 +69,21 @@ export const food = sqliteTable("food", {
   consumedBy: text("consumed_by"),
 });
 
+/**
+ * Deposits already honoured. A transaction hash is a bearer token until it is
+ * spent, so "spent" has to outlive the process — an in-memory set forgets every
+ * payment on restart, and the same deposit mints a second devot for free.
+ *
+ * tokenId and deposit are TEXT: they are uint256, and a REAL would round them.
+ */
+export const mintReceipts = sqliteTable("mint_receipts", {
+  txHash: text("tx_hash").primaryKey(),
+  tokenId: text("token_id").notNull(),
+  god: text("god").notNull(),
+  deposit: text("deposit").notNull(),
+  usedAt: integer("used_at").notNull(),
+});
+
 export const divineMsgs = sqliteTable("divine_msgs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   godId: text("god_id").notNull(),

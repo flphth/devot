@@ -170,8 +170,6 @@ export class WorldRoom extends Room<WorldState> {
   private vault?: LifeVaultClient;
   /** What a birth costs on chain, read once from the same config as the vault. */
   private vaultDepositWei = 0n;
-  /** Deposits already honoured. A hash is a bearer token until it is spent. */
-  private spentTx = new Set<string>();
   /** Funds riding on relics, so what rots away is burned rather than lost track of. */
   private rottedFunds = new Map<string, number>();
   private ledger = new LifeLedger(
@@ -398,14 +396,20 @@ export class WorldRoom extends Room<WorldState> {
         );
       }
       // A transaction hash is a bearer token until it is spent: without this,
-      // one payment would mint devots forever.
-      if (this.spentTx.has(msg.txHash.toLowerCase())) {
+      // one payment would mint devots forever. Cheap check first, so an obvious
+      // replay never costs a round trip to the chain.
+      if (this.repos.mintReceipts.spent(msg.txHash)) {
         return this.reject(client, "createFounder", "That deposit has already been used.");
       }
       client.send("creating", { stage: "paying" } satisfies CreatingMsg);
       try {
         minted = await this.vault.verifyMint(msg.txHash, this.vaultDepositWei);
-        this.spentTx.add(minted.txHash.toLowerCase());
+        // And claim it for real once the chain has spoken. The insert is the
+        // decision: two clients racing the same hash both pass the check above,
+        // and only one of them wins the primary key.
+        if (!this.repos.mintReceipts.claim(minted)) {
+          return this.reject(client, "createFounder", "That deposit has already been used.");
+        }
         console.log(
           `[world] ⛓ devot #${minted.tokenId} paid for by ${minted.god} — ${minted.deposit} wei, tx ${minted.txHash}`,
         );

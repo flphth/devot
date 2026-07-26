@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { CognitionProfileName, DevotEntity, InferenceUsage } from "@devot/shared";
 import type { DevotDb } from "./client.js";
-import { devots, divineMsgs, messages, worldEvents } from "./schema.js";
+import { devots, divineMsgs, messages, mintReceipts, worldEvents } from "./schema.js";
 
 export interface StoredMessage {
   role: "user" | "assistant";
@@ -161,6 +161,47 @@ export class EventRepo {
   }
 }
 
+/**
+ * THE LEDGER OF DEPOSITS ALREADY HONOURED.
+ *
+ * Claiming a hash and spending it are one operation, not two: an insert that
+ * fails on the primary key IS the refusal. Checking first and inserting after
+ * would leave a window where two clients both pass the check.
+ */
+export class MintReceiptRepo {
+  constructor(private db: DevotDb) {}
+
+  /** True when this deposit is ours to use, false when it was already spent. */
+  claim(r: { txHash: string; tokenId: bigint; god: string; deposit: bigint }): boolean {
+    try {
+      this.db
+        .insert(mintReceipts)
+        .values({
+          txHash: r.txHash.toLowerCase(),
+          tokenId: r.tokenId.toString(),
+          god: r.god,
+          deposit: r.deposit.toString(),
+          usedAt: Date.now(),
+        })
+        .run();
+      return true;
+    } catch {
+      // UNIQUE violation: somebody got here first.
+      return false;
+    }
+  }
+
+  spent(txHash: string): boolean {
+    return (
+      this.db
+        .select()
+        .from(mintReceipts)
+        .where(eq(mintReceipts.txHash, txHash.toLowerCase()))
+        .get() !== undefined
+    );
+  }
+}
+
 export class DivineMsgRepo {
   constructor(private db: DevotDb) {}
 
@@ -174,6 +215,7 @@ export interface Repos {
   messages: MessageRepo;
   events: EventRepo;
   divineMsgs: DivineMsgRepo;
+  mintReceipts: MintReceiptRepo;
 }
 
 export function createRepos(db: DevotDb): Repos {
@@ -182,6 +224,7 @@ export function createRepos(db: DevotDb): Repos {
     messages: new MessageRepo(db),
     events: new EventRepo(db),
     divineMsgs: new DivineMsgRepo(db),
+    mintReceipts: new MintReceiptRepo(db),
   };
 }
 
