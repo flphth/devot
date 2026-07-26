@@ -11,6 +11,7 @@ import {
   PERCEPTION_RADIUS,
   TICK_MS,
   hasLineOfSight,
+  resolveRockCollisions,
   slopeSpeedFactor,
   terrainGrade,
   terrainHeight,
@@ -95,8 +96,9 @@ function movementSystem(devot: DevotEntity, world: World, dt: number): void {
     }
   }
   clampToWorld(devot.pos, world.size);
+  resolveRockCollisions(devot.pos);
   // The ground is the only thing that decides altitude — bodies never fly and
-  // never sink, whatever moved them (walking, clamping, a god's hand).
+  // never sink, whatever moved them (walking, clamping, a boulder, a god).
   devot.pos.y = terrainHeight(devot.pos.x, devot.pos.z);
 }
 

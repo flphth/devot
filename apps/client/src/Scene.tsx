@@ -2,7 +2,13 @@ import { Billboard, Html, OrbitControls } from "@react-three/drei";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { PERCEPTION_RADIUS, WORLD_HALF, hasLineOfSight, terrainHeight } from "@devot/shared";
+import {
+  PERCEPTION_RADIUS,
+  WORLD_HALF,
+  hasLineOfSight,
+  terrainHeight,
+  worldProps,
+} from "@devot/shared";
 import type { DevotView, FoodView, SmiteFx, WorldSnapshot } from "./useWorld.js";
 
 const GROUND_SIZE = 120;
@@ -210,6 +216,94 @@ function GrassTufts({ vision, godMode }: { vision: VisionCircle[]; godMode: bool
     <instancedMesh ref={ref} args={[undefined, undefined, GRASS_COUNT]} frustumCulled={false}>
       <coneGeometry args={[0.07, 0.32, 4]} />
       <meshLambertMaterial />
+    </instancedMesh>
+  );
+}
+
+// ── Rocks and flowers ───────────────────────────────────────────────────────
+
+const ROCK_LIT = new THREE.Color("#8d8f96");
+const ROCK_DARK = new THREE.Color("#2b3033");
+const FLOWER_LIT = ["#e8657f", "#f0d24c", "#c98ce8", "#f2f2f2"].map(
+  (c) => new THREE.Color(c),
+);
+const FLOWER_DARK = new THREE.Color("#2a2733");
+
+/** Boulders. Solid in the simulation too — bodies slide around them. */
+function Rocks({ vision, godMode }: { vision: VisionCircle[]; godMode: boolean }) {
+  const ref = useRef<THREE.InstancedMesh>(null);
+  const rocks = useMemo(() => worldProps().rocks, []);
+
+  useEffect(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    rocks.forEach((r, i) => {
+      // Squashed and tilted, so a field of boulders never looks like a field
+      // of identical balls.
+      q.setFromEuler(new THREE.Euler(r.rotation * 0.2, r.rotation, r.rotation * 0.15));
+      scale.set(r.scale, r.scale * (0.6 + (r.variant % 3) * 0.18), r.scale);
+      m.compose(new THREE.Vector3(r.x, r.y + r.scale * 0.28, r.z), q, scale);
+      mesh.setMatrixAt(i, m);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+  }, [rocks]);
+
+  useEffect(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    rocks.forEach((r, i) => {
+      mesh.setColorAt(i, isVisible(r.x, r.z, vision, godMode) ? ROCK_LIT : ROCK_DARK);
+    });
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [rocks, vision, godMode]);
+
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, rocks.length]} frustumCulled={false}>
+      <dodecahedronGeometry args={[0.62, 0]} />
+      <meshStandardMaterial flatShading />
+    </instancedMesh>
+  );
+}
+
+/** Flowers. Pure decoration: nothing in the simulation knows they exist. */
+function Flowers({ vision, godMode }: { vision: VisionCircle[]; godMode: boolean }) {
+  const ref = useRef<THREE.InstancedMesh>(null);
+  const flowers = useMemo(() => worldProps().flowers, []);
+
+  useEffect(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    const m = new THREE.Matrix4();
+    flowers.forEach((f, i) => {
+      m.makeRotationY(f.rotation);
+      m.setPosition(f.x, f.y + 0.22 * f.scale, f.z);
+      m.scale(new THREE.Vector3(f.scale, f.scale, f.scale));
+      mesh.setMatrixAt(i, m);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+  }, [flowers]);
+
+  useEffect(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    flowers.forEach((f, i) => {
+      const lit = isVisible(f.x, f.z, vision, godMode);
+      mesh.setColorAt(i, lit ? FLOWER_LIT[f.variant % FLOWER_LIT.length]! : FLOWER_DARK);
+    });
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [flowers, vision, godMode]);
+
+  return (
+    <instancedMesh
+      ref={ref}
+      args={[undefined, undefined, flowers.length]}
+      frustumCulled={false}
+    >
+      <boxGeometry args={[0.16, 0.16, 0.16]} />
+      <meshStandardMaterial flatShading />
     </instancedMesh>
   );
 }
@@ -585,6 +679,8 @@ export function Scene({
         onPointerUp={() => setDraggingFood(null)}
       />
       <GrassTufts vision={vision} godMode={godMode} />
+      <Rocks vision={vision} godMode={godMode} />
+      <Flowers vision={vision} godMode={godMode} />
 
       {visibleDevots.map((d) => (
         <VoxelDevot
