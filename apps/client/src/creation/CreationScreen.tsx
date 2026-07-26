@@ -25,6 +25,7 @@ import {
   type StatKey,
 } from "@devot/shared";
 import { DevotModel } from "./DevotModel.js";
+import { PRESET_GROUPS, type Preset } from "./presets.js";
 import { useT } from "../i18n.js";
 
 /**
@@ -69,6 +70,20 @@ export function CreationScreen({
   const [soul, setSoul] = useState("");
   const [appearance, setAppearance] = useState<Appearance>({ ...DEFAULT_APPEARANCE });
   const [stats, setStats] = useState<Stats>({ ...DEFAULT_STATS });
+  const [presetId, setPresetId] = useState<string | null>(null);
+  const [groupId, setGroupId] = useState<string>(PRESET_GROUPS[0]!.id);
+  const activeGroup = PRESET_GROUPS.find((g) => g.id === groupId) ?? PRESET_GROUPS[0]!;
+
+  // Applying a preset pre-fills both halves of the personality at once: the
+  // traits (what the mind decides with) and the stats (what the body can do).
+  // Everything stays editable afterwards — the moment you tweak a stat or a
+  // trait, the preset is just where you started from.
+  const applyPreset = (p: Preset) => {
+    setPresetId(p.id);
+    setTraits([...p.traits]);
+    setStats({ ...p.stats });
+    setSoul(p.soul);
+  };
 
   const spent = STAT_KEYS.reduce((sum, k) => sum + stats[k], 0);
   const left = STAT_BUDGET - spent;
@@ -78,21 +93,25 @@ export function CreationScreen({
     [appearance, stats, traits, soul],
   );
 
-  const toggleTrait = (t: string) =>
+  const toggleTrait = (t: string) => {
+    setPresetId(null);
     setTraits((prev) =>
       prev.includes(t) ? prev.filter((x) => x !== t) : prev.length < 3 ? [...prev, t] : prev,
     );
+  };
 
   const set = <K extends keyof Appearance>(key: K, value: Appearance[K]) =>
     setAppearance((prev) => ({ ...prev, [key]: value }));
 
-  const bump = (key: StatKey, delta: number) =>
+  const bump = (key: StatKey, delta: number) => {
+    setPresetId(null);
     setStats((prev) => {
       const next = prev[key] + delta;
       if (next < STAT_MIN || next > STAT_MAX) return prev;
       if (delta > 0 && left <= 0) return prev;
       return { ...prev, [key]: next };
     });
+  };
 
   return (
     <div
@@ -134,7 +153,44 @@ export function CreationScreen({
         >
           {/* ── Column 1: the soul ────────────────────────────────────────── */}
           <div style={CARD}>
-            <SectionTitle>{t("creation.soul")}</SectionTitle>
+            <SectionTitle>Inspiration</SectionTitle>
+            <Help>
+              Pick a well-known figure to shape a whole personality at once — its traits and its
+              body. You can fine-tune everything afterwards.
+            </Help>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 10 }}>
+              {PRESET_GROUPS.map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => setGroupId(g.id)}
+                  style={{
+                    padding: "3px 10px",
+                    borderRadius: 8,
+                    border: "1px solid #2a3245",
+                    background: g.id === groupId ? "#26303e" : "transparent",
+                    color: g.id === groupId ? "#dde3ee" : "#8b95a6",
+                    font: "11px system-ui, sans-serif",
+                    fontWeight: g.id === groupId ? 700 : 400,
+                    cursor: "pointer",
+                  }}
+                >
+                  {g.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+              {activeGroup.presets.map((p) => (
+                <PresetChip
+                  key={p.id}
+                  preset={p}
+                  on={presetId === p.id}
+                  color={godColor}
+                  onClick={() => applyPreset(p)}
+                />
+              ))}
+            </div>
+
+            <SectionTitle style={{ marginTop: 18 }}>{t("creation.soul")}</SectionTitle>
             <Help>
               Two or three traits. They go literally into their head: these are what they will
               decide with.
@@ -376,6 +432,41 @@ function Chip({
       }}
     >
       {children}
+    </button>
+  );
+}
+
+function PresetChip({
+  preset,
+  on,
+  onClick,
+  color,
+}: {
+  preset: Preset;
+  on: boolean;
+  onClick: () => void;
+  color: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={`${preset.blurb}\n\ntraits: ${preset.traits.join(", ")}`}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "5px 10px",
+        borderRadius: 999,
+        border: `1px solid ${on ? color : "#2a3245"}`,
+        background: on ? color : "#131924",
+        color: on ? "#10131a" : "#cdd5e2",
+        font: "12px system-ui, sans-serif",
+        fontWeight: on ? 700 : 500,
+        cursor: "pointer",
+      }}
+    >
+      <span style={{ fontSize: 14 }}>{preset.emoji}</span>
+      {preset.label}
     </button>
   );
 }
