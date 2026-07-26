@@ -9,6 +9,7 @@ import {
   HUNGRY_THRESHOLD,
   METABOLISM_HP_PER_TICK,
   PERCEPTION_RADIUS,
+  THREAT_REALERT_MS,
   hasLineOfSight,
   metabolismMultiplier,
   resolveRockCollisions,
@@ -78,6 +79,12 @@ export function tick(world: World, now: number = Date.now()): TickResult {
     hungerSystem(devot, result, now);
     deathSystem(devot, result);
   }
+
+  // Reflexes run in their own pass, AFTER every blow of this tick has landed.
+  // Folded into the loop above, whether a devot reacted depended on where it
+  // happened to sit in the map relative to its attacker — the one inserted
+  // first reacted a whole tick later than the one inserted second.
+  for (const devot of world.aliveDevots()) reflexSystem(devot, world);
 
   return result;
 }
@@ -191,10 +198,11 @@ function combatSystem(
   const prey = world.devots.get(targetId);
   if (!prey) return;
 
-  // The victim is alerted once per attacker: it is up to them to decide
-  // (flee, strike back, beg, sacrifice themselves).
-  if (prey.underAttackBy !== devot.id) {
-    prey.underAttackBy = devot.id;
+  // The victim is alerted, and alerted AGAIN if it never got to think about
+  // it. Firing once per attacker meant an alert raised while the devot was
+  // already thinking was dropped by the queue and never came back: a devot
+  // could be eaten alive having never once been told.
+  if (shouldAlert(prey, devot.id, now)) {
     rememberAggressor(prey, devot.id);
     result.triggers.push({
       kind: "threat",
@@ -423,6 +431,57 @@ export function describeSurroundings(
     : "Around you, as far as you can see: nothing and no one.";
 
   return `${describeSelf(devot, world)}\n\n${body}`;
+}
+
+/**
+ * Has this victim been told about this attacker, recently enough to count?
+ *
+ * Marks the alert as raised and returns whether it is worth raising. Re-arms
+ * after THREAT_REALERT_MS so an alert lost to a busy mind is not lost for good.
+ */
+export function shouldAlert(victim: DevotEntity, attackerId: string, now: number): boolean {
+  const fresh = victim.underAttackBy === attackerId;
+  const recent = now - (victim.alertedAt ?? 0) < THREAT_REALERT_MS;
+  if (fresh && recent) return false;
+  victim.underAttackBy = attackerId;
+  victim.alertedAt = now;
+  return true;
+}
+
+/**
+ * FIGHT OR FLIGHT, DECIDED BY THE BODY.
+ *
+ * Being told it is under attack was never enough. A thought can be seconds
+ * away — queued behind another devot's, or waiting on the budget — and until
+ * it lands the body follows whatever goal it had, which is usually grazing.
+ * Devots were being eaten while wandering.
+ *
+ * So the reflex is free and instant, like every other thing the body does
+ * between two thoughts. It only ever overrides a PASSIVE goal: a mind that has
+ * already chosen to flee, to hunt, or to walk somewhere is obeyed. The next
+ * thought can overrule the reflex entirely — that is the point of having one.
+ */
+function reflexSystem(devot: DevotEntity, world: World): void {
+  const attackerId = devot.underAttackBy;
+  if (!attackerId) return;
+
+  const attacker = world.devots.get(attackerId) ?? world.monsters.get(attackerId);
+  if (!attacker || attacker.state === "dead") {
+    devot.underAttackBy = undefined;
+    return;
+  }
+
+  const goal = devot.currentGoal.kind;
+  const passive = goal === "idle" || goal === "wander" || goal === "seek_food";
+  if (!passive) return;
+
+  // A body's instinct is crude on purpose: strike back at something weaker
+  // than you, run from something stronger. A mind is what weighs the rest.
+  if (devot.hp > attacker.hp) {
+    devot.currentGoal = { kind: "attack", targetId: attackerId };
+  } else {
+    devot.currentGoal = { kind: "flee", from: { ...attacker.pos } };
+  }
 }
 
 /** A devot remembers who has hurt it, capped so the memory cannot grow forever. */

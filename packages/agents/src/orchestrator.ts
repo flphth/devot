@@ -71,9 +71,19 @@ export class CognitionOrchestrator {
   enqueue(trigger: Trigger): void {
     const devot = this.getDevot(trigger.devotId);
     if (!devot || devot.state === "dead") return;
-    // A devot already thinking, or already queued, is not woken again.
+    // A devot already thinking is not woken again: its thought is in flight.
     if (this.inFlight.has(trigger.devotId)) return;
-    if (this.queue.some((t) => t.devotId === trigger.devotId)) return;
+
+    // One trigger queued per devot — but the URGENT one, not the first one.
+    // Sorting only ever ordered different devots, so a devot queued behind its
+    // own idle musing would think about nothing while being torn apart.
+    const queuedIndex = this.queue.findIndex((t) => t.devotId === trigger.devotId);
+    if (queuedIndex >= 0) {
+      const queued = this.queue[queuedIndex]!;
+      if (TRIGGER_PRIORITY[trigger.kind] >= TRIGGER_PRIORITY[queued.kind]) return;
+      this.queue.splice(queuedIndex, 1);
+    }
+
     this.queue.push(trigger);
     this.queue.sort((a, b) => TRIGGER_PRIORITY[a.kind] - TRIGGER_PRIORITY[b.kind]);
     this.pump();

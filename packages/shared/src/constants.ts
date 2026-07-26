@@ -79,7 +79,13 @@ export const ATTACK_RADIUS = 1.5;
 // HP taken from the victim per tick. Absolute value: with the pool tripled,
 // killing someone now takes three times longer.
 export const ATTACK_DRAIN_PER_TICK = 150;
-export const ATTACK_EFFICIENCY = 0.7; // share actually absorbed by the attacker
+export const ATTACK_EFFICIENCY = 0.7;
+/**
+ * How long before a victim still under attack is told again. Without this an
+ * alert raised while the devot was already thinking was dropped by the queue
+ * and never came back.
+ */
+export const THREAT_REALERT_MS = 6_000; // share actually absorbed by the attacker
 
 // Reproduction: procreating exhausts.
 // Below this, too weak to procreate. Absolute threshold: it now amounts to 5%

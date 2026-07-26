@@ -102,6 +102,8 @@ export interface DevotEntity {
   pendingReproduction?: { partnerId?: string };
   /** Id of the last reported attacker (avoids re-triggering every tick). */
   underAttackBy?: string;
+  /** When that alert was last raised, so a lost one can be raised again. */
+  alertedAt?: number;
   /** HP at the end of its previous thought, so it can feel a trend. */
   hpAtLastThought?: number;
   /** Everyone who has ever drawn its life. Capped; survives between thoughts. */

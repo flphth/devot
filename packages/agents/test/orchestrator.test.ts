@@ -149,3 +149,90 @@ describe("orchestrateur cognitif", () => {
     expect(order.sort()).toEqual(["a", "b"]);
   });
 });
+
+describe("an urgent trigger displaces a queued idle one", () => {
+  it("a devot queued behind its own musing still hears the threat", async () => {
+    // One trigger is queued per devot, and it used to be the FIRST one. Sorting
+    // only ever ordered different devots, so a devot queued with an idle
+    // reflection thought about nothing while it was being torn apart.
+    const devots = [
+      makeDevot("busy1"),
+      makeDevot("busy2"),
+      makeDevot("busy3"),
+      makeDevot("busy4"),
+      makeDevot("victim"),
+    ];
+    const { orchestrator, repos, applied } = setup(devots);
+
+    // Fill every inference slot, so nothing leaves the queue immediately.
+    for (const d of devots.slice(0, 4)) {
+      orchestrator.enqueue({
+        kind: "idle_reflection",
+        devotId: d.id,
+        eventText: "nothing at all",
+        createdAt: Date.now(),
+      });
+    }
+    orchestrator.enqueue({
+      kind: "idle_reflection",
+      devotId: "victim",
+      eventText: "you are daydreaming",
+      createdAt: Date.now(),
+    });
+    orchestrator.enqueue({
+      kind: "threat",
+      devotId: "victim",
+      eventText: "something is eating you",
+      createdAt: Date.now(),
+    });
+
+    await settle(orchestrator);
+
+    expect(applied.some((a) => a.devotId === "victim")).toBe(true);
+    const asked = repos.messages
+      .history("victim")
+      .map((m) => String(m.content))
+      .join("\n");
+    expect(asked).toContain("something is eating you");
+    expect(asked).not.toContain("daydreaming");
+  });
+
+  it("does not let an idle musing displace a threat already queued", async () => {
+    const devots = [
+      makeDevot("busy1"),
+      makeDevot("busy2"),
+      makeDevot("busy3"),
+      makeDevot("busy4"),
+      makeDevot("victim"),
+    ];
+    const { orchestrator, repos } = setup(devots);
+    for (const d of devots.slice(0, 4)) {
+      orchestrator.enqueue({
+        kind: "idle_reflection",
+        devotId: d.id,
+        eventText: "nothing at all",
+        createdAt: Date.now(),
+      });
+    }
+    orchestrator.enqueue({
+      kind: "threat",
+      devotId: "victim",
+      eventText: "something is eating you",
+      createdAt: Date.now(),
+    });
+    orchestrator.enqueue({
+      kind: "idle_reflection",
+      devotId: "victim",
+      eventText: "you are daydreaming",
+      createdAt: Date.now(),
+    });
+
+    await settle(orchestrator);
+    const asked = repos.messages
+      .history("victim")
+      .map((m) => String(m.content))
+      .join("\n");
+    expect(asked).toContain("something is eating you");
+    expect(asked).not.toContain("daydreaming");
+  });
+});
