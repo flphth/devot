@@ -49,6 +49,27 @@ export default function App() {
   const hasLiving = snapshot.devots.some((d) => d.godId === godId && d.state !== "dead");
   const creating = status === "connected" && godId !== null && !hasLiving;
 
+  /**
+   * Look at the founder the moment it is born.
+   *
+   * The player has just spent a whole screen shaping this creature, and the
+   * world is sixty units across — without this it appears somewhere off-camera
+   * and the first thing the game does is lose it. Selecting it also opens its
+   * Mind panel, which is where the point of the game actually is.
+   *
+   * Fires once per founder, tracked by id: after that the camera is the
+   * player's again, and deselecting must not snap straight back.
+   */
+  const focused = useRef(new Set<string>());
+  useEffect(() => {
+    const founder = snapshot.devots.find(
+      (d) => d.godId === godId && d.isFounder && d.state !== "dead",
+    );
+    if (!founder || focused.current.has(founder.id)) return;
+    focused.current.add(founder.id);
+    setSelectedId(founder.id);
+  }, [snapshot.devots, godId]);
+
   // Driven-test hooks (dev only): state + programmable selection.
   useEffect(() => {
     if (!import.meta.env.DEV) return;
