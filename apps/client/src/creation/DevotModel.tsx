@@ -22,17 +22,35 @@ export function buildWidth(build: Build): number {
   return BUILD_WIDTH[BUILDS.includes(build) ? build : "average"];
 }
 
+/**
+ * The four limbs a walk cycle swings, handed out as refs.
+ *
+ * Deliberately refs and not a `stride` prop: a stride changes every frame, and
+ * a prop that changes every frame is a React re-render every frame, for every
+ * devot on screen. The caller mutates `rotation.x` on these groups inside its
+ * own useFrame instead, and React never hears about it.
+ */
+export interface Limbs {
+  legL: THREE.Group | null;
+  legR: THREE.Group | null;
+  armL: THREE.Group | null;
+  armR: THREE.Group | null;
+}
+
 export function DevotModel({
   appearance,
   selected = false,
   emissive = 0,
   items = [],
+  limbs,
 }: {
   appearance: Appearance;
   selected?: boolean;
   emissive?: number;
   /** Forged items, worn on the body: they show, they were paid for. */
   items?: readonly ItemKind[];
+  /** Filled in with the limb groups, for a caller that wants to animate them. */
+  limbs?: React.MutableRefObject<Limbs>;
 }) {
   const w = buildWidth(appearance.build);
   const shirt = useMemo(() => new THREE.Color(appearance.shirt), [appearance.shirt]);
@@ -42,15 +60,25 @@ export function DevotModel({
 
   return (
     <group>
-      {/* legs */}
-      <mesh position={[-0.12 * w, 0.14, 0]}>
-        <boxGeometry args={[0.16 * w, 0.28, 0.2]} />
-        <meshStandardMaterial color={pants} flatShading />
-      </mesh>
-      <mesh position={[0.12 * w, 0.14, 0]}>
-        <boxGeometry args={[0.16 * w, 0.28, 0.2]} />
-        <meshStandardMaterial color={pants} flatShading />
-      </mesh>
+      {/* legs — hung from the hip so they swing rather than bend in the middle */}
+      <group
+        position={[-0.12 * w, 0.28, 0]}
+        ref={(g) => { if (limbs) limbs.current.legL = g; }}
+      >
+        <mesh position={[0, -0.14, 0]}>
+          <boxGeometry args={[0.16 * w, 0.28, 0.2]} />
+          <meshStandardMaterial color={pants} flatShading />
+        </mesh>
+      </group>
+      <group
+        position={[0.12 * w, 0.28, 0]}
+        ref={(g) => { if (limbs) limbs.current.legR = g; }}
+      >
+        <mesh position={[0, -0.14, 0]}>
+          <boxGeometry args={[0.16 * w, 0.28, 0.2]} />
+          <meshStandardMaterial color={pants} flatShading />
+        </mesh>
+      </group>
 
       {/* torso: this is what carries the shirt colour */}
       <mesh position={[0, 0.53, 0]}>
@@ -63,15 +91,25 @@ export function DevotModel({
         />
       </mesh>
 
-      {/* arms */}
-      <mesh position={[-(0.29 * w), 0.55, 0]}>
-        <boxGeometry args={[0.11 * w, 0.36, 0.16]} />
-        <meshStandardMaterial color={skin} flatShading />
-      </mesh>
-      <mesh position={[0.29 * w, 0.55, 0]}>
-        <boxGeometry args={[0.11 * w, 0.36, 0.16]} />
-        <meshStandardMaterial color={skin} flatShading />
-      </mesh>
+      {/* arms — hung from the shoulder, and swung opposite the legs */}
+      <group
+        position={[-(0.29 * w), 0.73, 0]}
+        ref={(g) => { if (limbs) limbs.current.armL = g; }}
+      >
+        <mesh position={[0, -0.18, 0]}>
+          <boxGeometry args={[0.11 * w, 0.36, 0.16]} />
+          <meshStandardMaterial color={skin} flatShading />
+        </mesh>
+      </group>
+      <group
+        position={[0.29 * w, 0.73, 0]}
+        ref={(g) => { if (limbs) limbs.current.armR = g; }}
+      >
+        <mesh position={[0, -0.18, 0]}>
+          <boxGeometry args={[0.11 * w, 0.36, 0.16]} />
+          <meshStandardMaterial color={skin} flatShading />
+        </mesh>
+      </group>
 
       {/* head */}
       <mesh position={[0, 0.93, 0]}>

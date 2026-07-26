@@ -28,7 +28,7 @@ import {
   recentlyBitten,
   strikingAt,
 } from "./CombatFx.js";
-import { DevotModel } from "./creation/DevotModel.js";
+import { DevotModel, type Limbs } from "./creation/DevotModel.js";
 
 const GROUND_SIZE = 120;
 /** Quads across the ground. The relief is only as sharp as this grid is fine. */
@@ -380,6 +380,9 @@ function VoxelDevot({
   const bodyGroup = useRef<THREE.Group>(null);
   const target = useRef(new THREE.Vector3(devot.x, devot.y, devot.z));
   const heading = useRef(0);
+  const limbs = useRef<Limbs>({ legL: null, legR: null, armL: null, armR: null });
+  /** Phase of the walk cycle, advanced by DISTANCE covered rather than by time. */
+  const stride = useRef(0);
   const dead = devot.state === "dead";
 
   target.current.set(devot.x, devot.y, devot.z);
@@ -450,6 +453,21 @@ function VoxelDevot({
     b.rotation.z = (moving ? Math.sin(t * 9) * 0.06 : 0) + (struck ? 0.12 : 0);
     const pulse = devot.thinking ? 1 + Math.sin(t * 6) * 0.05 : 1;
     b.scale.setScalar(pulse);
+
+    // THE WALK.
+    //
+    // Advanced by the distance actually covered, not by the clock: a body that
+    // stops must stop walking, and one held up by a hill must slow down with it.
+    // Driving this off elapsed time gives a corpse that keeps marching on the
+    // spot, which is worse than no animation at all.
+    stride.current += speed * dt * 4.2;
+    const swing = moving ? Math.sin(stride.current) * 0.55 : 0;
+    const l = limbs.current;
+    // Arms swing against the legs, which is what makes a walk read as a walk.
+    if (l.legL) l.legL.rotation.x = swing;
+    if (l.legR) l.legR.rotation.x = -swing;
+    if (l.armL) l.armL.rotation.x = -swing * 0.7;
+    if (l.armR) l.armR.rotation.x = swing * 0.7;
   });
 
   // Appearance comes from the identity frozen at birth; a devot from before
@@ -511,6 +529,7 @@ function VoxelDevot({
             selected={selected}
             emissive={struck ? 0.7 : 0}
             items={carried}
+            limbs={limbs}
           />
         )}
       </group>
@@ -699,25 +718,121 @@ function LightningFx({ fx }: { fx: SmiteFx }) {
  * devot, and crowned by the size of its hoard. A fat monster must look like a
  * fat monster — that is the whole wager the player is being offered.
  */
+/**
+ * A BEAST, NOT A BOX.
+ *
+ * It was one cube for the body, two for the eyes, and two legs that never
+ * moved — a monster slid across the ground by `position.lerp` and stood
+ * perfectly still while eating someone. It reads as a beast now: a long spine
+ * carried low, a heavy head thrust out in front of the shoulders, a jaw, four
+ * legs that walk in diagonal pairs, and a tail that swings behind it.
+ *
+ * All of it is R3F geometry in the game's own voxel language. No model file, no
+ * asset, nothing to load — the same rule the rest of the world follows.
+ */
 function MonsterMesh({
   monster,
+  strikeAt,
+  lunge,
   onSelect,
 }: {
   monster: MonsterView;
+  /** Where it is biting, if it is. Drives the lunge. */
+  strikeAt?: { x: number; z: number };
+  /** How far through that bite, 0 → 1 → 0. */
+  lunge: number;
   onSelect: (id: string) => void;
 }) {
   const group = useRef<THREE.Group>(null);
+  const bodyGroup = useRef<THREE.Group>(null);
+  const head = useRef<THREE.Group>(null);
+  const jaw = useRef<THREE.Group>(null);
+  const tail = useRef<THREE.Group>(null);
+  const legs = useRef<Array<THREE.Group | null>>([null, null, null, null]);
   const ground = terrainHeight(monster.x, monster.z);
   const target = useRef(new THREE.Vector3(monster.x, ground, monster.z));
+  const heading = useRef(0);
+  const stride = useRef(0);
   target.current.set(monster.x, ground, monster.z);
 
-  useFrame((_, dt) => {
-    if (group.current) group.current.position.lerp(target.current, 1 - Math.exp(-dt * 7));
+  useFrame(({ clock }, dt) => {
+    const g = group.current;
+    const b = bodyGroup.current;
+    if (!g || !b) return;
+
+    const before = g.position.clone();
+    g.position.lerp(target.current, 1 - Math.exp(-dt * 7));
+    const delta = g.position.clone().sub(before);
+    const speed = delta.length() / Math.max(dt, 1e-4);
+    const moving = speed > 0.15;
+
+    // Face where it is going — and, while biting, what it is biting.
+    let desired: number | undefined;
+    if (lunge > 0 && strikeAt) {
+      desired = Math.atan2(strikeAt.x - g.position.x, strikeAt.z - g.position.z);
+    } else if (moving) {
+      desired = Math.atan2(delta.x, delta.z);
+    }
+    if (desired !== undefined) {
+      let diff = desired - heading.current;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      heading.current += diff * Math.min(1, dt * 10);
+      g.rotation.y = heading.current;
+    }
+
+    const t = clock.elapsedTime;
+
+    // The gait, advanced by ground covered rather than by the clock, so a beast
+    // that stops stops walking instead of marching on the spot.
+    stride.current += speed * dt * 3.4;
+    const swing = moving ? Math.sin(stride.current) * 0.6 : 0;
+    // Diagonal pairs, the way four-legged things actually move: front-left with
+    // back-right. In phase, it hops like a toy.
+    const [fl, fr, bl, br] = legs.current;
+    if (fl) fl.rotation.x = swing;
+    if (br) br.rotation.x = swing;
+    if (fr) fr.rotation.x = -swing;
+    if (bl) bl.rotation.x = -swing;
+
+    // It lunges into the bite and drops back, like a devot does — the whole
+    // point of reusing strikingAt/lungeProgress rather than inventing a second
+    // system. Since the body is already turned to face its prey, the throw is
+    // straight down local +Z.
+    b.position.z = lunge * 0.5;
+    b.position.y = (moving ? Math.abs(Math.sin(stride.current)) * 0.05 : 0) - lunge * 0.08;
+    b.rotation.x = -lunge * 0.3;
+
+    // The head leads: down and forward while hunting, thrown further on a bite.
+    if (head.current) {
+      head.current.rotation.x = 0.18 + lunge * 0.35;
+      head.current.position.z = 0.42 + lunge * 0.12;
+    }
+    // The jaw opens on the bite, and works while it feeds.
+    if (jaw.current) {
+      jaw.current.rotation.x = lunge > 0 ? 0.5 * lunge + 0.15 : 0.04 + Math.abs(Math.sin(t * 2)) * 0.03;
+    }
+    // The tail swings against the gait, and lashes when it is striking.
+    if (tail.current) {
+      tail.current.rotation.y = moving ? Math.sin(stride.current) * 0.35 : Math.sin(t * 1.4) * 0.12;
+      tail.current.rotation.x = -0.25 - lunge * 0.3;
+    }
   });
 
   // Bulk grows with the hoard: what it ate is written on its body.
   const bulk = 1 + Math.min(0.6, monster.hoard / 120_000);
   const hunting = monster.targetId !== "";
+  const hide = "#2b1f2c";
+  const dark = "#1b1420";
+
+  // Front pair, then back pair. Order matters: the gait reads them as
+  // [front-left, front-right, back-left, back-right].
+  const legPlan: Array<[number, number]> = [
+    [-0.26, 0.3],
+    [0.26, 0.3],
+    [-0.26, -0.36],
+    [0.26, -0.36],
+  ];
 
   return (
     <group
@@ -728,31 +843,104 @@ function MonsterMesh({
         onSelect(monster.id);
       }}
     >
-      <mesh position={[0, 0.55 * bulk, 0]}>
-        <boxGeometry args={[0.85 * bulk, 0.9 * bulk, 0.7 * bulk]} />
-        <meshStandardMaterial
-          color="#2b1f2c"
-          flatShading
-          emissive={hunting ? "#8b1e2d" : "#000000"}
-          emissiveIntensity={hunting ? 0.5 : 0}
-        />
-      </mesh>
-      {/* eyes: the only bright thing on it */}
-      <mesh position={[-0.2, 0.85 * bulk, 0.36 * bulk]}>
-        <boxGeometry args={[0.12, 0.1, 0.03]} />
-        <meshStandardMaterial color="#ff5a3c" emissive="#ff5a3c" emissiveIntensity={1.4} />
-      </mesh>
-      <mesh position={[0.2, 0.85 * bulk, 0.36 * bulk]}>
-        <boxGeometry args={[0.12, 0.1, 0.03]} />
-        <meshStandardMaterial color="#ff5a3c" emissive="#ff5a3c" emissiveIntensity={1.4} />
-      </mesh>
-      {/* legs */}
-      {[-0.28, 0.28].map((x) => (
-        <mesh key={x} position={[x * bulk, 0.14, 0]}>
-          <boxGeometry args={[0.22 * bulk, 0.3, 0.24 * bulk]} />
-          <meshStandardMaterial color="#1b1420" flatShading />
+      <group ref={bodyGroup} scale={[bulk, bulk, bulk]}>
+        {/* spine: long and low, the silhouette that says quadruped */}
+        <mesh position={[0, 0.5, -0.05]}>
+          <boxGeometry args={[0.62, 0.42, 1.15]} />
+          <meshStandardMaterial
+            color={hide}
+            flatShading
+            emissive={hunting ? "#8b1e2d" : "#000000"}
+            emissiveIntensity={hunting ? 0.5 : 0}
+          />
         </mesh>
-      ))}
+        {/* haunches, higher than the shoulders — it is always about to spring */}
+        <mesh position={[0, 0.62, -0.5]}>
+          <boxGeometry args={[0.58, 0.34, 0.36]} />
+          <meshStandardMaterial color={hide} flatShading />
+        </mesh>
+        {/* ridge of spikes along the back */}
+        {[-0.4, -0.1, 0.2].map((z, i) => (
+          <mesh key={z} position={[0, 0.76 - i * 0.02, z]} rotation={[0.2, 0, 0]}>
+            <boxGeometry args={[0.09, 0.22 - i * 0.03, 0.1]} />
+            <meshStandardMaterial color={dark} flatShading />
+          </mesh>
+        ))}
+
+        {/* head, carried low and forward of the shoulders */}
+        <group ref={head} position={[0, 0.42, 0.42]}>
+          <mesh position={[0, 0, 0.16]}>
+            <boxGeometry args={[0.44, 0.34, 0.46]} />
+            <meshStandardMaterial
+              color={hide}
+              flatShading
+              emissive={hunting ? "#8b1e2d" : "#000000"}
+              emissiveIntensity={hunting ? 0.35 : 0}
+            />
+          </mesh>
+          {/* jaw, hinged at the back so it opens downward */}
+          <group ref={jaw} position={[0, -0.13, 0.02]}>
+            <mesh position={[0, -0.05, 0.22]}>
+              <boxGeometry args={[0.36, 0.12, 0.42]} />
+              <meshStandardMaterial color={dark} flatShading />
+            </mesh>
+            {[-0.1, 0.1].map((x) => (
+              <mesh key={x} position={[x, 0.04, 0.4]}>
+                <boxGeometry args={[0.06, 0.12, 0.06]} />
+                <meshStandardMaterial color="#e8e2d6" flatShading />
+              </mesh>
+            ))}
+          </group>
+          {/* the eyes: still the only bright thing on it */}
+          {[-0.12, 0.12].map((x) => (
+            <mesh key={x} position={[x, 0.08, 0.38]}>
+              <boxGeometry args={[0.11, 0.09, 0.03]} />
+              <meshStandardMaterial color="#ff5a3c" emissive="#ff5a3c" emissiveIntensity={1.4} />
+            </mesh>
+          ))}
+          {/* ears, laid flat back */}
+          {[-0.17, 0.17].map((x) => (
+            <mesh key={x} position={[x, 0.2, -0.02]} rotation={[-0.5, 0, 0]}>
+              <boxGeometry args={[0.08, 0.16, 0.05]} />
+              <meshStandardMaterial color={dark} flatShading />
+            </mesh>
+          ))}
+        </group>
+
+        {/* four legs, each hung from its shoulder or hip so it swings */}
+        {legPlan.map(([x, z], i) => (
+          <group
+            key={`${x},${z}`}
+            position={[x, 0.34, z]}
+            ref={(g) => {
+              legs.current[i] = g;
+            }}
+          >
+            <mesh position={[0, -0.17, 0]}>
+              <boxGeometry args={[0.17, 0.34, 0.2]} />
+              <meshStandardMaterial color={dark} flatShading />
+            </mesh>
+            {/* paw */}
+            <mesh position={[0, -0.33, 0.04]}>
+              <boxGeometry args={[0.2, 0.09, 0.26]} />
+              <meshStandardMaterial color={dark} flatShading />
+            </mesh>
+          </group>
+        ))}
+
+        {/* tail, hinged at the haunches */}
+        <group ref={tail} position={[0, 0.6, -0.66]}>
+          <mesh position={[0, 0, -0.26]}>
+            <boxGeometry args={[0.14, 0.14, 0.5]} />
+            <meshStandardMaterial color={hide} flatShading />
+          </mesh>
+          <mesh position={[0, 0, -0.56]}>
+            <boxGeometry args={[0.09, 0.09, 0.24]} />
+            <meshStandardMaterial color={dark} flatShading />
+          </mesh>
+        </group>
+      </group>
+
       <Billboard position={[0, 1.5 * bulk, 0]}>
         <Html center distanceFactor={16} style={{ pointerEvents: "none" }}>
           <div
@@ -913,7 +1101,13 @@ export function Scene({
         <VoxelFood key={f.id} food={f} godModeRef={godModeRef} onDragStart={setDraggingFood} />
       ))}
       {visibleMonsters.map((m) => (
-        <MonsterMesh key={m.id} monster={m} onSelect={onSelect} />
+        <MonsterMesh
+          key={m.id}
+          monster={m}
+          strikeAt={strikingAt(combats, m.id)}
+          lunge={lungeProgress(combats, m.id)}
+          onSelect={onSelect}
+        />
       ))}
 
       {lastSmite && Date.now() - lastSmite.at < 600 && <LightningFx fx={lastSmite} />}

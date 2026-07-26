@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  CAPACITY_DEFAULT,
   MONSTER_CAPACITY,
   MONSTER_MAX,
+  TICK_MS,
   MONSTER_METABOLISM_PER_TICK,
   MONSTER_SPAWN_MIN_DISTANCE,
   defaultIdentity,
@@ -197,5 +199,81 @@ describe("the world produces its own predators", () => {
 
   it("refuses to spawn into a world with no devots at all", () => {
     expect(findMonsterSpawn(new World(30))).toBeUndefined();
+  });
+});
+
+/**
+ * THE THREE OUTCOMES THAT MAKE A MONSTER WORTH FIGHTING.
+ *
+ * These are the balance, stated as behaviour rather than as constants. A devot
+ * used to need a hundred seconds of unbroken contact to bring one down while the
+ * monster needed forty-nine to kill it — so a devot could never win, and a soak
+ * over twenty-five minutes of world time killed exactly zero monsters. "Killing
+ * a monster is the one act that pays" was unreachable by construction.
+ *
+ * Asserted as outcomes on purpose: anyone retuning ATTACK_DRAIN_PER_TICK or
+ * MONSTER_DRAIN_PER_TICK will hear about it here, in the language of the design
+ * rather than in numbers that mean nothing on their own.
+ */
+function duel(devots: number, monsterBalance: number) {
+  const world = new World(30);
+  const ds: DevotEntity[] = [];
+  for (let i = 0; i < devots; i++) {
+    // Today's real numbers, not the helper's: its defaults date from the
+    // 150,000-capacity era and give a devot two and a half lives, which wins
+    // duels it has no business winning.
+    const d = makeDevot({
+      pos: { x: 0.6 + i * 0.2, y: 0, z: 0 },
+      balance: CAPACITY_DEFAULT,
+      bornWith: CAPACITY_DEFAULT,
+      capacity: CAPACITY_DEFAULT,
+    });
+    world.devots.set(d.id, d);
+    ds.push(d);
+  }
+  const monster = spawnMonster(world, 0, 0);
+  monster.balance = monsterBalance;
+
+  for (let t = 0; t < 2000; t++) {
+    for (const d of ds) {
+      if (d.state !== "dead") applyDecision(d, { action: "attack", targetId: monster.id }, world);
+    }
+    tick(world);
+    monsterSystem(world);
+    const standing = ds.filter((d) => d.state !== "dead").length;
+    if (monster.state === "dead") {
+      return { winner: "devots" as const, seconds: (t * TICK_MS) / 1000, lost: devots - standing };
+    }
+    if (standing === 0) return { winner: "monster" as const, seconds: (t * TICK_MS) / 1000, lost: devots };
+  }
+  return { winner: "stalemate" as const, seconds: Infinity, lost: 0 };
+}
+
+describe("a monster is worth fighting, and worth fearing", () => {
+  it("beats a lone devot when it is healthy", () => {
+    const r = duel(1, MONSTER_CAPACITY);
+    expect(r.winner).toBe("monster");
+  });
+
+  it("loses to a lone devot once it is wounded", () => {
+    // The prize the whole economy points at: a beast carrying a hoard, hurt
+    // enough to be taken. Without this the hoard is unreachable and every
+    // monster simply starves back into the ground.
+    const r = duel(1, MONSTER_CAPACITY * 0.6);
+    expect(r.winner).toBe("devots");
+  });
+
+  it("loses to two devots together, and takes neither of them", () => {
+    const r = duel(2, MONSTER_CAPACITY);
+    expect(r.winner).toBe("devots");
+    expect(r.lost).toBe(0);
+  });
+
+  it("settles in seconds, not in minutes", () => {
+    // A fight used to be a hundred seconds of attrition that nobody watched.
+    for (const r of [duel(1, MONSTER_CAPACITY), duel(2, MONSTER_CAPACITY)]) {
+      expect(r.seconds).toBeLessThan(20);
+      expect(r.seconds).toBeGreaterThan(3); // nor an instant, invisible blink
+    }
   });
 });

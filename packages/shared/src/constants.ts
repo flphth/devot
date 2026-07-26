@@ -135,10 +135,29 @@ export const FOOD_TTL_JITTER = 0.35;
 
 // Combat: vital predation (balance transfer from victim to attacker).
 export const ATTACK_RADIUS = 1.5;
-// balance taken from the victim per tick. Absolute value: against a 60,000 pool a
-// sustained mauling empties a devot in roughly a minute and a half, which is
-// long enough to run and short enough to be frightening.
-export const ATTACK_DRAIN_PER_TICK = 150;
+/**
+ * HOW HARD A DEVOT BITES.
+ *
+ * Was 150, which meant a devot needed a hundred seconds of unbroken contact to
+ * bring down a monster while the monster needed forty-nine to bring down the
+ * devot. A devot could therefore never win a fight it did not start against
+ * something already dying — and a soak over twenty-five minutes of world time
+ * confirmed it: not one monster killed, ever. "Killing a monster is the one act
+ * that pays" was unreachable by construction.
+ *
+ * These two numbers were chosen by MEASURING duels with the real systems, not
+ * by arithmetic — a fight is not continuous contact, both bodies move, and the
+ * closed-form answer was out by a factor of two. What they buy, measured:
+ *
+ *   1 devot vs a healthy monster  → the devot dies, 14.8 s
+ *   1 devot vs a monster at 60%   → the devot wins,  12.5 s
+ *   2 devots vs a healthy monster → they win intact,  7.8 s
+ *
+ * So a straight duel with a healthy beast is still lost, a wounded one is a
+ * real prize, and hunting together is the answer. Those three outcomes are the
+ * whole design and are asserted in monsters.test.ts rather than left to drift.
+ */
+export const ATTACK_DRAIN_PER_TICK = 1200;
 export const ATTACK_EFFICIENCY = 0.7;
 /**
  * How long before a victim still under attack is told again. Without this an
@@ -211,7 +230,13 @@ export const TRAIT_POOL = [
 // else. A monster that does not hunt dies, and gives back what it took.
 export const MONSTER_CAPACITY = 60_000;
 export const MONSTER_METABOLISM_PER_TICK = 90;
-export const MONSTER_DRAIN_PER_TICK = 260;
+/**
+ * And how hard a monster bites back. Kept ahead of the devot's own bite, which
+ * is what keeps a beast frightening and makes fleeing a real choice rather than
+ * a slower way of dying. Raise ATTACK_DRAIN without raising this and monsters
+ * stop being dangerous at all.
+ */
+export const MONSTER_DRAIN_PER_TICK = 1680;
 export const MONSTER_SPEED = 2.4;
 export const MONSTER_SIGHT = 14;
 /** Share of what it drains that it actually absorbs; the rest swells the hoard. */
