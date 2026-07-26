@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "mortal-core": "tsx src/mortalCore.ts"
+    "mortal-core": "tsx src/mortalCore.ts",
+    "arena": "tsx src/arena.ts"
   },
   "dependencies": {
     "@devot/agents": "workspace:*",

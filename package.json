@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "mortal-core": "tsx apps/server/src/mortalCore.ts"
+    "mortal-core": "tsx apps/server/src/mortalCore.ts",
+    "arena": "tsx apps/server/src/arena.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

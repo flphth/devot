@@ -1,0 +1,18 @@
+# G4 — Partie autonome : monstres prédateurs & primes ambulantes
+# Capturé le : 2026-07-26T00:03:49Z
+# ==========================================================
+
+🏟️  Arène — partie autonome : prédateurs & primes ambulantes
+
+   dépôts : prey-1=700 µ · prey-2=1000 µ · hero=8000 µ (chasseur) · mon-1=0 µ
+
+  [t1] 👹 le monstre mon-1 tue prey-1 et encaisse 700 µ → il grossit à 700 µ
+  [t2] 👹 le monstre mon-1 tue prey-2 et encaisse 900 µ → il grossit à 1350 µ
+  [t3] ⚔️  hero abat le monstre mon-1 et réclame son trésor (1100 µ) → solde 8900 µ
+  [t4] 👹 le monstre mon-2 tue prey-3 et encaisse 600 µ → il grossit à 600 µ
+  [t6] 🍂 le monstre mon-2, sans chasse, meurt de faim et relâche son magot (100 µ)
+  [t6] 🌾 hero ramasse un résidu au sol (100 µ) → solde 8700 µ
+
+═══ Économie fermée ═══
+  déposé 10300 µ  =  soldes 8600 µ  +  brûlé 1700 µ  +  retiré 0 µ
+  invariant Σ soldes + brûlé + retiré == Σ déposé : ✓ TENU
