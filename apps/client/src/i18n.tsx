@@ -28,7 +28,7 @@ const EN: Dict = {
   "hud.treasury": "Treasury:",
   "hud.treasury-devots": "({n} devot(s) affordable)",
 
-  "creation.paying": "Paying the deposit on chain…",
+  "creation.paying": "Waiting for the deposit to be mined…",
   "wallet.connect": "Connect a wallet to pay the deposit",
   "wallet.none": "No wallet found in this browser. MetaMask or any injected wallet will do.",
   "wallet.connected": "Paying from {a}",
@@ -103,7 +103,7 @@ const FR: Dict = {
   "hud.treasury": "Trésor :",
   "hud.treasury-devots": "({n} devot(s) finançable(s))",
 
-  "creation.paying": "Paiement du dépôt sur la chaîne…",
+  "creation.paying": "Attente de la confirmation du dépôt…",
   "wallet.connect": "Connecte un wallet pour payer le dépôt",
   "wallet.none": "Aucun wallet dans ce navigateur. MetaMask ou tout wallet injecté fait l'affaire.",
   "wallet.connected": "Paiement depuis {a}",

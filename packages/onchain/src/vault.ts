@@ -16,6 +16,9 @@ import { Contract, JsonRpcProvider, Wallet, formatEther, keccak256, toUtf8Bytes 
  * TESTNET ONLY. The key that signs these lives in an env var.
  */
 
+/** How long to wait for a player's deposit to be mined before giving up. */
+const MINT_WAIT_MS = 90_000;
+
 /** Only what we call. A full ABI would be noise. */
 const VAULT_ABI = [
   "function createDevot(bytes32 identityHash) payable returns (uint256 tokenId)",
@@ -144,8 +147,26 @@ export class LifeVaultClient {
       throw new Error("that is not a transaction hash");
     }
     const provider = this.wallet.provider!;
-    const receipt = await provider.getTransactionReceipt(txHash);
-    if (!receipt) throw new Error("no such transaction on this chain");
+
+    // WAIT FOR IT TO BE MINED.
+    //
+    // The browser hands us the hash the moment the wallet broadcasts, so at
+    // this point the transaction usually exists only in the mempool and
+    // getTransactionReceipt returns null. Asking once and giving up reported
+    // "no such transaction" for a payment that was perfectly real and landed a
+    // second later. Somebody has to wait, and it is cheaper here than in the
+    // player's browser.
+    let receipt = null;
+    try {
+      receipt = await provider.waitForTransaction(txHash, 1, MINT_WAIT_MS);
+    } catch {
+      // Falls through to the null check: a timeout is not a different answer.
+    }
+    if (!receipt) {
+      throw new Error(
+        "that transaction has not been mined yet — give it a moment and try again",
+      );
+    }
     if (receipt.status !== 1) throw new Error("that transaction failed");
 
     const vaultAddress = this.config.vaultAddress.toLowerCase();
