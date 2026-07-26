@@ -1,0 +1,21 @@
+# Devot — hackathon submission description
+
+The text submitted to the ETHGlobal `Description` field, 4,000 characters exactly.
+Kept here so the claims can be checked against the code that backs them —
+every one of them was verified against this repository before being written.
+
+Devot is an artificial life simulation in which every creature is a real AI agent, and the cost of its own thinking is what kills it.
+
+**Intelligence is a scarce, purchased resource.** A devot cannot be conjured. It is born only when a player signs a payable `createDevot(identityHash)` transaction against our LifeVault on 0G Galileo (chain 16602), and the OG deposited becomes that creature's entire life. Not a metaphor: after every inference we read the real token usage returned by the model, convert it to the same unit as the deposit, and subtract it. A devot gets roughly seventy thoughts. Deliberation is a survival cost, and a creature that overthinks starves beside one that acted.
+
+**Nothing is hardcoded.** Each agent runs on the Claude Agent SDK. Ten seconds apart, and immediately when something happens to it, it is handed what it can actually see — bounded by its own eyesight, occluded by real terrain, so a rival behind a ridge does not exist to it — and asked what it wants to do. Flee, hunt, forage, forge a weapon, breed, speak, or stand still: the model decides, every time. Traits and a one-sentence "soul" written by the player ride in every prompt. The behaviour that emerges was not scripted, and the screenshots contain lines no human wrote: a devot out of life and alone saying *"Nothing remains but silence — I hold still and wait for dawn or death."*
+
+**What is on-chain, precisely.** Birth is a real transaction, and it is the one moment the simulation is allowed to block on a network. The player signs it in their own wallet (injected EIP-1193); the server trusts nothing it is sent, reads the receipt back off 0G, refuses any log not emitted by our vault address, and takes the payer, the amount and the tokenId from the event itself. A spent transaction hash is recorded in the database and stays spent across restarts — otherwise one payment would mint devots forever. Each devot is also minted as an ERC-721 (a hand-written minimal registry, no dependencies), so a lineage is an on-chain object rather than a server record. Life movements during play are netted and batched off-chain so the 250 ms tick never waits on a network; `LifeVault.settle(Delta[], serverSig)` is implemented and tested for that batch, and is the next thing to be wired live.
+
+**Value is conserved, and that was proven before it was coded.** The invariant `depositedTotal == balance + burnedTotal + withdrawnTotal` was written first and is verified from both sides: a Solidity fuzz run under Foundry, and a TypeScript replay of a full scripted game. Thinking spends a creature's time, not the principal — which never leaves the vault — so when a devot dies its whole birth deposit drops on the ground as a relic, claimable in full by any devot or monster that reaches it. A monster hoards what it takes from the dead, and killing one releases everything it ever stole. That single rule is what makes a corpse worth crossing the map for.
+
+**Death is permanent and cheap to verify.** When a balance reaches zero the creature's context rows are deleted from SQLite. That mind is gone; nothing restores it. Children inherit look, stats and traits, plus a chronicler pass that condenses their parents' histories into memories of a life they never lived.
+
+**It is a real, running world, not a demo loop.** Colyseus authoritative server at a 250 ms tick, React Three Fiber client, terrain generated from a shared seed on both sides so it is never synced, line of sight, day/night and seasons that change what existing costs, monsters that hunt on a cheaper model tier so danger is not expensive, and body-level reflexes so a creature fights back between two thoughts. The world persists: it survives a page reload and a server restart, and it keeps running while nobody is watching — though the minds sleep when no player is connected, because inference for an empty world is a real bill.
+
+TypeScript and Solidity, pnpm monorepo, 243 tests across the economy, the simulation and the migrations.
