@@ -57,11 +57,28 @@ export default function App() {
    * simply wanted to look at it — at the traits, at the signature, at what a
    * different body would cost — had to wait for their whole line to die.
    *
-   * It stays forced open only while it is asked for. The moment a line is
-   * extinct it comes back on its own, exactly as before, and Escape cannot
-   * dismiss it then: there is nothing behind it to go back to.
+   * Once opened it STAYS open — until a new devot is actually born, or the
+   * player closes it. The first version cleared the flag whenever the god had
+   * anybody alive at all, which is nearly always, so Escape produced a blink
+   * and nothing else.
+   *
+   * When a line is extinct the screen comes back on its own, exactly as before,
+   * and Escape cannot dismiss it then: there is nothing behind it to go to.
    */
   const [creationAsked, setCreationAsked] = useState(false);
+  /** Who was alive when the screen was opened by hand. Null while it is shut. */
+  const livingWhenAsked = useRef<Set<string> | null>(null);
+  /**
+   * The living, kept current for the key handler to read.
+   *
+   * Not a dependency of the handler's effect: the snapshot changes about twenty
+   * times a second, and depending on it would tear down and rebind a window
+   * listener at that rate for the sake of one keystroke.
+   */
+  const livingIds = useRef<Set<string>>(new Set());
+  livingIds.current = new Set(
+    snapshot.devots.filter((d) => d.godId === godId && d.state !== "dead").map((d) => d.id),
+  );
   const creating = status === "connected" && godId !== null && (!hasLiving || creationAsked);
 
   /**
@@ -116,17 +133,39 @@ export default function App() {
         });
         return;
       }
-      if (e.key === "Escape") setCreationAsked((open) => !open);
+      if (e.key === "Escape") {
+        setCreationAsked((open) => {
+          // Remember who was standing, so the effect below can tell a birth
+          // from the simple fact of already having a line.
+          livingWhenAsked.current = open ? null : new Set(livingIds.current);
+          return !open;
+        });
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // A birth closes the screen, however it was opened: the player asked for a
-  // devot and got one, and leaving the panel up over it would hide the answer.
+  /**
+   * A NEW DEVOT closes the screen — not merely having one.
+   *
+   * This read `if (hasLiving && creationAsked)`, and `hasLiving` is true the
+   * whole time a god has anybody at all. So Escape set the flag and this effect
+   * cleared it in the same breath: the screen flashed and was gone. The player
+   * asked for the creation menu and got a blink.
+   *
+   * What actually ends the screen is a devot that was not there when it opened.
+   * So the living are remembered at that moment, and only a face missing from
+   * that list counts as the birth the player was waiting for.
+   */
   useEffect(() => {
-    if (hasLiving && creationAsked) setCreationAsked(false);
-  }, [hasLiving, creationAsked]);
+    const opened = livingWhenAsked.current;
+    if (!creationAsked || !opened) return;
+    const born = snapshot.devots.some(
+      (d) => d.godId === godId && d.state !== "dead" && !opened.has(d.id),
+    );
+    if (born) setCreationAsked(false);
+  }, [snapshot.devots, godId, creationAsked]);
 
   // Journal of the selected devot: loaded on selection, then refreshed.
   useEffect(() => {
@@ -176,7 +215,10 @@ export default function App() {
       {creating && (
         <CreationScreen
           dismissible={hasLiving}
-          onClose={() => setCreationAsked(false)}
+          onClose={() => {
+            livingWhenAsked.current = null;
+            setCreationAsked(false);
+          }}
           paying={creatingStage === "paying"}
           godColor={god?.color ?? "#4ca6e0"}
           rejection={lastRejection}

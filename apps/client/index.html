@@ -1,16 +1,375 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Devot</title>
-    <style>
-      html, body, #root { margin: 0; height: 100%; overflow: hidden; background: #0b0e14; }
-      * { box-sizing: border-box; }
-    </style>
+    <title>Devot — you are a god, and your faithful are real AI agents</title>
+    <meta
+      name="description"
+      content="Every creature in Devot is a Claude agent that perceives, deliberates and acts. The tokens it burns to think are debited from an on-chain deposit made on 0G — and that deposit is its life."
+    />
+    <meta property="og:title" content="Devot — thinking costs them their life" />
+    <meta
+      property="og:description"
+      content="A world where deliberation is a survival cost. Real AI agents, real token costs, a life bought on 0G."
+    />
+    <meta property="og:type" content="website" />
+    <link rel="stylesheet" href="/landing.css" />
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <nav class="nav">
+      <div class="wrap">
+        <a class="brand" href="/">DEV<span>O</span>T</a>
+        <div class="nav-links">
+          <a href="#rule">The rule</a>
+          <a href="#screens">The world</a>
+          <a href="#mind">A thought</a>
+          <a href="#chain">On 0G</a>
+          <a href="https://github.com/flphth/devot">GitHub</a>
+        </div>
+        <a class="btn btn-primary btn-sm" href="/game/">Enter the world</a>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <img class="hero-bg" src="../../docs/media/world.jpg" alt="" aria-hidden="true" />
+      <div class="hero-veil"></div>
+      <div class="wrap">
+        <p class="eyebrow">ETHGlobal Lisbon 2026 · 0G Galileo · chain 16602</p>
+        <h1>You are a god. Your faithful are <em>real AI agents</em>.</h1>
+        <p class="hero-lead">Thinking costs them their life.</p>
+        <p class="hero-sub">
+          Every devot in this world is a Claude agent that perceives, deliberates and acts. The
+          tokens it burns to think are debited from an on-chain deposit made on 0G — and that
+          deposit <em>is</em> its life. When it runs out the creature dies and its context is
+          destroyed forever, but the deposit itself was never consumed: the whole of it drops on the
+          ground, for a monster or a rival to take.
+        </p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="/game/">Shape a founder →</a>
+          <a class="btn btn-ghost" href="https://github.com/flphth/devot">Read the source</a>
+        </div>
+        <p class="hero-note">
+          A birth costs 0.001 OG on 0G Galileo testnet. No wallet? The world still runs — it just
+          says so out loud rather than quietly handing out creatures for free.
+        </p>
+      </div>
+    </header>
+
+    <div class="stats">
+      <div class="wrap">
+        <div class="stat"><b>0.001 OG</b><span>what a life costs to buy</span></div>
+        <div class="stat"><b>~70</b><span>thoughts, and that is a life</span></div>
+        <div class="stat"><b>250 ms</b><span>deterministic tick, zero tokens</span></div>
+        <div class="stat"><b>0</b><span>lines of scripted behaviour</span></div>
+      </div>
+    </div>
+
+    <section id="rule">
+      <div class="wrap">
+        <p class="eyebrow">The rule</p>
+        <h2>Nothing here is hardcoded.</h2>
+        <p class="section-lead">
+          Most “AI agent” games script the behaviour and dress it up as intelligence. Devot does the
+          opposite: a devot is given what it can see and asked what it wants to do. Whether it flees,
+          hunts, forages, breeds, forges a weapon or talks to its neighbour is the model’s call,
+          every time. That would be an expensive toy if thinking were free. It isn’t.
+        </p>
+        <div class="cards">
+          <div class="card">
+            <h3>A thought has a price</h3>
+            <p>
+              The real <code>usage</code> returned by the inference is converted into life and
+              subtracted. Not a simulation of a cost — the actual token count.
+            </p>
+          </div>
+          <div class="card is-life">
+            <h3>A life is a budget</h3>
+            <p>
+              A devot’s balance <em>is</em> its remaining cognition. Roughly seventy thoughts, and
+              that is a life. A creature that overthinks starves next to one that acted.
+            </p>
+          </div>
+          <div class="card is-death">
+            <h3>Death is real</h3>
+            <p>
+              When the balance reaches zero the context rows are deleted from the database. That
+              mind is gone; nothing restores it.
+            </p>
+          </div>
+          <div class="card">
+            <h3>The deposit outlives the creature</h3>
+            <p>
+              Thinking spends a devot’s <em>time</em>, not the OG that bought it. So a death puts the
+              whole birth deposit back on the ground, and a corpse is the richest thing in the world.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="screens">
+      <div class="wrap">
+        <p class="eyebrow">The world</p>
+        <h2>Everything in these screens is real.</h2>
+        <p class="section-lead">
+          No mockups, no captured highlight reel. These are three moments from a running world: a
+          founder being shaped, its first ten seconds alive, and a nightfall two of them did not
+          expect to survive.
+        </p>
+
+        <figure class="shot">
+          <span class="shot-num">01 — CREATION</span>
+          <div class="shot-frame">
+            <img
+              src="../../docs/media/creation.jpg"
+              alt="The creation screen: trait chips, a one-sentence conviction, the founder rendered in the middle, and a fixed stat budget on the right"
+              loading="lazy"
+            />
+          </div>
+          <figcaption class="shot-cap">
+            <strong>Shaping a founder.</strong> Traits go literally into its head — they are what it
+            will decide with. The one sentence you write is the conviction it carries into every
+            prompt it will ever receive. Stats come out of a fixed budget, because there is no devot
+            who is good at everything, and the signature <em>DVT-0U6-BKY7</em> is derived from every
+            choice. At the bottom: the wallet the deposit will be paid from.
+          </figcaption>
+        </figure>
+
+        <figure class="shot">
+          <span class="shot-num">02 — BIRTH</span>
+          <div class="shot-frame">
+            <img
+              src="../../docs/media/birth.jpg"
+              alt="A single devot standing in a lit circle of meadow surrounded by black fog, with its first prompt and its first decision shown on the left"
+              loading="lazy"
+            />
+          </div>
+          <figcaption class="shot-cap">
+            <strong>The first ten seconds of a life.</strong> Fog of war: it knows only what is
+            inside that circle, and the circle is its own eyesight, not a camera trick. Its first
+            prompt tells it the season, that it has just been born, and <em>that thinking costs it
+            its life</em> — then lists the one thing it can see, a grain worth 2,000, 6.2 away. It
+            answers <strong>eat</strong>, and says <em>“Food, close — I go.”</em>
+          </figcaption>
+        </figure>
+
+        <figure class="shot">
+          <span class="shot-num">03 — NIGHTFALL</span>
+          <div class="shot-frame">
+            <img
+              src="../../docs/media/world.jpg"
+              alt="Two creatures at nightfall, a lineage panel with three dead devots, the ledger of life theft, and the Mind panel showing a decision"
+              loading="lazy"
+            />
+          </div>
+          <figcaption class="shot-cap">
+            <strong>A lineage, most of the way through.</strong> On the left, a line of six: three
+            already dead at <em>0 / 60,000</em>, the survivors carrying 41,888 and 46,259 — and under
+            each balance, what it has cost in actual dollars of thinking so far. Bottom left, the
+            ledger of life theft: <em>150 Devot-3 → a stranger</em>, then
+            <em>147 a stranger → Devot-3 ☠</em>, which is a devot being drained to death by something
+            that was not its god’s problem. In the middle, the Mind panel shows the exact text a
+            creature was handed and what it chose to do with it. The other one has given up and said
+            so out loud: <em>“Nothing remains but silence — I hold still and wait for dawn or
+            death.”</em> Nobody wrote that line. It is what the model decided to say while running
+            out of life.
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="mind">
+      <div class="wrap">
+        <p class="eyebrow">A thought</p>
+        <h2>What a devot actually knows.</h2>
+        <p class="section-lead">
+          Before every thought a devot is handed a picture of its own situation, bounded by its own
+          eyesight — which is exactly the circle the player sees lit through the fog.
+        </p>
+        <div class="prompt-grid">
+          <pre class="prompt">
+The sun is low and the light is going. Autumn.
+
+<span class="hot">A monster, Beast-3, has fallen upon you and is
+tearing your life away.</span>
+
+Your situation:
+· Since your last thought you have LOST <span class="val">1,240</span>
+  balance. You are bleeding out.
+· You are running out. Food is not the only life
+  within reach: every devot and every monster
+  around you is carrying some, and attacking
+  takes it.
+· Has attacked you before: Beast-3.
+· You are down in a hollow: the rises around you
+  hide what lies beyond them, and hide you too.
+
+Around you, as far as you can see (beyond this
+you know nothing):
+- A MONSTER, Beast-3, 1.2 away, carrying a hoard
+  of <span class="val">24,180</span> taken from the dead — HUNTING YOU
+- Adam-son 412, of your own line, 6.4 away,
+  starving, carrying a spear
+- a RELIC left by Eve, holding <span class="val">9,000</span> in funds,
+  8.1 away. It will NOT feed you — it goes to
+  your god, who needs it to make more of you.</pre
+          >
+          <div class="aside">
+            <p>It answers with a structured decision:</p>
+            <ul class="verbs">
+              <li>idle</li>
+              <li>move</li>
+              <li>eat</li>
+              <li>flee</li>
+              <li>attack</li>
+              <li>speak</li>
+              <li>craft</li>
+              <li>reproduce</li>
+            </ul>
+            <p>
+              — plus a private thought and an emotion, both of which surface in the UI. Nothing
+              steers it toward any of them.
+            </p>
+            <p>
+              <strong>Bodies act between thoughts.</strong> A thought can be seconds away, queued
+              behind another creature’s or waiting on the budget, so the body has reflexes: a devot
+              with a monster’s teeth in it turns and fights whatever its mind last decided, and a
+              starving one walks to the nearest meal it can actually see. The next thought can
+              overrule any of it — that is the point of having a reflex rather than a rule.
+            </p>
+            <p>
+              As a god you get three verbs of your own: <strong>speak</strong> to it (140 characters,
+              and it costs), <strong>feed</strong> it, or <strong>smite</strong> it. Everything else
+              is the creature’s.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="chain">
+      <div class="wrap">
+        <p class="eyebrow">On 0G</p>
+        <h2>A life has to be bought with something real.</h2>
+        <p class="section-lead">
+          Otherwise “thinking costs you your life” is just a number in a server’s RAM. 0G Galileo is
+          where a devot’s life comes from and where its identity lives — and the birth is the one
+          moment the simulation is allowed to wait on a network. That only works if confirmation is
+          fast and cheap enough to sit inside a player’s character-creation flow.
+        </p>
+        <div class="chain-grid">
+          <div class="chain-item">
+            <h3>The deposit that creates life</h3>
+            <p>
+              <code>createDevot(identityHash)</code> payable — the OG sent becomes the creature’s
+              starting balance.
+            </p>
+          </div>
+          <div class="chain-item">
+            <h3>A devot is an NFT</h3>
+            <p>
+              A hand-written minimal ERC-721: a lineage is an on-chain object, not a server record.
+            </p>
+          </div>
+          <div class="chain-item">
+            <h3>The player pays, not the server</h3>
+            <p>The god signs the deposit in their own wallet — injected EIP-1193 / MetaMask.</p>
+          </div>
+          <div class="chain-item">
+            <h3>The server verifies rather than trusts</h3>
+            <p>
+              It reads the receipt back off 0G. Payer, amount and tokenId all come from the event
+              log, never from the client.
+            </p>
+          </div>
+        </div>
+        <div class="vault">
+          <span
+            ><b>Deployed vault</b>
+            <a
+              href="https://chainscan-galileo.0g.ai/address/0x30B5E767917695B9268948DB872aa3c22EBba62D"
+              ><code>0x30B5E767917695B9268948DB872aa3c22EBba62D</code></a
+            ></span
+          >
+          <span><b>Cost of a life</b> <code>0.001 OG</code></span>
+          <span><b>Chain</b> <code>16602 · Galileo</code></span>
+        </div>
+      </div>
+    </section>
+
+    <section id="world">
+      <div class="wrap">
+        <p class="eyebrow">The place itself</p>
+        <h2>A map that is never a stable larder.</h2>
+        <div class="world-grid">
+          <div class="world-item">
+            <h3>Relief and line of sight</h3>
+            <p>
+              Terrain generated from a seeded hash on both sides, never synced. Hills genuinely
+              occlude — for perception, not just for the camera. Climbing costs speed.
+            </p>
+          </div>
+          <div class="world-item">
+            <h3>Day, night and seasons</h3>
+            <p>
+              A two-minute day, seasons every two days. Night makes existing more expensive and
+              predators see further. Winter starves the map.
+            </p>
+          </div>
+          <div class="world-item">
+            <h3>Monsters</h3>
+            <p>
+              They hunt, hoard what they take, and starve if they stop. They think too, on a cheaper
+              tier. One never appears within sight of anyone.
+            </p>
+          </div>
+          <div class="world-item">
+            <h3>Food that rots</h3>
+            <p>
+              It appears at random and expires, so the map is never a stable larder and waiting is
+              never free.
+            </p>
+          </div>
+          <div class="world-item">
+            <h3>Many gods, one world</h3>
+            <p>
+              Two browsers, two <code>?god=</code> names, one shared world. Lineages compete for the
+              same food and the same corpses.
+            </p>
+          </div>
+          <div class="world-item">
+            <h3>Reproduction</h3>
+            <p>
+              Budding or sexual, across rival lines. The child inherits look, stats and — through a
+              chronicler pass — condensed memories of a life it never lived.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="closer">
+      <div class="wrap">
+        <h2>Every creature in this world is really thinking, and it is really dying of it.</h2>
+        <p>Shape a founder, sign the deposit, and see how long your line lasts.</p>
+        <p><a class="btn btn-primary" href="/game/">Enter the world →</a></p>
+        <p class="stack" style="margin-top: 48px">
+          <b>TypeScript</b> · <b>Solidity 0.8.24</b> · <b>GLSL</b><br />
+          Colyseus · React 19 · React Three Fiber · Three.js · Vite<br />
+          Claude Agent SDK · SQLite + Drizzle · Foundry · ethers v6 · <b>0G Galileo (16602)</b>
+        </p>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap">
+        <span>Devot — built at ETHGlobal Lisbon 2026</span>
+        <span class="spacer"></span>
+        <a href="https://ethglobal.com/showcase/undefined-u3djs">Showcase</a>
+        <a href="https://github.com/flphth/devot">Source</a>
+        <a href="/game/">Play</a>
+      </div>
+    </footer>
   </body>
 </html>

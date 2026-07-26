@@ -287,12 +287,15 @@ the point of having a reflex rather than a rule.
 ```sh
 pnpm install
 pnpm --filter @devot/server dev   # world on ws://localhost:2567
-pnpm --filter @devot/client dev   # http://localhost:5173?god=YourName
+pnpm --filter @devot/client dev   # landing on http://localhost:5173, world on /game
 ```
 
-Open `http://localhost:5173?god=YourName`, shape your founder, sign the deposit, then
+Open `http://localhost:5173/game/?god=YourName`, shape your founder, sign the deposit, then
 click its body to speak to it, feed it, or strike it down. A second browser with a
 different `?god=` puts another god in the same world.
+
+The same build serves the landing page at `/` and the world at `/game/` — one `vite build`,
+one static directory, no separate site to deploy.
 
 **Requirements:** Node ≥ 22, pnpm ≥ 9. For a birth to cost anything you need a wallet
 holding 0G Galileo testnet OG; with no chain configured the world still runs, and says so
@@ -340,6 +343,7 @@ cd contracts && forge test          # the vault's conservation invariant, fuzzed
 ```
 apps/server        Colyseus WorldRoom — the authority. Nothing is decided anywhere else.
 apps/client        Vite + React + React Three Fiber, MetaMask, i18n (FR/EN)
+                   plus the landing page at / — static HTML, the world at /game
 packages/shared    types, constants, terrain, props, world clock, decision schema
 packages/sim       the reactive layer: the deterministic systems of the 250 ms tick
 packages/agents    minds: prompts, model tiers, real cost → life, orchestrator
