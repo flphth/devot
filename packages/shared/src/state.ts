@@ -182,6 +182,11 @@ defineTypes(MonsterState, {
 });
 
 export class WorldState extends Schema {
+  /**
+   * Milliseconds of world time since this world began. One number, from which
+   * both sides derive the same hour, the same season and the same sky.
+   */
+  declare worldMs: number;
   declare devots: MapSchema<DevotState>;
   declare food: MapSchema<FoodState>;
   declare gods: MapSchema<GodState>;
@@ -189,6 +194,7 @@ export class WorldState extends Schema {
 
   constructor() {
     super();
+    this.worldMs = 0;
     this.devots = new MapSchema<DevotState>();
     this.food = new MapSchema<FoodState>();
     this.gods = new MapSchema<GodState>();
@@ -196,6 +202,7 @@ export class WorldState extends Schema {
   }
 }
 defineTypes(WorldState, {
+  worldMs: "number",
   devots: { map: DevotState },
   food: { map: FoodState },
   gods: { map: GodState },

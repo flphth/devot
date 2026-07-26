@@ -5,6 +5,11 @@ export class World {
   devots = new Map<string, DevotEntity>();
   food = new Map<string, FoodEntity>();
   monsters = new Map<string, MonsterEntity>();
+  /**
+   * Milliseconds of world time elapsed. Advanced by the server, one tick at a
+   * time, and synced so the client derives the same sky.
+   */
+  worldMs = 0;
   /** Map size: the square [-size, size] on x/z. */
   constructor(public size = 50) {}
 

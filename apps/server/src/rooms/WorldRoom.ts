@@ -17,6 +17,8 @@ import {
   statMultiplier,
   FOOD_SPAWN_CHANCE_PER_TICK,
   FOOD_TARGET,
+  describeSky,
+  foodSpawnMultiplier,
   FOOD_TTL_JITTER,
   FOOD_TTL_MS,
   TRAIT_POOL,
@@ -460,7 +462,13 @@ export class WorldRoom extends Room<WorldState> {
   private wake(trigger: Trigger): void {
     const devot = this.world.devots.get(trigger.devotId);
     if (!devot) return;
-    const eventText = `${trigger.eventText}\n\n${describeSurroundings(devot, this.world)}`;
+    // The sky comes first: the hour and the season change what every other
+    // line in the picture is worth.
+    const eventText = [
+      describeSky(this.world.worldMs),
+      trigger.eventText,
+      describeSurroundings(devot, this.world),
+    ].join("\n\n");
     // Stamped here rather than when the decision lands: this is the moment the
     // picture was taken, so the next thought's "since your last thought" is
     // measured against exactly what this one was told.
@@ -472,6 +480,10 @@ export class WorldRoom extends Room<WorldState> {
 
   private simulate(): void {
     this.tickCount++;
+    // The world's own clock, advanced one tick at a time rather than read from
+    // the wall: a world that was paused did not live through the night.
+    this.world.worldMs += TICK_MS;
+    this.state.worldMs = this.world.worldMs;
     const result = tick(this.world);
 
     for (const foodId of result.rotted) {
@@ -564,7 +576,7 @@ export class WorldRoom extends Room<WorldState> {
     // settles into a rhythm a devot could learn to wait out.
     if (
       this.world.food.size < FOOD_TARGET &&
-      Math.random() < FOOD_SPAWN_CHANCE_PER_TICK
+      Math.random() < FOOD_SPAWN_CHANCE_PER_TICK * foodSpawnMultiplier(this.world.worldMs)
     ) {
       this.spawnFood("spawn");
     }

@@ -8,6 +8,7 @@ import {
   MONSTER_SPEED,
   TICK_MS,
   hasLineOfSight,
+  monsterSightMultiplier,
   resolveRockCollisions,
   slopeSpeedFactor,
   terrainGrade,
@@ -131,7 +132,9 @@ export function monsterSystem(world: World, now: number = Date.now()): MonsterTi
  * put a ridge between itself and the beast has genuinely escaped its notice.
  */
 function acquireTarget(monster: MonsterEntity, world: World) {
-  const r2 = MONSTER_SIGHT * MONSTER_SIGHT;
+  // Predators see further in the dark; devots do not. Night is the beast's.
+  const sight = MONSTER_SIGHT * monsterSightMultiplier(world.worldMs);
+  const r2 = sight * sight;
   const current = monster.targetId ? world.devots.get(monster.targetId) : undefined;
   if (
     current &&

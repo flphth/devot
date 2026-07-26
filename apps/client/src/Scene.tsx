@@ -6,6 +6,7 @@ import {
   DEFAULT_APPEARANCE,
   DEFAULT_STATS,
   WORLD_HALF,
+  dayPhase,
   hasLineOfSight,
   sightRadiusFromStats,
   decodeIdentity,
@@ -233,6 +234,36 @@ function GrassTufts({ vision, godMode }: { vision: VisionCircle[]; godMode: bool
       <coneGeometry args={[0.07, 0.32, 4]} />
       <meshLambertMaterial />
     </instancedMesh>
+  );
+}
+
+// ── The sky ─────────────────────────────────────────────────────────────────
+
+/**
+ * Light, colour and fog, all derived from the one world clock the server sends.
+ * Night is not a filter over the picture: it is the same darkness the
+ * simulation is charging the devots for.
+ */
+function Sky({ worldMs }: { worldMs: number }) {
+  const phase = dayPhase(worldMs);
+  const night = phase === "night";
+  const twilight = phase === "dawn" || phase === "dusk";
+
+  const ambient = night ? 0.22 : twilight ? 0.45 : 0.75;
+  const sun = night ? 0.25 : twilight ? 0.8 : 1.3;
+  const ambientColor = night ? "#7f8fc4" : twilight ? "#ffd8b0" : "#eef4ff";
+  const sunColor = night ? "#9fb4ff" : twilight ? "#ffb072" : "#fff4dd";
+  const fogColor = night ? "#070a12" : twilight ? "#2a1f24" : "#101720";
+  // Night closes the world in as well as darkening it.
+  const fogNear = night ? 26 : twilight ? 40 : 55;
+
+  return (
+    <>
+      <ambientLight intensity={ambient} color={ambientColor} />
+      <directionalLight position={[18, 28, 12]} intensity={sun} color={sunColor} />
+      <fog attach="fog" args={[fogColor, fogNear, night ? 90 : 130]} />
+      <color attach="background" args={[fogColor]} />
+    </>
   );
 }
 
@@ -795,9 +826,7 @@ export function Scene({
   return (
     <>
       <DevTestHooks />
-      <ambientLight intensity={0.75} color="#eef4ff" />
-      <directionalLight position={[18, 28, 12]} intensity={1.3} color="#fff4dd" />
-      <fog attach="fog" args={["#101720", 55, 130]} />
+      <Sky worldMs={snapshot.worldMs} />
 
       <PrairieGround
         vision={vision}

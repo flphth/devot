@@ -10,6 +10,7 @@ import {
   METABOLISM_HP_PER_TICK,
   PERCEPTION_RADIUS,
   hasLineOfSight,
+  metabolismMultiplier,
   resolveRockCollisions,
   slopeSpeedFactor,
   terrainGrade,
@@ -63,9 +64,13 @@ export function tick(world: World, now: number = Date.now()): TickResult {
 
   decaySystem(world, result, now);
 
+  // Existing costs more at night and through winter: this is what stops
+  // standing still from being a dominant strategy.
+  const upkeep = METABOLISM_HP_PER_TICK * metabolismMultiplier(world.worldMs);
+
   for (const devot of world.aliveDevots()) {
     devot.age += 1;
-    devot.hp -= METABOLISM_HP_PER_TICK;
+    devot.hp -= upkeep;
 
     movementSystem(devot, world, dt);
     feedingSystem(devot, world, result);

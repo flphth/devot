@@ -68,6 +68,8 @@ export interface GodView {
 }
 
 export interface WorldSnapshot {
+  /** World time in ms. The sky, the season and the light all derive from it. */
+  worldMs: number;
   devots: DevotView[];
   food: FoodView[];
   gods: GodView[];
@@ -119,7 +121,7 @@ export interface WorldConnection {
   actions: WorldActions;
 }
 
-const EMPTY: WorldSnapshot = { devots: [], food: [], gods: [], monsters: [] };
+const EMPTY: WorldSnapshot = { worldMs: 0, devots: [], food: [], gods: [], monsters: [] };
 
 export function useWorld(godName: string): WorldConnection {
   const [snapshot, setSnapshot] = useState<WorldSnapshot>(EMPTY);
@@ -224,7 +226,7 @@ export function useWorld(godName: string): WorldConnection {
               targetId: m.targetId ?? "",
             });
           });
-          setSnapshot({ devots, food, gods, monsters });
+          setSnapshot({ worldMs: state.worldMs ?? 0, devots, food, gods, monsters });
         });
       })
       .catch((err) => {
