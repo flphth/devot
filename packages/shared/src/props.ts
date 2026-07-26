@@ -27,8 +27,21 @@ export interface RockProp extends WorldProp {
   radius: number;
 }
 
-export const ROCK_COUNT = 52;
-export const FLOWER_COUNT = 240;
+/**
+ * HOW THE MAP GETS COVERED, RATHER THAN HOW MUCH OF IT.
+ *
+ * These used to be flat counts — 52 rocks and 240 flowers — thrown at the
+ * square by uniform random. Uniform random over 3,600 m² with a couple of
+ * hundred samples clumps badly: it left whole quadrants of the world bare
+ * while piling props into a few patches, which is why the map read as empty.
+ *
+ * So the world is divided into cells and each cell grows its own, jittered
+ * inside its own square. Nowhere can come up empty by luck, and density is a
+ * property of the grid rather than of the random number generator's mood.
+ */
+export const ROCK_GRID = 13; // 13×13 cells ≈ 4.6 units across
+export const FLOWER_GRID = 22; // 22×22 cells ≈ 2.7 units across
+export const FLOWERS_PER_CELL = 3;
 
 /** Seed of the world's decoration. Change it and every rock moves. */
 const PROP_SEED = 0x5eed1e;
@@ -61,49 +74,66 @@ function build(): { rocks: RockProp[]; flowers: WorldProp[] } {
   const flowers: WorldProp[] = [];
 
   // Rocks first: they own their ground, and flowers will avoid them.
-  let guard = 0;
-  while (rocks.length < ROCK_COUNT && guard++ < ROCK_COUNT * 40) {
-    const x = (rand() - 0.5) * 2 * WORLD_HALF * 0.96;
-    const z = (rand() - 0.5) * 2 * WORLD_HALF * 0.96;
-    const radius = 0.55 + rand() * 0.95;
+  const rockCell = (2 * WORLD_HALF) / ROCK_GRID;
+  for (let cx = 0; cx < ROCK_GRID; cx++) {
+    for (let cz = 0; cz < ROCK_GRID; cz++) {
+      // Jittered inside its own cell, and kept off the very edge of it so two
+      // boulders in neighbouring cells are rarely born touching.
+      const x = -WORLD_HALF + (cx + 0.15 + rand() * 0.7) * rockCell;
+      const z = -WORLD_HALF + (cz + 0.15 + rand() * 0.7) * rockCell;
+      const radius = 0.55 + rand() * 0.95;
+      const rotation = rand() * Math.PI * 2;
+      const variant = Math.floor(rand() * 3);
 
-    // Keep the middle of the map clear: it is where founders open their eyes.
-    if (Math.hypot(x, z) < 4) continue;
-    // No boulder may overlap another, or bodies could get pinched between them.
-    if (rocks.some((r) => Math.hypot(r.x - x, r.z - z) < r.radius + radius + 1.2)) {
-      continue;
+      // Draws happen before the tests below, always and in the same order:
+      // a `continue` that skipped them would shift every later cell's numbers
+      // and make the whole world depend on which cells happened to reject.
+
+      // Keep the middle of the map clear: it is where founders open their eyes.
+      if (Math.hypot(x, z) < 4) continue;
+      // No boulder may overlap another, or bodies could get pinched between them.
+      if (rocks.some((r) => Math.hypot(r.x - x, r.z - z) < r.radius + radius + 1.2)) {
+        continue;
+      }
+
+      rocks.push({
+        id: `rock-${rocks.length}`,
+        x,
+        z,
+        y: terrainHeight(x, z),
+        radius,
+        scale: radius,
+        rotation,
+        variant,
+      });
     }
-
-    rocks.push({
-      id: `rock-${rocks.length}`,
-      x,
-      z,
-      y: terrainHeight(x, z),
-      radius,
-      scale: radius,
-      rotation: rand() * Math.PI * 2,
-      variant: Math.floor(rand() * 3),
-    });
   }
 
-  guard = 0;
-  while (flowers.length < FLOWER_COUNT && guard++ < FLOWER_COUNT * 30) {
-    const x = (rand() - 0.5) * 2 * WORLD_HALF * 0.98;
-    const z = (rand() - 0.5) * 2 * WORLD_HALF * 0.98;
+  const flowerCell = (2 * WORLD_HALF) / FLOWER_GRID;
+  for (let cx = 0; cx < FLOWER_GRID; cx++) {
+    for (let cz = 0; cz < FLOWER_GRID; cz++) {
+      for (let n = 0; n < FLOWERS_PER_CELL; n++) {
+        const x = -WORLD_HALF + (cx + rand()) * flowerCell;
+        const z = -WORLD_HALF + (cz + rand()) * flowerCell;
+        const scale = 0.7 + rand() * 0.6;
+        const rotation = rand() * Math.PI * 2;
+        const variant = Math.floor(rand() * 4);
 
-    // Flowers are meadow things: they do not grow on the steep faces.
-    if (steepness(x, z) > 0.55) continue;
-    if (rocks.some((r) => Math.hypot(r.x - x, r.z - z) < r.radius + 0.5)) continue;
+        // Flowers are meadow things: they do not grow on the steep faces.
+        if (steepness(x, z) > 0.55) continue;
+        if (rocks.some((r) => Math.hypot(r.x - x, r.z - z) < r.radius + 0.5)) continue;
 
-    flowers.push({
-      id: `flower-${flowers.length}`,
-      x,
-      z,
-      y: terrainHeight(x, z),
-      scale: 0.7 + rand() * 0.6,
-      rotation: rand() * Math.PI * 2,
-      variant: Math.floor(rand() * 4),
-    });
+        flowers.push({
+          id: `flower-${flowers.length}`,
+          x,
+          z,
+          y: terrainHeight(x, z),
+          scale,
+          rotation,
+          variant,
+        });
+      }
+    }
   }
 
   return { rocks, flowers };

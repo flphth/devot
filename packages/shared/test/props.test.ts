@@ -1,18 +1,41 @@
 import { describe, expect, it } from "vitest";
 import {
   BODY_RADIUS,
-  FLOWER_COUNT,
-  ROCK_COUNT,
   resolveRockCollisions,
   worldProps,
 } from "../src/props.js";
 import { WORLD_HALF, terrainHeight } from "../src/terrain.js";
 
 describe("world props — decoration server and client must agree on", () => {
-  it("generates the asked-for population", () => {
+  it("populates the whole map, not a few lucky patches", () => {
+    // The real requirement was never a headcount, it was coverage. Uniform
+    // random with a couple of hundred samples clumped: whole quadrants of the
+    // world came up bare, which is what made the map read as empty. Asserting
+    // a total would have passed happily through that.
     const { rocks, flowers } = worldProps();
-    expect(rocks).toHaveLength(ROCK_COUNT);
-    expect(flowers).toHaveLength(FLOWER_COUNT);
+    const G = 6;
+    const cell = (2 * WORLD_HALF) / G;
+    const at = (v: number) => Math.min(G - 1, Math.max(0, Math.floor((v + WORLD_HALF) / cell)));
+    const rockRegions = new Set<string>();
+    const flowerCounts = new Map<string, number>();
+
+    for (const r of rocks) rockRegions.add(`${at(r.x)},${at(r.z)}`);
+    for (const f of flowers) {
+      const key = `${at(f.x)},${at(f.z)}`;
+      flowerCounts.set(key, (flowerCounts.get(key) ?? 0) + 1);
+    }
+
+    // Every one of the 36 regions of the world has both.
+    expect(rockRegions.size).toBe(G * G);
+    expect(flowerCounts.size).toBe(G * G);
+    // And no region is a token sprinkle next to a dense one.
+    expect(Math.min(...flowerCounts.values())).toBeGreaterThan(10);
+  });
+
+  it("is dense enough to be a landscape rather than a scattering", () => {
+    const { rocks, flowers } = worldProps();
+    expect(rocks.length).toBeGreaterThan(100);
+    expect(flowers.length).toBeGreaterThan(800);
   });
 
   it("returns the very same props every call", () => {

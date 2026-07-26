@@ -31,6 +31,7 @@ import {
   TICK_MS,
   DEVOT_THINK_INTERVAL_MS,
   MONSTER_THINK_INTERVAL_MS,
+  MONSTER_SPAWN_CHANCE_PER_TICK,
   SOUL_MAX_CHARS,
   statMultiplier,
   DEFAULT_DEVOT_PROFILE,
@@ -83,6 +84,8 @@ import {
   describeMonsterSurroundings,
   describeSurroundings,
   dist2,
+  findMonsterSpawn,
+  monsterCeiling,
   monsterSystem,
   perceptionSystem,
   spawnMonster,
@@ -170,8 +173,6 @@ export class WorldRoom extends Room<WorldState> {
   private vault?: LifeVaultClient;
   /** What a birth costs on chain, read once from the same config as the vault. */
   private vaultDepositWei = 0n;
-  /** Funds riding on relics, so what rots away is burned rather than lost track of. */
-  private rottedFunds = new Map<string, number>();
   private ledger = new LifeLedger(
     new LocalSettler((batch) =>
       this.repos.events.record(
@@ -459,7 +460,7 @@ export class WorldRoom extends Room<WorldState> {
       x?: number;
       z?: number;
       generation?: number;
-      /** Absente pour une naissance par reproduction ou en mode god. */
+      /** Absent for a birth by reproduction, or in god mode. */
       identity?: Identity;
     },
   ): DevotEntity {
@@ -714,9 +715,7 @@ export class WorldRoom extends Room<WorldState> {
     this.state.worldMs = this.world.worldMs;
     const result = tick(this.world);
 
-    for (const { godId, funds, leftBy, devotId, foodId } of result.claimed) {
-      // Claimed, so it can no longer rot: drop it from the pending-burn book.
-      this.rottedFunds.delete(foodId);
+    for (const { godId, funds, leftBy, devotId } of result.claimed) {
       const finder = this.world.devots.get(devotId);
       if (finder) {
         // Straight into the body. There is no purse to put it in any more, and
@@ -731,12 +730,7 @@ export class WorldRoom extends Room<WorldState> {
       );
     }
 
-    // A relic that rots takes its funds with it: nobody came, nobody gets it.
-    for (const foodId of result.rotted) {
-      // A relic nobody came for is simply gone: the world is poorer by it.
-      this.rottedFunds.delete(foodId);
-    }
-
+    // A relic nobody came for is simply gone: the world is poorer by it.
     for (const foodId of result.rotted) {
       this.repos.events.record("food_rotted", [], { foodId });
     }
@@ -758,10 +752,9 @@ export class WorldRoom extends Room<WorldState> {
       if (st) st.utterance = "";
     }
 
-    for (const { monsterId, foodId, funds, leftBy } of beasts.scavenged) {
+    for (const { monsterId, funds, leftBy } of beasts.scavenged) {
       // Taken out of circulation: the funds ride on a monster's back now, and
       // only come home if something brings it down.
-      this.rottedFunds.delete(foodId);
       this.repos.events.record("legacy_scavenged", [], { monsterId, funds, leftBy });
       const name = this.world.monsters.get(monsterId)?.name ?? monsterId;
       console.log(
@@ -868,6 +861,7 @@ export class WorldRoom extends Room<WorldState> {
       for (const d of this.world.devots.values()) this.repos.devots.snapshot(d);
     }
 
+    this.spawnMonsters();
     this.wakeMonsters();
     this.keepThinking();
 
@@ -880,6 +874,37 @@ export class WorldRoom extends Room<WorldState> {
     this.detectExtinctions();
     this.scoreLineages();
     this.syncState();
+  }
+
+  /**
+   * WHERE THE DANGER COMES FROM.
+   *
+   * Monsters existed in code and never in a game: `spawnMonster` was reachable
+   * only from the debug message, so unless someone clicked it, the hunting, the
+   * hoards, the scavenging and the fight-back reflex were all dead weight and
+   * the world was a meadow with nothing in it.
+   *
+   * Kept honest by two rules. The population follows the living, so a predator
+   * is never left with nothing to hunt and a lone founder is never met by a
+   * pack. And nothing appears within sight of anyone: a beast has to cross the
+   * ground to reach you, and you get to watch it come.
+   */
+  private spawnMonsters(): void {
+    const ceiling = monsterCeiling(this.world.aliveDevots().length);
+    if (this.world.aliveMonsters().length >= ceiling) return;
+    if (Math.random() >= MONSTER_SPAWN_CHANCE_PER_TICK) return;
+
+    const at = findMonsterSpawn(this.world);
+    if (!at) return; // nowhere far enough from anyone this tick; try again later
+
+    const beast = spawnMonster(this.world, at.x, at.z);
+    this.repos.events.record("monster_spawned", [beast.id], {
+      x: Math.round(at.x),
+      z: Math.round(at.z),
+    });
+    console.log(
+      `[world] 🐺 ${beast.name} comes out of the wild at x=${at.x.toFixed(0)}, z=${at.z.toFixed(0)}`,
+    );
   }
 
   /**
@@ -1007,7 +1032,6 @@ export class WorldRoom extends Room<WorldState> {
       leftBy: devot.name,
     };
     this.world.food.set(relic.id, relic);
-    this.rottedFunds.set(relic.id, funds);
     this.repos.events.record("legacy_dropped", [devot.id], { funds });
   }
 

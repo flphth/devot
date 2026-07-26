@@ -159,7 +159,7 @@ export class CognitionOrchestrator {
     try {
       let history = memory.history(entity.id);
 
-      // Vieillir, c'est oublier : historique trop long → le chroniqueur le
+      // To grow old is to forget: a history grown too long → the chronicler
       // condenses it into a single memory. That memory work costs balance, like every other thought.
       if (this.chronicler && history.length > CONTEXT_COMPACT_THRESHOLD_MSGS) {
         const { summary, usage } = await this.chronicler.chronicle(

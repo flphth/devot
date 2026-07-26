@@ -5,8 +5,7 @@ import { resolveReproduction, World, type Birth } from "@devot/sim";
 
 /**
  * Consumes the reproduction intents left by the minds and carries out the
- * births: mechanics (sim) + context inheritance
- * (chroniqueur) + persistance.
+ * births: mechanics (sim) + context inheritance (the chronicler) + persistence.
  */
 export async function processReproductions(
   world: World,

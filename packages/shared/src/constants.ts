@@ -146,6 +146,20 @@ export const ATTACK_EFFICIENCY = 0.7;
  * and never came back.
  */
 export const THREAT_REALERT_MS = 6_000; // share actually absorbed by the attacker
+/**
+ * HOW LONG THE BODY KEEPS FIGHTING AFTER THE LAST BLOW.
+ *
+ * The reflex used to have no end at all: a devot struck once carried
+ * `underAttackBy` for the rest of its life, and since the reflex overrides any
+ * passive goal, every "go and eat" it ever decided was overwritten on the very
+ * next tick. Devots that had been in one fight could never eat again, and every
+ * single one of them died of vital exhaustion.
+ *
+ * So aggression expires. Long enough to cover a chase — a monster closing from
+ * the edge of the leash arrives in about two seconds — and short enough that a
+ * skirmish which ended is genuinely over.
+ */
+export const AGGRESSION_MEMORY_MS = 5_000;
 
 // Reproduction: procreating exhausts.
 // Below this, too weak to procreate. Absolute threshold: with the pool at
@@ -209,3 +223,26 @@ export const MONSTER_ABSORB = 0.35;
  * second and starves on its own deliberation.
  */
 export const MONSTER_THINK_INTERVAL_MS = 15_000;
+
+/**
+ * THE WORLD PRODUCES ITS OWN PREDATORS.
+ *
+ * Everything above this line — hunting, hoards, scavenging, the reflex that
+ * makes a cornered devot turn and fight — was reachable only through the debug
+ * "spawn a monster" button. In a real game no monster had ever existed, so
+ * none of it ran, and the world was a meadow.
+ *
+ * The population is tied to the living, for two reasons. A predator with no
+ * prey starves within a minute and is pure waste; and a lone founder taking
+ * their first steps should not be met by a pack.
+ */
+export const MONSTER_PER_DEVOTS = 2;
+export const MONSTER_MAX = 4;
+/** ~1 every 25 s while the world is under its ceiling. */
+export const MONSTER_SPAWN_CHANCE_PER_TICK = 0.01;
+/**
+ * How far from every living devot one may appear. Wider than MONSTER_SIGHT, so
+ * a beast is never conjured already looking at someone — it has to find them,
+ * and a player always gets to see it coming.
+ */
+export const MONSTER_SPAWN_MIN_DISTANCE = 18;

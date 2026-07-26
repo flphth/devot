@@ -108,6 +108,13 @@ export interface DevotEntity {
   underAttackBy?: string;
   /** When that alert was last raised, so a lost one can be raised again. */
   alertedAt?: number;
+  /**
+   * When a blow last actually landed on it — stamped every single time, unlike
+   * `alertedAt`, which is throttled so the victim is not told twice a second.
+   * "When was I last struck" and "when was I last told" are different questions,
+   * and the body's reflex needs the first one.
+   */
+  lastStruckAt?: number;
   /** balance at the end of its previous thought, so it can feel a trend. */
   balanceAtLastThought?: number;
   /** When its mind last ran. The idle loop is paced off this. */

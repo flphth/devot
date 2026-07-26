@@ -47,8 +47,8 @@ export function resolveReproduction(
 
   if (partner && partner.id !== parent.id) {
     // Sexual reproduction — including across the lines of different gods.
-    if (partner.state === "dead") return { reason: "partenaire mort" };
-    if (partner.balance < REPRO_MIN_BALANCE) return { reason: "partenaire trop faible" };
+    if (partner.state === "dead") return { reason: "partner is dead" };
+    if (partner.balance < REPRO_MIN_BALANCE) return { reason: "partner too weak" };
     if (dist2(parent.pos, partner.pos) > REPRO_RADIUS * REPRO_RADIUS) {
       return { reason: "partner too far away" };
     }

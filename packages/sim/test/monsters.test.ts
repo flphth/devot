@@ -1,12 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
   MONSTER_CAPACITY,
+  MONSTER_MAX,
   MONSTER_METABOLISM_PER_TICK,
+  MONSTER_SPAWN_MIN_DISTANCE,
   defaultIdentity,
   encodeIdentity,
   type DevotEntity,
 } from "@devot/shared";
-import { applyDecision, monsterSystem, spawnMonster, tick, World } from "../src/index.js";
+import {
+  applyDecision,
+  dist2,
+  findMonsterSpawn,
+  monsterCeiling,
+  monsterSystem,
+  spawnMonster,
+  tick,
+  World,
+} from "../src/index.js";
 
 /**
  * Monsters are the one thing in this world that takes without ever paying for a
@@ -124,5 +135,66 @@ describe("a devot can fight back", () => {
     expect(result.monsterDeaths).toHaveLength(1);
     expect(result.monsterDeaths[0]).toMatchObject({ killerId: hero.id, hoard: 9_000 });
     expect(monster.state).toBe("dead");
+  });
+});
+
+/**
+ * The whole predator system was unreachable in a real game: `spawnMonster` was
+ * called from the debug message and nowhere else, so unless a developer clicked
+ * the button, no monster had ever existed — and the hunting, the hoards, the
+ * scavenging and the fight-back reflex were all dead weight.
+ */
+describe("the world produces its own predators", () => {
+  it("holds none at all while nothing is alive to hunt", () => {
+    // A monster with no prey starves within the minute. Spawning one into an
+    // empty world is pure waste, and it would think on the way down.
+    expect(monsterCeiling(0)).toBe(0);
+  });
+
+  it("scales with the living, and stops", () => {
+    expect(monsterCeiling(1)).toBe(1);
+    expect(monsterCeiling(4)).toBe(2);
+    expect(monsterCeiling(100)).toBe(MONSTER_MAX);
+  });
+
+  it("never puts one within sight of anybody", () => {
+    const world = new World(30);
+    const devot = makeDevot({ pos: { x: 0, y: 0, z: 0 } });
+    world.devots.set(devot.id, devot);
+
+    // Every candidate the rng offers lands right on top of the devot.
+    expect(findMonsterSpawn(world, () => 0.5)).toBeUndefined();
+  });
+
+  it("gives up for this tick rather than spinning", () => {
+    // On a crowded map there may be no far-enough spot at all. Looping until
+    // one appears would hang the tick; skipping a spawn costs nothing.
+    const world = new World(30);
+    for (let i = 0; i < 40; i++) {
+      const d = makeDevot({ pos: { x: (i % 7) * 8 - 24, y: 0, z: Math.floor(i / 7) * 8 - 24 } });
+      world.devots.set(d.id, d);
+    }
+    let calls = 0;
+    findMonsterSpawn(world, () => {
+      calls++;
+      return Math.random();
+    });
+    expect(calls).toBeLessThanOrEqual(24); // 12 attempts, two draws each
+  });
+
+  it("finds ground far from a lone devot in a corner", () => {
+    const world = new World(30);
+    const devot = makeDevot({ pos: { x: -27, y: 0, z: -27 } });
+    world.devots.set(devot.id, devot);
+
+    const at = findMonsterSpawn(world);
+    expect(at).toBeDefined();
+    expect(dist2({ ...at!, y: 0 }, devot.pos)).toBeGreaterThanOrEqual(
+      MONSTER_SPAWN_MIN_DISTANCE * MONSTER_SPAWN_MIN_DISTANCE,
+    );
+  });
+
+  it("refuses to spawn into a world with no devots at all", () => {
+    expect(findMonsterSpawn(new World(30))).toBeUndefined();
   });
 });

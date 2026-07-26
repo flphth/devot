@@ -52,10 +52,15 @@ describe("reactive layer (0 tokens)", () => {
   });
 
   it("eating on contact restores balance and consumes the food", () => {
+    // At the cleared centre, which worldProps() guarantees holds no boulder.
+    // This used to sit at x=10 and broke the day the rock field got denser: a
+    // new boulder landed there, the devot was pushed out of it, and the meal —
+    // placed by hand here, rather than through placeOnGround as the game does —
+    // stayed inside the rock, out of reach.
     const world = new World();
-    const devot = makeDevot({ balance: 5000, pos: { x: 10, y: 0, z: 0 } });
+    const devot = makeDevot({ balance: 5000, pos: { x: 0, y: 0, z: 0 } });
     world.devots.set(devot.id, devot);
-    world.food.set("f1", makeFood("f1", 10.1, 0, 500));
+    world.food.set("f1", makeFood("f1", 0.1, 0, 500));
 
     const result = tick(world);
     expect(result.eaten).toHaveLength(1);

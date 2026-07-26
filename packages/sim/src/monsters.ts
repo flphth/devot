@@ -7,6 +7,9 @@ import {
   MONSTER_METABOLISM_PER_TICK,
   MONSTER_SIGHT,
   MONSTER_SPEED,
+  MONSTER_MAX,
+  MONSTER_PER_DEVOTS,
+  MONSTER_SPAWN_MIN_DISTANCE,
   COMBAT_RESIDUE_FRACTION,
   EAT_RADIUS,
   TICK_MS,
@@ -58,6 +61,46 @@ export function spawnMonster(world: World, x: number, z: number): MonsterEntity 
   };
   world.monsters.set(monster.id, monster);
   return monster;
+}
+
+/**
+ * HOW MANY PREDATORS THIS WORLD SHOULD HOLD RIGHT NOW.
+ *
+ * Tied to the living, deliberately. A monster with nothing to hunt starves
+ * within the minute and is pure waste, and a lone founder taking their first
+ * steps should not be met by a pack.
+ */
+export function monsterCeiling(livingDevots: number): number {
+  if (livingDevots === 0) return 0;
+  return Math.min(MONSTER_MAX, Math.ceil(livingDevots / MONSTER_PER_DEVOTS));
+}
+
+/**
+ * Where a new monster may come out of the wild, or undefined if nowhere will
+ * do this tick.
+ *
+ * Never within sight of anyone: a beast is not conjured already looking at its
+ * prey, it has to cross the ground, and a player always gets to watch it come.
+ * Bounded attempts rather than a loop — on a crowded map there may be no
+ * far-enough spot at all, and spinning until one appears would hang the tick.
+ */
+export function findMonsterSpawn(
+  world: World,
+  rng: () => number = Math.random,
+  attempts = 12,
+): { x: number; z: number } | undefined {
+  const living = world.aliveDevots();
+  if (living.length === 0) return undefined;
+  const min2 = MONSTER_SPAWN_MIN_DISTANCE * MONSTER_SPAWN_MIN_DISTANCE;
+
+  for (let i = 0; i < attempts; i++) {
+    const pos = { x: (rng() - 0.5) * 2 * world.size * 0.9, y: 0, z: 0 };
+    pos.z = (rng() - 0.5) * 2 * world.size * 0.9;
+    resolveRockCollisions(pos);
+    if (living.some((d) => dist2(pos, d.pos) < min2)) continue;
+    return { x: pos.x, z: pos.z };
+  }
+  return undefined;
 }
 
 export interface MonsterTickResult {

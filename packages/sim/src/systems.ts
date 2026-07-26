@@ -1,5 +1,6 @@
 import type { Decision, DevotEntity, FoodEntity, Trigger, Vec3 } from "@devot/shared";
 import {
+  AGGRESSION_MEMORY_MS,
   AGONIZING_THRESHOLD,
   ATTACK_DRAIN_PER_TICK,
   ATTACK_EFFICIENCY,
@@ -87,15 +88,15 @@ export function tick(world: World, now: number = Date.now()): TickResult {
     movementSystem(devot, world, dt);
     feedingSystem(devot, world, result);
     combatSystem(devot, world, result, now);
-    hungerSystem(devot, result, now);
-    deathSystem(devot, result);
+    hungerSystem(devot, world, result, now);
+    deathSystem(devot, world, result, now);
   }
 
   // Reflexes run in their own pass, AFTER every blow of this tick has landed.
   // Folded into the loop above, whether a devot reacted depended on where it
   // happened to sit in the map relative to its attacker — the one inserted
   // first reacted a whole tick later than the one inserted second.
-  for (const devot of world.aliveDevots()) reflexSystem(devot, world);
+  for (const devot of world.aliveDevots()) reflexSystem(devot, world, now);
 
   return result;
 }
@@ -283,7 +284,12 @@ function feedingSystem(devot: DevotEntity, world: World, result: TickResult): vo
   }
 }
 
-function hungerSystem(devot: DevotEntity, result: TickResult, now: number): void {
+function hungerSystem(
+  devot: DevotEntity,
+  world: World,
+  result: TickResult,
+  now: number,
+): void {
   // The dead do not get hungry. This runs before deathSystem and recomputes
   // state from balance, so without the guard it quietly RESURRECTED a devot that
   // combat had just killed — back to "dying", and then killed again a moment
@@ -309,31 +315,47 @@ function hungerSystem(devot: DevotEntity, result: TickResult, now: number): void
     });
   }
 
-  // A starving devot with no goal starts looking for food on its own: the body
-  // keeps the devot credible even while the mind sleeps.
+  // A starving devot with no goal goes for the nearest meal it can actually
+  // see. The code here used to set `wander` — replacing wandering with
+  // wandering, under a comment claiming the body looked for food. It did not,
+  // and a starving devot would circle within sight of a meal until it died.
   if (
     (devot.state === "starving" || devot.state === "dying") &&
     (devot.currentGoal.kind === "idle" || devot.currentGoal.kind === "wander")
   ) {
-    devot.currentGoal = { kind: "wander" };
+    const meal = nearestVisibleFood(world, devot.pos, sightOf(devot) ** 2);
+    devot.currentGoal = meal ? { kind: "seek_food", foodId: meal.id } : { kind: "wander" };
   }
 }
 
-function deathSystem(devot: DevotEntity, result: TickResult): void {
+function deathSystem(
+  devot: DevotEntity,
+  world: World,
+  result: TickResult,
+  now: number,
+): void {
   // Combat can kill a devot part-way through this same tick, and the loop is
   // walking a list captured before the blow landed. Without this the victim is
   // reported dead twice — and its estate dropped twice with it.
   if (devot.state === "dead") return;
-  if (devot.balance <= 0) {
-    devot.balance = 0;
-    devot.state = "dead";
-    // Nothing left: it spent itself down to nothing, and leaves nothing.
-    result.deaths.push({
-      residue: 0,
-      devotId: devot.id,
-      cause: devot.underAttackBy ? `devoured by ${devot.underAttackBy}` : "vital exhaustion",
-    });
-  }
+  if (devot.balance > 0) return;
+
+  devot.balance = 0;
+  devot.state = "dead";
+  // Only blame a killer that was actually still on it. `underAttackBy` used to
+  // name whoever had struck it at any point in its life, so a devot that
+  // starved alone in a field was recorded as devoured — by a raw entity id, at
+  // that, which is not a name any player has ever seen.
+  const killer =
+    now - (devot.lastStruckAt ?? 0) <= AGGRESSION_MEMORY_MS && devot.underAttackBy
+      ? (world.devots.get(devot.underAttackBy) ?? world.monsters.get(devot.underAttackBy))
+      : undefined;
+  // Nothing left: it spent itself down to nothing, and leaves nothing.
+  result.deaths.push({
+    residue: 0,
+    devotId: devot.id,
+    cause: killer ? `devoured by ${killer.name}` : "vital exhaustion",
+  });
 }
 
 /**
@@ -510,10 +532,17 @@ export function describeSurroundings(
  * after THREAT_REALERT_MS so an alert lost to a busy mind is not lost for good.
  */
 export function shouldAlert(victim: DevotEntity, attackerId: string, now: number): boolean {
-  const fresh = victim.underAttackBy === attackerId;
+  // Read before either is overwritten: a DIFFERENT attacker is news, and must
+  // not be swallowed by a throttle armed for the previous one.
+  const sameAttacker = victim.underAttackBy === attackerId;
   const recent = now - (victim.alertedAt ?? 0) < THREAT_REALERT_MS;
-  if (fresh && recent) return false;
+
+  // Stamped on EVERY blow, whether or not the victim is told about this one:
+  // the reflex needs to know when it was last hit, and the telling is throttled.
+  victim.lastStruckAt = now;
   victim.underAttackBy = attackerId;
+
+  if (sameAttacker && recent) return false;
   victim.alertedAt = now;
   return true;
 }
@@ -531,12 +560,24 @@ export function shouldAlert(victim: DevotEntity, attackerId: string, now: number
  * already chosen to flee, to hunt, or to walk somewhere is obeyed. The next
  * thought can overrule the reflex entirely — that is the point of having one.
  */
-function reflexSystem(devot: DevotEntity, world: World): void {
+function reflexSystem(devot: DevotEntity, world: World, now: number): void {
   const attackerId = devot.underAttackBy;
   if (!attackerId) return;
 
   const attacker = world.devots.get(attackerId) ?? world.monsters.get(attackerId);
   if (!attacker || attacker.state === "dead") {
+    devot.underAttackBy = undefined;
+    return;
+  }
+
+  // AGGRESSION EXPIRES, AND THIS IS THE WHOLE POINT OF THE CLAUSE.
+  //
+  // Without it `underAttackBy` was set for life on the first blow a devot ever
+  // took. The reflex below overrides any passive goal, and `seek_food` is
+  // passive — so a devot that had survived one fight had every subsequent
+  // decision to eat overwritten on the next tick, forever, and starved with a
+  // meal in front of it. Every death in the log read "vital exhaustion".
+  if (now - (devot.lastStruckAt ?? 0) > AGGRESSION_MEMORY_MS) {
     devot.underAttackBy = undefined;
     return;
   }
