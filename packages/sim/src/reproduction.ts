@@ -100,6 +100,10 @@ function makeChild(
       z: a.pos.z + (rng() - 0.5) * 2,
     },
     balance,
+    // What it was handed, kept for the estate it will leave. NOT its capacity:
+    // a child is born with whatever its parents could pay, which is almost never
+    // the same number.
+    bornWith: balance,
     // Its max balance follow from the inherited vitality, not from the best-endowed
     // parent's: a frail child of sturdy parents stays frail.
     capacity: Math.round(CAPACITY_DEFAULT * statMultiplier(identity.stats.vitality)),

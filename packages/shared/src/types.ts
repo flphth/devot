@@ -104,6 +104,16 @@ export interface DevotEntity {
   generation: number;
   /** Its wallet address: the onchain identity it is born with and dies as. */
   wallet: string;
+  /**
+   * WHAT IT WAS GIVEN WHEN IT OPENED ITS EYES. Written once, never again.
+   *
+   * This is what its relic is worth when it dies — the whole of it, whatever it
+   * managed to spend in between. Deliberately NOT `capacity`: a founder is born
+   * with exactly its capacity, but a child is born with whatever its parents
+   * could pay, against a capacity derived from its own inherited vitality. Using
+   * capacity would quietly hand every child a bigger estate than it ever had.
+   */
+  bornWith: number;
   /** Id of the last reported attacker (avoids re-triggering every tick). */
   underAttackBy?: string;
   /** When that alert was last raised, so a lost one can be raised again. */

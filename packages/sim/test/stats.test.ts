@@ -41,6 +41,8 @@ function makeDevot(stats: Partial<Stats>, overrides: Partial<DevotEntity> = {}):
     name: `Devot${seq}`,
     pos: { x: 0, y: 0, z: 0 },
     balance: 40_000,
+    // Born at its capacity, like a founder, unless a test says otherwise.
+    bornWith: overrides.bornWith ?? 60_000,
     capacity: CAPACITY_DEFAULT,
     state: "alive",
     profile: "frugal",

@@ -19,6 +19,7 @@ function makeDevot(over: Partial<DevotEntity> = {}): DevotEntity {
     name: `Devot${seq}`,
     pos: { x: 0, y: 0, z: 0 },
     balance: 100_000,
+    bornWith: 100_000,
     capacity: 150_000,
     state: "alive",
     profile: "frugal",

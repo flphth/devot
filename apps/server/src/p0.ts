@@ -45,6 +45,7 @@ async function main(): Promise<void> {
     name: "Adam",
     pos: { x: 0, y: 0, z: 0 },
     balance: DEMO_HP_MAX,
+    bornWith: DEMO_HP_MAX,
     capacity: DEMO_HP_MAX,
     state: "alive",
     profile: "frugal",

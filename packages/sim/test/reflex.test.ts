@@ -20,6 +20,8 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     wallet: "",
     name: `D${seq}`,
     balance: 55_000,
+    // Born at its capacity, like a founder, unless a test says otherwise.
+    bornWith: overrides.bornWith ?? 60_000,
     capacity: 60_000,
     state: "alive",
     profile: "frugal",

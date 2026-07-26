@@ -12,6 +12,8 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     name: "Test",
     pos: { x: 0, y: 0, z: 0 },
     balance: 10_000,
+    // Born at its capacity, like a founder, unless a test says otherwise.
+    bornWith: overrides.bornWith ?? 10_000,
     capacity: 10_000,
     state: "alive",
     profile: "frugal",
@@ -75,8 +77,10 @@ describe("reactive layer (0 tokens)", () => {
     world.devots.set(devot.id, devot);
 
     const result = tick(world);
+    // It leaves everything it was given, not the nothing it died holding: the
+    // deposit that bought it was never destroyed, only its time was.
     expect(result.deaths).toEqual([
-      { devotId: "d1", cause: "vital exhaustion", residue: 0 },
+      { devotId: "d1", cause: "vital exhaustion", residue: 10_000 },
     ]);
     expect(devot.state).toBe("dead");
     expect(devot.balance).toBe(0);

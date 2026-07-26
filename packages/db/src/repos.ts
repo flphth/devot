@@ -21,6 +21,7 @@ export class DevotRepo {
         name: e.name,
         balance: e.balance,
         capacity: e.capacity,
+        bornWith: e.bornWith,
         cognitionProfile: e.profile,
         x: e.pos.x,
         y: e.pos.y,

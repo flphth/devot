@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS devots (
   name TEXT NOT NULL,
   balance REAL NOT NULL,
   capacity REAL NOT NULL,
+  born_with REAL NOT NULL DEFAULT 0,
   cognition_profile TEXT NOT NULL,
   x REAL NOT NULL DEFAULT 0,
   y REAL NOT NULL DEFAULT 0,
@@ -140,6 +141,15 @@ const MIGRATIONS: Array<(db: Sqlite) => void> = [
   (db) => {
     renameColumnIfPresent(db, "devots", "hp", "balance");
     renameColumnIfPresent(db, "devots", "hp_max", "capacity");
+  },
+
+  // 6 — A death now leaves everything the devot was given, so what it was given
+  //     has to be recorded. Existing rows get their capacity, which is right for
+  //     every founder and the closest honest guess for anyone else: the true
+  //     birth balance of an already-living devot was never written down.
+  (db) => {
+    addColumnIfMissing(db, "devots", "born_with", "REAL NOT NULL DEFAULT 0");
+    db.exec("UPDATE devots SET born_with = capacity WHERE born_with = 0");
   },
 ];
 

@@ -22,7 +22,7 @@ import {
   type MonsterEntity,
   type Trigger,
 } from "@devot/shared";
-import { rememberAggressor, shouldAlert } from "./systems.js";
+import { legacyOf, rememberAggressor, shouldAlert } from "./systems.js";
 import { clampToWorld, dist2, World } from "./world.js";
 
 /**
@@ -217,7 +217,7 @@ export function monsterSystem(world: World, now: number = Date.now()): MonsterTi
       result.kills.push({
         monsterId: monster.id,
         devotId: prey.id,
-        residue: Math.max(0, Math.round(prey.balance)),
+        residue: legacyOf(prey),
       });
       prey.balance = 0;
       monster.targetId = undefined;

@@ -40,3 +40,35 @@
   par le dieu sur le testnet 0G. Le serveur est l'autorité (soldes en mémoire) ;
   la chaîne ne voit que création / mort / retrait (settle signé serveur, aucun
   règlement au tick). claim suit checks-effects-interactions.
+
+## ADDENDUM — le modèle côté simulation a changé, le contrat non
+
+L'invariant ci-dessus porte sur LifeVault et reste vrai mot pour mot :
+
+    depositedTotal == address(vault).balance + burnedTotal + withdrawnTotal
+
+Il est vérifié par `forge test` sur un contrat qui n'a pas bougé d'un octet.
+
+Ce qui a changé est ailleurs, et il faut le dire clairement pour que personne ne
+lise ce document comme une description du jeu d'aujourd'hui. La simulation ne
+considère plus que penser détruit le dépôt : elle considère que penser détruit
+la CRÉATURE. Le dépôt en OG, lui, ne quitte jamais le vault — rien n'est retiré
+on-chain et `burnedTotal` n'est jamais settlé. Donc à la mort, quelle qu'en soit
+la cause, la totalité du montant de naissance retombe au sol sous forme de
+relique, récupérable par n'importe quel devot ou monstre.
+
+Conséquences pour qui relit ce fichier :
+
+- La ligne « Σ soldes + brûlé + retiré == Σ déposé » décrit le CONTRAT, pas le
+  monde. Côté simulation, les soldes des vivants plus les reliques au sol
+  peuvent dépasser Σ déposé, puisqu'une mort restitue un principal que la
+  simulation avait déjà compté comme brûlé.
+- L'invariant tenu côté simulation est plus faible et volontairement mesuré
+  plutôt que modélisé : entre deux ticks le monde ne peut que s'appauvrir, sauf
+  de ce qu'une mort a restitué et de ce qu'un repas valait. Rien n'apparaît.
+  Voir `packages/sim/test/estate.test.ts`.
+- Deux puits invisibles ont été trouvés en écrivant ce test, et ne sont PAS des
+  bugs corrigés ici, seulement documentés : un attaquant déjà à sa capacité voit
+  ses gains écrêtés (il détruit donc l'intégralité de ce qu'il draine), et le
+  solde d'une victime est remis à zéro à sa mort alors que sa relique vaut son
+  montant de naissance.

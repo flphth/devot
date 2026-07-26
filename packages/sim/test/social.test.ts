@@ -23,6 +23,8 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     name: `Devot${seq}`,
     pos: { x: 0, y: 0, z: 0 },
     balance: 20_000,
+    // Born at its capacity, like a founder, unless a test says otherwise.
+    bornWith: overrides.bornWith ?? 50_000,
     capacity: 50_000,
     state: "alive",
     profile: "frugal",
@@ -99,7 +101,10 @@ describe("combat — vital predation", () => {
     // second time — and its estate dropped twice with it.
     expect(result.deaths).toHaveLength(1);
     expect(result.deaths[0]!.cause).toContain("killed by");
-    expect(result.deaths[0]!.residue).toBe(100);
+    // It dies holding 100 and still leaves everything it was given: a killer
+    // takes a life, it does not take the deposit that bought one.
+    expect(result.deaths[0]!.residue).toBe(victim.bornWith);
+    expect(result.deaths[0]!.residue).toBeGreaterThan(victim.balance);
   });
 
   it("an attacker cannot drain a victim below the residue floor", () => {
@@ -123,9 +128,11 @@ describe("combat — vital predation", () => {
 
     expect(death).toBeDefined();
     expect(death!.cause).toContain("killed by");
-    // Its own metabolism nibbles at the floor too, so this is close, not exact.
-    expect(death!.residue).toBeGreaterThan(floor * 0.8);
-    expect(death!.residue).toBeLessThanOrEqual(floor);
+    // The floor governs what the KILLER may take. What lands on the ground is a
+    // separate rule now — the whole of what the victim was given — so the two
+    // are asserted apart. They used to be the same number, and reading one as
+    // the other is exactly the confusion this test exists to prevent.
+    expect(death!.residue).toBe(victim.bornWith);
   });
 
   it("you cannot attack yourself", () => {

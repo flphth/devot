@@ -48,6 +48,25 @@ export interface TickResult {
 }
 
 /**
+ * WHAT A CORPSE IS WORTH: everything it was given at birth.
+ *
+ * The deposit that bought a devot never leaves LifeVault — nothing is withdrawn
+ * on chain, and the burn is only ever a number in this simulation. So thinking
+ * does not destroy the principal, it destroys the CREATURE; and when the
+ * creature is gone the principal comes back to the world, on the ground, for
+ * whoever is standing there.
+ *
+ * That is the whole rule, and it lives here alone. It used to be decided in four
+ * different places that had already drifted apart: combat dropped 15% of
+ * capacity, a monster's kill the same, divine lightning dropped the current
+ * balance, and starving to death dropped NOTHING — which is how most devots die,
+ * so the relic system almost never fired at all.
+ */
+export function legacyOf(devot: DevotEntity): number {
+  return Math.max(0, Math.round(devot.bornWith));
+}
+
+/**
  * Food rots. Runs before the bodies move, so a devot never gets to eat on the
  * exact tick a meal expires — the race would be invisible and maddening.
  */
@@ -206,7 +225,7 @@ function combatSystem(
     result.deaths.push({
       devotId: prey.id,
       cause: `killed by ${devot.name}`,
-      residue: Math.max(0, Math.round(prey.balance)),
+      residue: legacyOf(prey),
     });
     prey.balance = 0;
     return;
@@ -350,9 +369,10 @@ function deathSystem(
     now - (devot.lastStruckAt ?? 0) <= AGGRESSION_MEMORY_MS && devot.underAttackBy
       ? (world.devots.get(devot.underAttackBy) ?? world.monsters.get(devot.underAttackBy))
       : undefined;
-  // Nothing left: it spent itself down to nothing, and leaves nothing.
+  // It spent itself down to nothing, and still leaves everything it was given:
+  // what it burned was its own time, not the deposit that bought it.
   result.deaths.push({
-    residue: 0,
+    residue: legacyOf(devot),
     devotId: devot.id,
     cause: killer ? `devoured by ${killer.name}` : "vital exhaustion",
   });

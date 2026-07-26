@@ -16,6 +16,7 @@ function makeDevot(id: string, balance = 10_000): DevotEntity {
     name: id,
     pos: { x: 0, y: 0, z: 0 },
     balance,
+    bornWith: balance,
     capacity: 10_000,
     state: "alive",
     profile: "frugal",

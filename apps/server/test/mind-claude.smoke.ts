@@ -15,6 +15,7 @@ const devot: DevotEntity = {
   name: "Echo",
   pos: { x: 0, y: 0, z: 0 },
   balance: 42_000,
+  bornWith: 42_000,
   capacity: 50_000,
   state: "alive",
   profile: "frugal",

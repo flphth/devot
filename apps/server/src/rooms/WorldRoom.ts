@@ -85,6 +85,7 @@ import {
   describeSurroundings,
   dist2,
   findMonsterSpawn,
+  legacyOf,
   monsterCeiling,
   monsterSystem,
   perceptionSystem,
@@ -481,6 +482,10 @@ export class WorldRoom extends Room<WorldState> {
       // longer, it thinks longer for the same deposit.
       balance: capacityFor(identity.stats.vitality),
       capacity: capacityFor(identity.stats.vitality),
+      // What the deposit bought, kept for the estate it will leave. A founder
+      // is born at exactly its capacity; a child is not, which is why this is
+      // its own field rather than a reading of `capacity`.
+      bornWith: capacityFor(identity.stats.vitality),
       identityJson: encodeIdentity(identity),
       // A devot is born empty-handed: every item must be forged, and paid for.
       items: [],
@@ -515,10 +520,10 @@ export class WorldRoom extends Room<WorldState> {
     }
 
     // Lightning kills outside deathSystem, so this death never reaches the
-    // tick's list. It also kills a devot that was perfectly healthy, so the
-    // whole of what it held drops — smiting your own is expensive, and it
+    // tick's list — but it leaves the same estate as any other death, which is
+    // everything the devot was given. Smiting your own is expensive, and it
     // feeds whoever is nearest.
-    this.dropLegacy(devot.id, devot.balance);
+    this.dropLegacy(devot.id, legacyOf(devot));
     devot.balance = 0;
     devot.state = "dead";
     this.repos.devots.kill(devot.id, "divine lightning");

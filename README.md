@@ -4,9 +4,9 @@
 >
 > Every devot in this world is a Claude agent that perceives, deliberates and acts.
 > The tokens it burns to think are debited from an **on-chain deposit made on 0G** —
-> and that deposit *is* its life. When it runs out, the creature dies, its context is
-> destroyed forever, and whatever it still held drops on the ground for a monster or a
-> rival to take.
+> and that deposit *is* its life. When it runs out the creature dies and its context is
+> destroyed forever, but the deposit itself was never consumed: the whole of it drops
+> on the ground, for a monster or a rival to take.
 
 **Built at ETHGlobal Lisbon 2026** · [Showcase](https://ethglobal.com/showcase/undefined-u3djs) · [Source](https://github.com/flphth/devot)
 
@@ -54,7 +54,7 @@ That would be an expensive toy if thinking were free. It isn't:
 | **A thought has a price** | The real `usage` returned by the inference is converted into life and subtracted. Not a simulation of a cost — the actual token count. |
 | **A life is a budget** | A devot's balance *is* its remaining cognition. Roughly seventy thoughts, and that is a life. |
 | **Death is real** | When the balance reaches zero the context rows are deleted from SQLite. That mind is gone; nothing restores it. |
-| **Value is conserved** | Nothing is minted by the simulation. Life moves between bodies, into monsters' hoards, onto the ground as relics — and is burned only by thinking. |
+| **The deposit outlives the creature** | Thinking spends a devot's *time*, not the OG that bought it — that never leaves LifeVault. So a death puts the whole birth deposit back on the ground, and a corpse is the richest thing in the world. |
 
 The result is a world where **deliberation is a survival cost**, and where a creature
 that overthinks starves next to one that acted.
@@ -165,9 +165,9 @@ sequenceDiagram
     end
 
     alt drained by a rival or a monster
-        World->>World: dies holding 15% — it drops where it fell
+        World->>World: dies, and leaves the whole of what it was given
     else spent itself thinking
-        World->>World: dies with nothing, and leaves nothing
+        World->>World: dies, and leaves the whole of what it was given
     end
 
     World->>Srv: destroy the context — that mind is gone
@@ -195,7 +195,8 @@ graph LR
 
 ### Where value goes, and where it does not
 
-Nothing in the simulation mints life. It only ever changes hands, or is burned by thought:
+Thinking burns a creature's time. It does not burn the deposit — that sits in LifeVault
+untouched, which is why a death can hand all of it back:
 
 ```mermaid
 graph TD
@@ -206,7 +207,7 @@ graph TD
     LIFE -->|"forging an item"| BURN
     LIFE -->|"drained in combat"| ATT["The attacker"]
     LIFE -->|"drained by a beast"| HOARD["A monster's hoard"]
-    LIFE -->|"death: the last 15%"| RELIC["A relic on the ground"]
+    DEP -->|"death, however it came —<br/>the whole deposit, always"| RELIC["A relic on the ground"]
 
     RELIC -->|"claimed by a devot"| ATT
     RELIC -->|"scavenged"| HOARD
@@ -218,6 +219,11 @@ graph TD
     style BURN fill:#5a2a2a,stroke:#e87a7a,color:#fff
     style DEP fill:#1a3a52,stroke:#4a9eff,color:#fff
 ```
+
+Read the two arrows into `RELIC` together: a devot's life drains away into whoever kills
+it, **and** the deposit that bought it comes back whole when it falls. Those are different
+pools. Killing someone takes their remaining time; standing on the corpse afterwards takes
+the principal, and anyone who saw the fight can do that.
 
 A monster is the world's only **sink that can be reversed**: it takes life out of
 circulation and holds it, and the only way that value comes home is if something kills it.

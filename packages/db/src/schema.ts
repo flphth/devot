@@ -16,6 +16,8 @@ export const devots = sqliteTable("devots", {
   name: text("name").notNull(),
   balance: real("balance").notNull(),
   capacity: real("capacity").notNull(),
+  /** What it was given at birth. Its relic is worth exactly this. */
+  bornWith: real("born_with").notNull().default(0),
   cognitionProfile: text("cognition_profile").notNull(),
   x: real("x").notNull().default(0),
   y: real("y").notNull().default(0),
