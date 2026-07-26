@@ -14,10 +14,13 @@ export const WORLD_HALF = 30;
 
 /**
  * Half-amplitude of the relief, in world units (a devot is ~1.1 tall).
- * Calibrated so that roughly a quarter of the sight lines at full perception
- * range are blocked by ground: hills matter without walling the world in.
+ *
+ * Deliberately gentle: rolling ground rather than mountains. This is the dial
+ * to turn if the world should be hillier — but note the trade-off, because
+ * flatter ground hides less, and past roughly 3 the hills stop breaking any
+ * line of sight at all.
  */
-export const TERRAIN_AMPLITUDE = 7;
+export const TERRAIN_AMPLITUDE = 4;
 
 /** Eye height above the ground, used when tracing a line of sight. */
 export const EYE_HEIGHT = 1;
@@ -67,7 +70,7 @@ function valueNoise(x: number, z: number): number {
 export function terrainHeight(x: number, z: number): number {
   // Two octaves only. Piling up more averages the noise towards its mean and
   // flattens the world: hills stop being tall enough to hide anything.
-  const n = 0.68 * valueNoise(x / 11, z / 11) + 0.32 * valueNoise(x / 4.5, z / 4.5);
+  const n = 0.7 * valueNoise(x / 16, z / 16) + 0.3 * valueNoise(x / 6, z / 6);
   return (n - 0.5) * 2 * TERRAIN_AMPLITUDE;
 }
 
