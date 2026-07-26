@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { DevotEntity } from "@devot/shared";
-import { THOUGHT_COST_FLOOR_HP, THOUGHT_COST_SCALE, devotSubject } from "@devot/shared";
+import { THOUGHT_COST_FLOOR, THOUGHT_COST_SCALE, devotSubject } from "@devot/shared";
 import { createRepos, openDb } from "@devot/db";
 import { MockMind } from "../src/mind.js";
 import { PROFILES } from "../src/profiles.js";
 import { CognitionOrchestrator, type AppliedThought } from "../src/orchestrator.js";
 
-function makeDevot(id: string, hp = 10_000): DevotEntity {
+function makeDevot(id: string, balance = 10_000): DevotEntity {
   return {
     id,
     godId: "g1",
@@ -15,8 +15,8 @@ function makeDevot(id: string, hp = 10_000): DevotEntity {
     wallet: "",
     name: id,
     pos: { x: 0, y: 0, z: 0 },
-    hp,
-    hpMax: 10_000,
+    balance,
+    capacity: 10_000,
     state: "alive",
     profile: "frugal",
     traits: [],
@@ -61,7 +61,7 @@ async function settle(orchestrator: CognitionOrchestrator): Promise<void> {
 }
 
 describe("orchestrateur cognitif", () => {
-  it("a thought deducts HP from real usage and persists the history", async () => {
+  it("a thought deducts balance from real usage and persists the history", async () => {
     const devot = makeDevot("d1");
     const { orchestrator, repos, applied } = setup([devot]);
 
@@ -74,11 +74,11 @@ describe("orchestrateur cognitif", () => {
     await settle(orchestrator);
 
     expect(applied).toHaveLength(1);
-    expect(applied[0]!.hpLoss).toBeGreaterThan(0);
+    expect(applied[0]!.spent).toBeGreaterThan(0);
     // MockMind: 1200 in / 60 out on Haiku -> 1500 µ$, of which a devot pays
     // THOUGHT_COST_SCALE. The scale is read rather than hard-coded so this
     // test measures the pipeline, not a number someone will tune next week.
-    expect(devot.hp).toBeCloseTo(10_000 - 1500 * THOUGHT_COST_SCALE, 0);
+    expect(devot.balance).toBeCloseTo(10_000 - 1500 * THOUGHT_COST_SCALE, 0);
     // History: user turn (event) + assistant turn (decision).
     expect(repos.devots.contextSize("d1")).toBe(2);
     expect(devot.thinking).toBe(false);
@@ -101,7 +101,7 @@ describe("orchestrateur cognitif", () => {
   });
 
   it("a devot below the cost floor does not think (it cannot spend more than its life)", async () => {
-    const devot = makeDevot("d1", THOUGHT_COST_FLOOR_HP - 1);
+    const devot = makeDevot("d1", THOUGHT_COST_FLOOR - 1);
     const { orchestrator, applied } = setup([devot]);
 
     orchestrator.enqueue({
@@ -113,7 +113,7 @@ describe("orchestrateur cognitif", () => {
     await settle(orchestrator);
 
     expect(applied).toHaveLength(0);
-    expect(devot.hp).toBe(THOUGHT_COST_FLOOR_HP - 1);
+    expect(devot.balance).toBe(THOUGHT_COST_FLOOR - 1);
   });
 
   it("a dead devot is never asked to think", async () => {

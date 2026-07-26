@@ -1,7 +1,7 @@
 import type { DevotEntity } from "@devot/shared";
 import {
-  HP_MAX_DEFAULT,
-  REPRO_MIN_HP,
+  CAPACITY_DEFAULT,
+  REPRO_MIN_BALANCE,
   REPRO_PAIR_COST_FRACTION,
   REPRO_RADIUS,
   REPRO_SOLO_COST_FRACTION,
@@ -39,7 +39,7 @@ export function resolveReproduction(
   rng: () => number = Math.random,
 ): Birth | ReproFailure {
   if (parent.state === "dead") return { reason: "dead" };
-  if (parent.hp < REPRO_MIN_HP) {
+  if (parent.balance < REPRO_MIN_BALANCE) {
     return { reason: "too weak to procreate" };
   }
 
@@ -48,22 +48,22 @@ export function resolveReproduction(
   if (partner && partner.id !== parent.id) {
     // Sexual reproduction — including across the lines of different gods.
     if (partner.state === "dead") return { reason: "partenaire mort" };
-    if (partner.hp < REPRO_MIN_HP) return { reason: "partenaire trop faible" };
+    if (partner.balance < REPRO_MIN_BALANCE) return { reason: "partenaire trop faible" };
     if (dist2(parent.pos, partner.pos) > REPRO_RADIUS * REPRO_RADIUS) {
       return { reason: "partner too far away" };
     }
-    const costA = parent.hp * REPRO_PAIR_COST_FRACTION;
-    const costB = partner.hp * REPRO_PAIR_COST_FRACTION;
-    parent.hp -= costA;
-    partner.hp -= costB;
+    const costA = parent.balance * REPRO_PAIR_COST_FRACTION;
+    const costB = partner.balance * REPRO_PAIR_COST_FRACTION;
+    parent.balance -= costA;
+    partner.balance -= costB;
     const childHp = (costA + costB) * REPRO_TRANSFER_EFFICIENCY;
     const child = makeChild(parent, partner, childHp, rng);
     return { child, parents: [parent, partner], mode: "sexual" };
   }
 
   // Budding: a mutated clone.
-  const cost = parent.hp * REPRO_SOLO_COST_FRACTION;
-  parent.hp -= cost;
+  const cost = parent.balance * REPRO_SOLO_COST_FRACTION;
+  parent.balance -= cost;
   const child = makeChild(parent, undefined, cost * REPRO_TRANSFER_EFFICIENCY, rng);
   return { child, parents: [parent], mode: "budding" };
 }
@@ -71,7 +71,7 @@ export function resolveReproduction(
 function makeChild(
   a: DevotEntity,
   b: DevotEntity | undefined,
-  hp: number,
+  balance: number,
   rng: () => number,
 ): DevotEntity {
   const traits = mutateTraits(
@@ -99,10 +99,10 @@ function makeChild(
       y: 0,
       z: a.pos.z + (rng() - 0.5) * 2,
     },
-    hp,
-    // Its max HP follow from the inherited vitality, not from the best-endowed
+    balance,
+    // Its max balance follow from the inherited vitality, not from the best-endowed
     // parent's: a frail child of sturdy parents stays frail.
-    hpMax: Math.round(HP_MAX_DEFAULT * statMultiplier(identity.stats.vitality)),
+    capacity: Math.round(CAPACITY_DEFAULT * statMultiplier(identity.stats.vitality)),
     state: "alive",
     profile: a.profile,
     traits,

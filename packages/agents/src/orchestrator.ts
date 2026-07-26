@@ -10,19 +10,19 @@ import {
   CONTEXT_COMPACT_THRESHOLD_MSGS,
   GLOBAL_BUDGET_UHP_PER_MIN,
   MAX_CONCURRENT_INFERENCES,
-  THOUGHT_COST_FLOOR_HP,
+  THOUGHT_COST_FLOOR,
   TRIGGER_PRIORITY,
 } from "@devot/shared";
 import type { StoredMessage } from "@devot/db";
 import type { Chronicler } from "./chronicler.js";
-import { hpCost } from "./hpCost.js";
+import { thoughtCost } from "./thoughtCost.js";
 import type { MindProvider } from "./mind.js";
 
 
 export interface AppliedThought {
   devotId: string;
   decision: Decision;
-  hpLoss: number;
+  spent: number;
 }
 
 /**
@@ -46,8 +46,8 @@ export interface MemoryStore {
  * of creature it is.
  */
 export interface Thinker {
-  /** The live entity: hp is read before thinking and written back after. */
-  entity: { id: string; hp: number; state: string; thinking: boolean };
+  /** The live entity: balance is read before thinking and written back after. */
+  entity: { id: string; balance: number; state: string; thinking: boolean };
   subject: ThoughtSubject;
   profile: CognitionProfile;
   memory: MemoryStore;
@@ -82,7 +82,7 @@ class BudgetBucket {
  * - bounded concurrency (p-limit)
  * - a single thought in flight per devot
  * - priority: divine > threat > survival > encounter > idle
- * - pre-check hp > floor cost + global token bucket
+ * - pre-check balance > floor cost + global token bucket
  */
 export class CognitionOrchestrator {
   private queue: Trigger[] = [];
@@ -133,8 +133,8 @@ export class CognitionOrchestrator {
       if (!thinker || thinker.entity.state === "dead") continue;
 
       // Budget pre-check: a creature too poor to think abstains.
-      if (thinker.entity.hp <= THOUGHT_COST_FLOOR_HP) continue;
-      if (!this.bucket.tryConsume(THOUGHT_COST_FLOOR_HP)) {
+      if (thinker.entity.balance <= THOUGHT_COST_FLOOR) continue;
+      if (!this.bucket.tryConsume(THOUGHT_COST_FLOOR)) {
         // Under budget pressure: the non-priority ones fall asleep.
         // The body carries on; the mind waits for the next window.
         this.queue.unshift(trigger);
@@ -160,20 +160,20 @@ export class CognitionOrchestrator {
       let history = memory.history(entity.id);
 
       // Vieillir, c'est oublier : historique trop long → le chroniqueur le
-      // condenses it into a single memory. That memory work costs HP.
+      // condenses it into a single memory. That memory work costs balance, like every other thought.
       if (this.chronicler && history.length > CONTEXT_COMPACT_THRESHOLD_MSGS) {
         const { summary, usage } = await this.chronicler.chronicle(
           [{ name: subject.name, history }],
           "aging",
         );
         memory.replaceWithSummary(entity.id, summary);
-        entity.hp -= hpCost(usage, "claude-haiku-4-5");
+        entity.balance -= thoughtCost(usage, "claude-haiku-4-5");
         history = memory.history(entity.id);
       }
       const result = await this.mind.think(subject, profile, history, trigger.eventText);
 
-      const loss = hpCost(result.usage, profile.model);
-      this.bucket.settle(THOUGHT_COST_FLOOR_HP, loss);
+      const loss = thoughtCost(result.usage, profile.model);
+      this.bucket.settle(THOUGHT_COST_FLOOR, loss);
 
       // The creature may have died while its mind was thinking.
       const current = this.getThinker(entity.id);
@@ -183,8 +183,8 @@ export class CognitionOrchestrator {
       memory.append(entity.id, "user", result.userTurn);
       memory.append(entity.id, "assistant", result.rawAssistantContent, result.usage);
 
-      current.entity.hp -= loss;
-      this.onDecision({ devotId: entity.id, decision: result.decision, hpLoss: loss });
+      current.entity.balance -= loss;
+      this.onDecision({ devotId: entity.id, decision: result.decision, spent: loss });
     } catch (err) {
       this.onError(entity.id, err);
     }

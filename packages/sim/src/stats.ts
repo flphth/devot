@@ -2,7 +2,7 @@ import {
   ATTACK_DRAIN_PER_TICK,
   DEFAULT_STATS,
   DEVOT_SPEED,
-  HP_MAX_DEFAULT,
+  CAPACITY_DEFAULT,
   decodeIdentity,
   sightRadiusFromStats,
   statMultiplier,
@@ -45,7 +45,7 @@ function bodyStatsOf(devot: DevotEntity): Stats {
  * EFFECTIVE stats: the body, plus what it has forged.
  *
  * An item is not an ornament: it shifts a stat, and therefore changes what the
- * devot can do. And since it was paid for in HP, it also shortened that devot's
+ * devot can do. And since it was paid for in balance, it also shortened that devot's
  * life — that is the bargain.
  */
 export function statsOf(devot: DevotEntity): Stats {
@@ -55,7 +55,7 @@ export function statsOf(devot: DevotEntity): Stats {
 
 /** Points de vie maximaux de ce devot. */
 export function hpMaxOf(devot: DevotEntity): number {
-  return Math.round(HP_MAX_DEFAULT * statMultiplier(statsOf(devot).vitality));
+  return Math.round(CAPACITY_DEFAULT * statMultiplier(statsOf(devot).vitality));
 }
 
 /** Movement speed, in units per second. */
@@ -68,7 +68,7 @@ export function sightOf(devot: DevotEntity): number {
   return sightRadiusFromStats(statsOf(devot));
 }
 
-/** HP drained per tick when this devot attacks. */
+/** balance drained per tick when this devot attacks. */
 export function drainOf(devot: DevotEntity): number {
   return ATTACK_DRAIN_PER_TICK * statMultiplier(statsOf(devot).power);
 }

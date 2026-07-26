@@ -19,8 +19,8 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     generation: 1,
     wallet: "",
     name: `Prey${seq}`,
-    hp: 100_000,
-    hpMax: 150_000,
+    balance: 100_000,
+    capacity: 150_000,
     state: "alive",
     profile: "frugal",
     traits: [],
@@ -112,7 +112,7 @@ describe("a monster's mind steers a body that already hunts", () => {
 describe("what a monster is shown", () => {
   it("ranks the living by distance and says how weak they are", () => {
     const world = new World();
-    const weak = makeDevot({ pos: { x: 1, y: 0, z: 0 }, hp: 15_000, state: "dying" });
+    const weak = makeDevot({ pos: { x: 1, y: 0, z: 0 }, balance: 15_000, state: "dying" });
     world.devots.set(weak.id, weak);
     const monster = spawnMonster(world, 0, 0);
 

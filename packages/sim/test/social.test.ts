@@ -3,7 +3,7 @@ import type { DevotEntity } from "@devot/shared";
 import {
   ATTACK_DRAIN_PER_TICK,
   ATTACK_EFFICIENCY,
-  REPRO_MIN_HP,
+  REPRO_MIN_BALANCE,
   REPRO_PAIR_COST_FRACTION,
   REPRO_SOLO_COST_FRACTION,
   REPRO_TRANSFER_EFFICIENCY,
@@ -22,8 +22,8 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     wallet: "",
     name: `Devot${seq}`,
     pos: { x: 0, y: 0, z: 0 },
-    hp: 20_000,
-    hpMax: 50_000,
+    balance: 20_000,
+    capacity: 50_000,
     state: "alive",
     profile: "frugal",
     traits: ["curious"],
@@ -38,7 +38,7 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
 }
 
 describe("combat — vital predation", () => {
-  it("transfers HP from victim to attacker (with loss)", () => {
+  it("transfers balance from victim to attacker (with loss)", () => {
     const world = new World();
     const attacker = makeDevot({ pos: { x: 0, y: 0, z: 0 } });
     const victim = makeDevot({ pos: { x: 0.5, y: 0, z: 0 } });
@@ -50,8 +50,8 @@ describe("combat — vital predation", () => {
 
     expect(result.combats).toHaveLength(1);
     // Victim: -drain -metabolism; attacker: +drain*efficiency -metabolism.
-    expect(victim.hp).toBeCloseTo(20_000 - ATTACK_DRAIN_PER_TICK - 1, 5);
-    expect(attacker.hp).toBeCloseTo(
+    expect(victim.balance).toBeCloseTo(20_000 - ATTACK_DRAIN_PER_TICK - 1, 5);
+    expect(attacker.balance).toBeCloseTo(
       20_000 + ATTACK_DRAIN_PER_TICK * ATTACK_EFFICIENCY - 1,
       5,
     );
@@ -88,13 +88,13 @@ describe("combat — vital predation", () => {
   it("a victim killed in combat dies once, holding its estate", () => {
     const world = new World();
     const attacker = makeDevot();
-    const victim = makeDevot({ pos: { x: 0.5, y: 0, z: 0 }, hp: 100 });
+    const victim = makeDevot({ pos: { x: 0.5, y: 0, z: 0 }, balance: 100 });
     world.devots.set(attacker.id, attacker);
     world.devots.set(victim.id, victim);
     applyDecision(attacker, { action: "attack", targetId: victim.id }, world);
 
     const result = tick(world);
-    // Once. hungerSystem used to recompute a dead devot's state from its HP
+    // Once. hungerSystem used to recompute a dead devot's state from its balance
     // before deathSystem ran, resurrecting it just long enough to be killed a
     // second time — and its estate dropped twice with it.
     expect(result.deaths).toHaveLength(1);
@@ -107,8 +107,8 @@ describe("combat — vital predation", () => {
     // afterwards, for anyone who saw the fight — the killer included, if it
     // stays. Draining someone is no longer the efficient way to take a life.
     const world = new World();
-    const attacker = makeDevot({ hp: 60_000, hpMax: 60_000 });
-    const victim = makeDevot({ pos: { x: 0.5, y: 0, z: 0 }, hp: 60_000, hpMax: 60_000 });
+    const attacker = makeDevot({ balance: 60_000, capacity: 60_000 });
+    const victim = makeDevot({ pos: { x: 0.5, y: 0, z: 0 }, balance: 60_000, capacity: 60_000 });
     world.devots.set(attacker.id, attacker);
     world.devots.set(victim.id, victim);
     applyDecision(attacker, { action: "attack", targetId: victim.id }, world);
@@ -118,7 +118,7 @@ describe("combat — vital predation", () => {
     for (let i = 0; i < 4000 && !death; i++) {
       death = tick(world).deaths.find((d) => d.devotId === victim.id);
       // While it lives, the attacker has never pushed it under the floor.
-      if (!death) expect(victim.hp).toBeGreaterThanOrEqual(floor - 1);
+      if (!death) expect(victim.balance).toBeGreaterThanOrEqual(floor - 1);
     }
 
     expect(death).toBeDefined();
@@ -140,7 +140,7 @@ describe("combat — vital predation", () => {
 describe("reproduction", () => {
   it("budding: cost to the parent, life passed to the child, mutated traits", () => {
     const world = new World();
-    const parent = makeDevot({ hp: 20_000, traits: ["curious", "pious"] });
+    const parent = makeDevot({ balance: 20_000, traits: ["curious", "pious"] });
     world.devots.set(parent.id, parent);
 
     const outcome = resolveReproduction(world, parent, undefined, () => 0.99);
@@ -148,8 +148,8 @@ describe("reproduction", () => {
     if (!("child" in outcome)) return;
 
     const cost = 20_000 * REPRO_SOLO_COST_FRACTION;
-    expect(parent.hp).toBeCloseTo(20_000 - cost, 5);
-    expect(outcome.child.hp).toBeCloseTo(cost * REPRO_TRANSFER_EFFICIENCY, 5);
+    expect(parent.balance).toBeCloseTo(20_000 - cost, 5);
+    expect(outcome.child.balance).toBeCloseTo(cost * REPRO_TRANSFER_EFFICIENCY, 5);
     expect(outcome.mode).toBe("budding");
     expect(outcome.child.isFounder).toBe(false);
     expect(outcome.child.godId).toBe(parent.godId);
@@ -157,8 +157,8 @@ describe("reproduction", () => {
 
   it("sexual: both parents pay, the child accumulates", () => {
     const world = new World();
-    const a = makeDevot({ hp: 20_000, godId: "g1" });
-    const b = makeDevot({ hp: 30_000, godId: "g2", pos: { x: 1, y: 0, z: 0 } });
+    const a = makeDevot({ balance: 20_000, godId: "g1" });
+    const b = makeDevot({ balance: 30_000, godId: "g2", pos: { x: 1, y: 0, z: 0 } });
     world.devots.set(a.id, a);
     world.devots.set(b.id, b);
 
@@ -168,9 +168,9 @@ describe("reproduction", () => {
 
     const costA = 20_000 * REPRO_PAIR_COST_FRACTION;
     const costB = 30_000 * REPRO_PAIR_COST_FRACTION;
-    expect(a.hp).toBeCloseTo(20_000 - costA, 5);
-    expect(b.hp).toBeCloseTo(30_000 - costB, 5);
-    expect(outcome.child.hp).toBeCloseTo((costA + costB) * REPRO_TRANSFER_EFFICIENCY, 5);
+    expect(a.balance).toBeCloseTo(20_000 - costA, 5);
+    expect(b.balance).toBeCloseTo(30_000 - costB, 5);
+    expect(outcome.child.balance).toBeCloseTo((costA + costB) * REPRO_TRANSFER_EFFICIENCY, 5);
     expect(outcome.mode).toBe("sexual");
     // Overlordship: the child is born under the initiator's god.
     expect(outcome.child.godId).toBe("g1");
@@ -178,7 +178,7 @@ describe("reproduction", () => {
 
   it("refuses if the parent is too weak", () => {
     const world = new World();
-    const parent = makeDevot({ hp: REPRO_MIN_HP - 1 });
+    const parent = makeDevot({ balance: REPRO_MIN_BALANCE - 1 });
     world.devots.set(parent.id, parent);
     const outcome = resolveReproduction(world, parent, undefined);
     expect(outcome).toEqual({ reason: "too weak to procreate" });

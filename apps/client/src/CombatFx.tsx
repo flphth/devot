@@ -7,7 +7,7 @@ import type { CombatFx, DevotView } from "./useWorld.js";
 /**
  * LE VOL DE VIE, RENDU VISIBLE.
  *
- * Combat already existed and worked: an attacker drains their victim's HP and
+ * Combat already existed and worked: an attacker drains their victim's balance and
  * absorbs a share of it. But it could not be seen — it was a line in a log,
  * when it is the most meaningful act in the game.
  *

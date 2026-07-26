@@ -11,8 +11,8 @@ function makeDevot(id: string): DevotEntity {
     wallet: "",
     name: "Test",
     pos: { x: 0, y: 0, z: 0 },
-    hp: 1000,
-    hpMax: 1000,
+    balance: 1000,
+    capacity: 1000,
     state: "alive",
     profile: "frugal",
     traits: [],
@@ -46,7 +46,7 @@ describe("death = destruction of the context", () => {
     const row = repos.devots.get("devot-1");
     expect(row?.state).toBe("dead");
     expect(row?.diedAt).toBeTruthy();
-    expect(row?.hp).toBe(0);
+    expect(row?.balance).toBe(0);
   });
 
   it("leaves other devots' contexts untouched", () => {

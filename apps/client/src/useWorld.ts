@@ -21,8 +21,8 @@ export interface DevotView {
   x: number;
   y: number;
   z: number;
-  hp: number;
-  hpMax: number;
+  balance: number;
+  capacity: number;
   state: string;
   profile: string;
   thinking: boolean;
@@ -56,8 +56,8 @@ export interface MonsterView {
   name: string;
   x: number;
   z: number;
-  hp: number;
-  hpMax: number;
+  balance: number;
+  capacity: number;
   hoard: number;
   state: string;
   targetId: string;
@@ -212,8 +212,8 @@ export function useWorld(godName: string): WorldConnection {
               x: d.x,
               y: d.y,
               z: d.z,
-              hp: d.hp,
-              hpMax: d.hpMax,
+              balance: d.balance,
+              capacity: d.capacity,
               state: d.state,
               profile: d.profile,
               thinking: d.thinking,
@@ -255,8 +255,8 @@ export function useWorld(godName: string): WorldConnection {
               name: m.name,
               x: m.x,
               z: m.z,
-              hp: m.hp,
-              hpMax: m.hpMax,
+              balance: m.balance,
+              capacity: m.capacity,
               hoard: m.hoard,
               state: m.state,
               targetId: m.targetId ?? "",

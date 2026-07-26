@@ -16,8 +16,8 @@ export class DevotState extends Schema {
   declare x: number;
   declare y: number;
   declare z: number;
-  declare hp: number;
-  declare hpMax: number;
+  declare balance: number;
+  declare capacity: number;
   declare state: string;
   declare profile: string;
   declare thinking: boolean;
@@ -45,8 +45,8 @@ export class DevotState extends Schema {
     this.x = 0;
     this.y = 0;
     this.z = 0;
-    this.hp = 0;
-    this.hpMax = 0;
+    this.balance = 0;
+    this.capacity = 0;
     this.state = "alive";
     this.profile = "frugal";
     this.thinking = false;
@@ -67,8 +67,8 @@ defineTypes(DevotState, {
   x: "number",
   y: "number",
   z: "number",
-  hp: "number",
-  hpMax: "number",
+  balance: "number",
+  capacity: "number",
   state: "string",
   profile: "string",
   thinking: "boolean",
@@ -86,7 +86,7 @@ export class FoodState extends Schema {
   declare x: number;
   declare z: number;
   declare kind: string;
-  declare hpValue: number;
+  declare worth: number;
   declare source: string;
   /** Sent so the client can wilt the food as its end approaches. */
   declare spawnedAt: number;
@@ -101,7 +101,7 @@ export class FoodState extends Schema {
     this.x = 0;
     this.z = 0;
     this.kind = "grain";
-    this.hpValue = 0;
+    this.worth = 0;
     this.source = "spawn";
     this.spawnedAt = 0;
     this.ttlMs = 0;
@@ -114,7 +114,7 @@ defineTypes(FoodState, {
   x: "number",
   z: "number",
   kind: "string",
-  hpValue: "number",
+  worth: "number",
   source: "string",
   spawnedAt: "number",
   ttlMs: "number",
@@ -189,8 +189,8 @@ export class MonsterState extends Schema {
   declare name: string;
   declare x: number;
   declare z: number;
-  declare hp: number;
-  declare hpMax: number;
+  declare balance: number;
+  declare capacity: number;
   /** What it has taken from the dead. A fat monster is a visible wager. */
   declare hoard: number;
   declare state: string;
@@ -206,8 +206,8 @@ export class MonsterState extends Schema {
     this.name = "";
     this.x = 0;
     this.z = 0;
-    this.hp = 0;
-    this.hpMax = 0;
+    this.balance = 0;
+    this.capacity = 0;
     this.hoard = 0;
     this.state = "alive";
     this.targetId = "";
@@ -220,8 +220,8 @@ defineTypes(MonsterState, {
   name: "string",
   x: "number",
   z: "number",
-  hp: "number",
-  hpMax: "number",
+  balance: "number",
+  capacity: "number",
   hoard: "number",
   state: "string",
   targetId: "string",
@@ -278,7 +278,7 @@ export interface CreateFounderMsg {
 export interface CombatFxMsg {
   attackerId: string;
   victimId: string;
-  /** HP actually transferred this tick. */
+  /** balance actually transferred this tick. */
   drained: number;
   /** The victim's position: that is where the numbers spring from. */
   x: number;

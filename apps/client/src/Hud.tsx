@@ -271,11 +271,11 @@ export function Hud({
               <div
                 style={{
                   height: "100%",
-                  width: `${d.hpMax > 0 ? (d.hp / d.hpMax) * 100 : 0}%`,
+                  width: `${d.capacity > 0 ? (d.balance / d.capacity) * 100 : 0}%`,
                   background:
-                    d.hp / d.hpMax > 0.4
+                    d.balance / d.capacity > 0.4
                       ? "#5ee07a"
-                      : d.hp / d.hpMax > 0.15
+                      : d.balance / d.capacity > 0.15
                         ? "#e0b34c"
                         : "#e0634c",
                   transition: "width .3s",
@@ -283,7 +283,7 @@ export function Hud({
               />
             </div>
             <div style={{ opacity: 0.6, fontSize: 11, marginTop: 2 }}>
-              {Math.round(d.hp)} / {d.hpMax} HP — ${(d.hp / 1e6).toFixed(4)} {t("hud.thinking")}
+              {Math.round(d.balance).toLocaleString()} / {d.capacity.toLocaleString()} — ${(d.balance / 1e6).toFixed(4)} {t("hud.thinking")}
             </div>
           </div>
         ))}
@@ -426,7 +426,7 @@ export function Hud({
 /**
  * THE COMBAT LOG.
  *
- * It does not merely list transfers: it says what they are. In this world HP
+ * It does not merely list transfers: it says what they are. In this world a balance
  * are the thinking budget — a devot spends its life every time it thinks. To
  * steal someone's life is therefore to steal their thinking time: they think
  * less, decide worse, and die. The player must understand that by watching,

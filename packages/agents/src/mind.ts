@@ -90,7 +90,7 @@ export class AnthropicMind implements MindProvider {
 
 /**
  * Fake mind for tests and for the demo without an API key: plausible decisions,
- * simulated usage (so real HP damage in the loop).
+ * simulated usage (so a real cost is taken from the balance in the loop).
  */
 export class MockMind implements MindProvider {
   constructor(

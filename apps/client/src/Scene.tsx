@@ -469,7 +469,7 @@ function VoxelDevot({
       : devot.state === "starving"
         ? { ...look, shirt: fade(look.shirt, "#888888", 0.3) }
         : look;
-  const ratio = devot.hpMax > 0 ? devot.hp / devot.hpMax : 0;
+  const ratio = devot.capacity > 0 ? devot.balance / devot.capacity : 0;
   const bubble = devot.thinking ? "…" : devot.utterance || "";
   const innerVoice = !devot.thinking && !devot.utterance ? devot.thought : "";
 

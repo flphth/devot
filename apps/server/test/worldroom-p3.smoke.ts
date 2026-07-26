@@ -55,11 +55,11 @@ async function main(): Promise<void> {
   const abel = devots.find((d) => d.godId === "god-abel");
   kain.pos = { x: 0, y: 0, z: 0 };
   abel.pos = { x: 2, y: 0, z: 0 };
-  abel.hp = 2500;
+  abel.balance = 2500;
 
   // Encounter -> "attack" thought -> hunt -> predation -> death.
   // Polling: mutual combat (both draining each other) can take 10-20 s.
-  const kainHpBeforeKill = room.world.devots.get(kain.id)!.hp;
+  const kainHpBeforeKill = room.world.devots.get(kain.id)!.balance;
   const deadline = Date.now() + 25_000;
   while (Date.now() < deadline && state().devots.get(abel.id)?.state !== "dead") {
     await sleep(500);
@@ -68,9 +68,9 @@ async function main(): Promise<void> {
     "Abel died in combat (cross-line PvP)",
     state().devots.get(abel.id)?.state === "dead",
   );
-  check("Abel really was drained to 0 HP", state().devots.get(abel.id)?.hp === 0);
+  check("Abel really was drained to nothing", state().devots.get(abel.id)?.balance === 0);
   console.log(
-    `  (Kain: ${Math.round(kainHpBeforeKill)} HP before the killing blow, ${Math.round(room.world.devots.get(kain.id)!.hp)} after)`,
+    `  (Kain: ${Math.round(kainHpBeforeKill)} balance before the killing blow, ${Math.round(room.world.devots.get(kain.id)!.balance)} after)`,
   );
 
   // Abel's line is extinct: his god may shape a founder anew.

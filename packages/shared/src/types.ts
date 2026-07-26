@@ -39,7 +39,7 @@ export interface Decision {
 export type TriggerKind =
   | "divine_message" // top priority
   | "threat" // combat / danger
-  | "survival" // low HP
+  | "survival" // low balance
   | "encounter" // meaningful encounter
   | "utterance_heard" // words received from another devot
   | "idle_reflection"; // idle musing
@@ -74,8 +74,8 @@ export interface DevotEntity {
   isFounder: boolean;
   name: string;
   pos: Vec3;
-  hp: number;
-  hpMax: number;
+  balance: number;
+  capacity: number;
   state: DevotLifeState;
   profile: CognitionProfileName;
   traits: string[];
@@ -108,8 +108,8 @@ export interface DevotEntity {
   underAttackBy?: string;
   /** When that alert was last raised, so a lost one can be raised again. */
   alertedAt?: number;
-  /** HP at the end of its previous thought, so it can feel a trend. */
-  hpAtLastThought?: number;
+  /** balance at the end of its previous thought, so it can feel a trend. */
+  balanceAtLastThought?: number;
   /** When its mind last ran. The idle loop is paced off this. */
   lastThoughtAt?: number;
   /** Everyone who has ever drawn its life. Capped; survives between thoughts. */
@@ -130,8 +130,8 @@ export interface MonsterEntity {
   id: string;
   name: string;
   pos: Vec3;
-  hp: number;
-  hpMax: number;
+  balance: number;
+  capacity: number;
   /** Everything drained from the devots it has killed. Its death releases it. */
   hoard: number;
   state: "alive" | "dead";
@@ -168,8 +168,8 @@ export interface ThoughtSubject {
   kind: CreatureKind;
   name: string;
   pos: Vec3;
-  hp: number;
-  hpMax: number;
+  balance: number;
+  capacity: number;
   state: string;
   age: number;
   traits: string[];
@@ -186,7 +186,7 @@ export interface FoodEntity {
   id: string;
   pos: Vec3;
   type: FoodType;
-  hpValue: number;
+  worth: number;
   source: "spawn" | "god";
   /** When it appeared. Food that is not eaten rots away. */
   spawnedAt: number;

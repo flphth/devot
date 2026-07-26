@@ -9,7 +9,7 @@ import { buildEventBlock, buildPersona, rulesFor } from "./prompts.js";
 /**
  * Minds driven by the Claude Code subscription (Agent SDK): no pay-per-token
  * API key — every thought goes through the machine's Claude Code credentials.
- * Real usage (tokens) is still converted into HP damage.
+ * Real usage (tokens) is still taken out of the balance.
  *
  * Each thought is an ephemeral session: the devot's history is replayed into
  * the prompt as a transcript (its memory lives in our database).

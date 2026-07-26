@@ -24,7 +24,7 @@ export const DECISION_SCHEMA = {
     item: {
       type: "string",
       enum: ["spear", "shield", "boots", "scope"],
-      description: "Item to forge if action=craft. Its HP cost is taken from your life.",
+      description: "Item to forge if action=craft. Its cost is taken from your life.",
     },
     direction: {
       type: "object",
@@ -66,7 +66,7 @@ export function parseDecision(raw: unknown): Decision {
   }
   const decision: Decision = { action: d.action as DecisionAction };
   // The requested item is not validated here: the SERVER decides whether the
-  // forge is possible, knowing the HP and what the devot already carries.
+  // forge is possible, knowing the balance and what the devot already carries.
   if (typeof d.item === "string") decision.item = d.item as Decision["item"];
   if (typeof d.targetId === "string") decision.targetId = d.targetId;
   if (

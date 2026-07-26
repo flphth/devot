@@ -47,10 +47,10 @@ async function main(): Promise<void> {
   const founder = devots.find((d) => d.isFounder);
   check("the child belongs to the same line", child?.godId === founder?.godId);
   check(
-    "procreating exhausted the parent (HP < hpMax)",
-    founder && founder.hp < founder.hpMax * 0.75,
+    "procreating exhausted the parent (balance < capacity)",
+    founder && founder.balance < founder.capacity * 0.75,
   );
-  check("l'enfant est vivant avec des HP", child && child.hp > 0 && child.state !== "dead");
+  check("the child is alive with a balance", child && child.balance > 0 && child.state !== "dead");
 
   await room.leave();
   await gameServer.gracefullyShutdown(false);

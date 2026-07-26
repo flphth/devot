@@ -3,8 +3,8 @@ import {
   ATTACK_RADIUS,
   MONSTER_ABSORB,
   MONSTER_DRAIN_PER_TICK,
-  MONSTER_HP_MAX,
-  MONSTER_METABOLISM_HP_PER_TICK,
+  MONSTER_CAPACITY,
+  MONSTER_METABOLISM_PER_TICK,
   MONSTER_SIGHT,
   MONSTER_SPEED,
   COMBAT_RESIDUE_FRACTION,
@@ -46,8 +46,8 @@ export function spawnMonster(world: World, x: number, z: number): MonsterEntity 
     id: `monster-${Date.now()}-${++seq}`,
     name: `Beast-${seq}`,
     pos: { x, y: terrainHeight(x, z), z },
-    hp: MONSTER_HP_MAX,
-    hpMax: MONSTER_HP_MAX,
+    balance: MONSTER_CAPACITY,
+    capacity: MONSTER_CAPACITY,
     hoard: 0,
     state: "alive",
     age: 0,
@@ -83,10 +83,10 @@ export function monsterSystem(world: World, now: number = Date.now()): MonsterTi
 
   for (const monster of world.aliveMonsters()) {
     // Hunting is not optional: this is what it costs to be a monster.
-    monster.hp -= MONSTER_METABOLISM_HP_PER_TICK;
+    monster.balance -= MONSTER_METABOLISM_PER_TICK;
     scavenge(monster, world, result);
-    if (monster.hp <= 0) {
-      monster.hp = 0;
+    if (monster.balance <= 0) {
+      monster.balance = 0;
       monster.state = "dead";
       result.deaths.push({
         monsterId: monster.id,
@@ -146,12 +146,12 @@ export function monsterSystem(world: World, now: number = Date.now()): MonsterTi
     // A monster cannot empty its prey either: it drains to the floor, the prey
     // dies there, and what it still held drops for whoever comes next —
     // including the monster itself, which will scavenge it.
-    const floor = prey.hpMax * COMBAT_RESIDUE_FRACTION;
-    const drained = Math.max(0, Math.min(MONSTER_DRAIN_PER_TICK, prey.hp - floor));
-    prey.hp -= drained;
+    const floor = prey.capacity * COMBAT_RESIDUE_FRACTION;
+    const drained = Math.max(0, Math.min(MONSTER_DRAIN_PER_TICK, prey.balance - floor));
+    prey.balance -= drained;
     // It absorbs only a share; the rest swells the hoard, which is what makes a
     // long-lived monster worth hunting rather than merely worth avoiding.
-    monster.hp = Math.min(monster.hpMax, monster.hp + drained * MONSTER_ABSORB);
+    monster.balance = Math.min(monster.capacity, monster.balance + drained * MONSTER_ABSORB);
     monster.hoard += drained * (1 - MONSTER_ABSORB);
     result.combats.push({ attackerId: monster.id, victimId: prey.id, drained });
 
@@ -167,16 +167,16 @@ export function monsterSystem(world: World, now: number = Date.now()): MonsterTi
     }
 
     // Drained to the floor: the prey dies HERE, holding its estate. Without
-    // this it would sit at the floor forever — deathSystem only ever sees hp
+    // this it would sit at the floor forever — deathSystem only ever sees balance
     // reach zero, and the floor is above zero by construction.
-    if (prey.hp <= floor + 1e-6) {
+    if (prey.balance <= floor + 1e-6) {
       prey.state = "dead";
       result.kills.push({
         monsterId: monster.id,
         devotId: prey.id,
-        residue: Math.max(0, Math.round(prey.hp)),
+        residue: Math.max(0, Math.round(prey.balance)),
       });
-      prey.hp = 0;
+      prey.balance = 0;
       monster.targetId = undefined;
     }
   }
@@ -310,7 +310,7 @@ export function describeMonsterSurroundings(monster: MonsterEntity, world: World
 
   const lines = prey.map((d) => {
     const dist = Math.sqrt(dist2(monster.pos, d.pos));
-    const share = Math.round((d.hp / d.hpMax) * 100);
+    const share = Math.round((d.balance / d.capacity) * 100);
     // Whether it is coming for you is the fact that decides everything.
     const coming =
       d.currentGoal.kind === "attack" && d.currentGoal.targetId === monster.id

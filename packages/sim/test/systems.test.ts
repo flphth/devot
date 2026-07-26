@@ -11,8 +11,8 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     wallet: "",
     name: "Test",
     pos: { x: 0, y: 0, z: 0 },
-    hp: 10_000,
-    hpMax: 10_000,
+    balance: 10_000,
+    capacity: 10_000,
     state: "alive",
     profile: "frugal",
     traits: [],
@@ -26,12 +26,12 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
   };
 }
 
-function makeFood(id: string, x: number, z: number, hpValue = 500): FoodEntity {
+function makeFood(id: string, x: number, z: number, worth = 500): FoodEntity {
   return {
     id,
     pos: { x, y: 0, z },
     type: "grain",
-    hpValue,
+    worth,
     source: "spawn",
     spawnedAt: Date.now(),
     ttlMs: 10 * 60_000, // long enough that decay never interferes with a test
@@ -51,9 +51,9 @@ describe("reactive layer (0 tokens)", () => {
     expect(after).toBeLessThan(before);
   });
 
-  it("eating on contact restores HP and consumes the food", () => {
+  it("eating on contact restores balance and consumes the food", () => {
     const world = new World();
-    const devot = makeDevot({ hp: 5000, pos: { x: 10, y: 0, z: 0 } });
+    const devot = makeDevot({ balance: 5000, pos: { x: 10, y: 0, z: 0 } });
     world.devots.set(devot.id, devot);
     world.food.set("f1", makeFood("f1", 10.1, 0, 500));
 
@@ -61,12 +61,12 @@ describe("reactive layer (0 tokens)", () => {
     expect(result.eaten).toHaveLength(1);
     expect(world.food.size).toBe(0);
     // +500 from food, -1 from metabolism
-    expect(devot.hp).toBeCloseTo(5000 + 500 - 1, 5);
+    expect(devot.balance).toBeCloseTo(5000 + 500 - 1, 5);
   });
 
-  it("hp ≤ 0 → death detected by the DeathSystem", () => {
+  it("balance ≤ 0 → death detected by the DeathSystem", () => {
     const world = new World();
-    const devot = makeDevot({ hp: 0.5 });
+    const devot = makeDevot({ balance: 0.5 });
     world.devots.set(devot.id, devot);
 
     const result = tick(world);
@@ -74,13 +74,13 @@ describe("reactive layer (0 tokens)", () => {
       { devotId: "d1", cause: "vital exhaustion", residue: 0 },
     ]);
     expect(devot.state).toBe("dead");
-    expect(devot.hp).toBe(0);
+    expect(devot.balance).toBe(0);
   });
 
   it("emits a survival trigger when the hunger threshold is crossed", () => {
     const world = new World();
     // Just above the starving threshold (40%): metabolism pushes it across.
-    const devot = makeDevot({ hp: 4000.5, hpMax: 10_000 });
+    const devot = makeDevot({ balance: 4000.5, capacity: 10_000 });
     world.devots.set(devot.id, devot);
 
     const result = tick(world);
@@ -94,7 +94,7 @@ describe("reactive layer (0 tokens)", () => {
 
   it("a dead devot no longer moves nor ages", () => {
     const world = new World();
-    const devot = makeDevot({ hp: 0, state: "dead", age: 42 });
+    const devot = makeDevot({ balance: 0, state: "dead", age: 42 });
     world.devots.set(devot.id, devot);
     tick(world);
     expect(devot.age).toBe(42);
@@ -216,7 +216,7 @@ describe("food rots", () => {
     // Decay runs before the bodies move, so a devot standing on a meal the
     // instant it expires loses it rather than winning an invisible race.
     const world = new World();
-    const devot = makeDevot({ hp: 1000 });
+    const devot = makeDevot({ balance: 1000 });
     world.devots.set(devot.id, devot);
     const food = makeFood("f-race", 0, 0, 500);
     food.spawnedAt = Date.now() - 60_000;
@@ -226,6 +226,6 @@ describe("food rots", () => {
     const result = tick(world);
     expect(result.rotted).toEqual(["f-race"]);
     expect(result.eaten).toEqual([]);
-    expect(devot.hp).toBeLessThan(1000);
+    expect(devot.balance).toBeLessThan(1000);
   });
 });

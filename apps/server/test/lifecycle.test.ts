@@ -16,8 +16,8 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     wallet: "",
     name: `Devot${seq}`,
     pos: { x: 0, y: 0, z: 0 },
-    hp: 20_000,
-    hpMax: 50_000,
+    balance: 20_000,
+    capacity: 50_000,
     state: "alive",
     profile: "frugal",
     traits: ["curious"],
@@ -64,7 +64,7 @@ describe("naissances (lifecycle serveur)", () => {
     const db = openDb(":memory:");
     const repos = createRepos(db);
     const world = new World();
-    const parent = makeDevot({ hp: 100 });
+    const parent = makeDevot({ balance: 100 });
     world.devots.set(parent.id, parent);
     repos.devots.insertFromEntity(parent);
 

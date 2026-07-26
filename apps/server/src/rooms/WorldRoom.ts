@@ -23,7 +23,7 @@ import {
   FoodState,
   MonsterState,
   GodState,
-  HP_MAX_DEFAULT,
+  CAPACITY_DEFAULT,
   PATCH_RATE_MS,
   PERCEPTION_RADIUS,
   TICK_MS,
@@ -415,11 +415,11 @@ export class WorldRoom extends Room<WorldState> {
         opts.x ?? (Math.random() - 0.5) * this.world.size,
         opts.z ?? (Math.random() - 0.5) * this.world.size,
       ),
-      // Max HP follow from the chosen VITALITY: it is the heaviest stat, since
-      // HP are also the thinking budget. A hardy devot does not merely live
+      // Max balance follow from the chosen VITALITY: it is the heaviest stat, since
+      // balance are also the thinking budget. A hardy devot does not merely live
       // longer, it thinks longer.
-      hp: hpMaxFor(identity.stats.vitality),
-      hpMax: hpMaxFor(identity.stats.vitality),
+      balance: hpMaxFor(identity.stats.vitality),
+      capacity: hpMaxFor(identity.stats.vitality),
       identityJson: encodeIdentity(identity),
       // A devot is born empty-handed: every item must be forged, and paid for.
       items: [],
@@ -457,8 +457,8 @@ export class WorldRoom extends Room<WorldState> {
     // tick's list. It also kills a devot that was perfectly healthy, so the
     // whole of what it held drops — smiting your own is expensive, and it
     // feeds whoever is nearest.
-    this.dropLegacy(devot.id, devot.hp);
-    devot.hp = 0;
+    this.dropLegacy(devot.id, devot.balance);
+    devot.balance = 0;
     devot.state = "dead";
     this.repos.devots.kill(devot.id, "divine lightning");
     this.repos.events.record("smite", [devot.id], { godId });
@@ -640,7 +640,7 @@ export class WorldRoom extends Room<WorldState> {
     // Stamped here rather than when the decision lands: this is the moment the
     // picture was taken, so the next thought's "since your last thought" is
     // measured against exactly what this one was told.
-    devot.hpAtLastThought = devot.hp;
+    devot.balanceAtLastThought = devot.balance;
     this.orchestrator.enqueue({ ...trigger, eventText });
   }
 
@@ -679,8 +679,8 @@ export class WorldRoom extends Room<WorldState> {
       this.repos.events.record("food_rotted", [], { foodId });
     }
 
-    for (const { devotId, foodId, hpValue } of result.eaten) {
-      this.repos.events.record("meal", [devotId], { foodId, hpValue });
+    for (const { devotId, foodId, worth } of result.eaten) {
+      this.repos.events.record("meal", [devotId], { foodId, worth });
     }
 
     // Monsters move before the triggers are dispatched, so a devot woken this
@@ -719,7 +719,7 @@ export class WorldRoom extends Room<WorldState> {
         drained: Math.round(drained),
         x: victim?.pos.x ?? 0,
         z: victim?.pos.z ?? 0,
-        lethal: !!victim && victim.hp <= 0,
+        lethal: !!victim && victim.balance <= 0,
       } satisfies CombatFxMsg);
     }
 
@@ -748,7 +748,7 @@ export class WorldRoom extends Room<WorldState> {
         drained: Math.round(drained),
         x: victim?.pos.x ?? 0,
         z: victim?.pos.z ?? 0,
-        lethal: !!victim && victim.hp <= 0,
+        lethal: !!victim && victim.balance <= 0,
       } satisfies CombatFxMsg);
     }
 
@@ -811,7 +811,7 @@ export class WorldRoom extends Room<WorldState> {
 
     for (const d of this.world.devots.values()) {
       if (d.state === "dead") continue;
-      this.ledger.record(d.id, d.wallet, Math.max(0, d.hp));
+      this.ledger.record(d.id, d.wallet, Math.max(0, d.balance));
     }
     void this.ledger.flush();
 
@@ -834,14 +834,14 @@ export class WorldRoom extends Room<WorldState> {
       monster.lastThoughtAt = now;
 
       const prey = monster.targetId ? this.world.devots.get(monster.targetId) : undefined;
-      const ratio = Math.round((monster.hp / monster.hpMax) * 100);
+      const ratio = Math.round((monster.balance / monster.capacity) * 100);
       this.orchestrator.enqueue({
         kind: prey ? "threat" : "idle_reflection",
         devotId: monster.id,
         eventText: [
           describeSky(this.world.worldMs),
           prey
-            ? `Your instinct has fastened on ${prey.name} (id "${prey.id}"), ${Math.sqrt(dist2(monster.pos, prey.pos)).toFixed(1)} away, at ${Math.round((prey.hp / prey.hpMax) * 100)}% of its life. You are at ${ratio}% of yours, and it is draining. Press this hunt, take something else, or break off.`
+            ? `Your instinct has fastened on ${prey.name} (id "${prey.id}"), ${Math.sqrt(dist2(monster.pos, prey.pos)).toFixed(1)} away, at ${Math.round((prey.balance / prey.capacity) * 100)}% of its life. You are at ${ratio}% of yours, and it is draining. Press this hunt, take something else, or break off.`
             : `You have found nothing to kill. You are at ${ratio}% of your life and it is draining while you prowl.`,
           describeMonsterSurroundings(monster, this.world),
         ].join("\n\n"),
@@ -936,7 +936,7 @@ export class WorldRoom extends Room<WorldState> {
       id: `legacy-${devot.id}`,
       pos: placeOnGround(devot.pos.x, devot.pos.z),
       type: "legacy",
-      hpValue: 0,
+      worth: 0,
       source: "spawn",
       spawnedAt: Date.now(),
       ttlMs: LEGACY_TTL_MS,
@@ -992,7 +992,7 @@ export class WorldRoom extends Room<WorldState> {
     source: "spawn" | "god",
     at?: { x: number; z: number },
     kind: FoodEntity["type"] = "grain",
-    hpValue?: number,
+    worth?: number,
   ): void {
     const rare = Math.random() < 0.06;
     const f: FoodEntity = {
@@ -1002,14 +1002,14 @@ export class WorldRoom extends Room<WorldState> {
         at?.z ?? (Math.random() - 0.5) * 2 * this.world.size * 0.9,
       ),
       type: at ? kind : rare ? "manna" : Math.random() < 0.3 ? "fruit" : "grain",
-      hpValue: hpValue ?? 0,
+      worth: worth ?? 0,
       source,
       spawnedAt: Date.now(),
       ttlMs: 0,
     };
     f.ttlMs = rotsIn(f.type);
-    if (f.hpValue === 0) {
-      f.hpValue = f.type === "manna" ? HP_MAX_DEFAULT : f.type === "fruit" ? 6000 : 2000;
+    if (f.worth === 0) {
+      f.worth = f.type === "manna" ? CAPACITY_DEFAULT : f.type === "fruit" ? 6000 : 2000;
     }
     this.world.food.set(f.id, f);
   }
@@ -1028,7 +1028,7 @@ export class WorldRoom extends Room<WorldState> {
       id: `food-carrion-${this.foodSeq++}`,
       pos: placeOnGround(x, z),
       type: "carrion",
-      hpValue: Math.round(hoard),
+      worth: Math.round(hoard),
       source: "spawn",
       spawnedAt: Date.now(),
       ttlMs: rotsIn("carrion"),
@@ -1047,7 +1047,7 @@ export class WorldRoom extends Room<WorldState> {
         s.name = d.name;
         s.isFounder = d.isFounder;
         s.profile = d.profile;
-        s.hpMax = d.hpMax;
+        s.capacity = d.capacity;
         // Identity is written ONCE, when entering the state: it never changes,
         // and resynchronising it every tick would be absurd.
         s.identity = d.identityJson;
@@ -1057,7 +1057,7 @@ export class WorldRoom extends Room<WorldState> {
       s.x = d.pos.x;
       s.y = d.pos.y;
       s.z = d.pos.z;
-      s.hp = Math.max(0, d.hp);
+      s.balance = Math.max(0, d.balance);
       s.state = d.state;
       s.thinking = d.thinking;
       s.utterance = d.utterance;
@@ -1073,12 +1073,12 @@ export class WorldRoom extends Room<WorldState> {
         s = new MonsterState();
         s.id = m.id;
         s.name = m.name;
-        s.hpMax = m.hpMax;
+        s.capacity = m.capacity;
         this.state.monsters.set(m.id, s);
       }
       s.x = m.pos.x;
       s.z = m.pos.z;
-      s.hp = m.hp;
+      s.balance = m.balance;
       s.hoard = m.hoard;
       s.state = m.state;
       s.targetId = m.targetId ?? "";
@@ -1090,7 +1090,7 @@ export class WorldRoom extends Room<WorldState> {
         s = new FoodState();
         s.id = id;
         s.kind = f.type;
-        s.hpValue = f.hpValue;
+        s.worth = f.worth;
         s.source = f.source;
         s.x = f.pos.x;
         s.z = f.pos.z;

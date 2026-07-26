@@ -53,8 +53,8 @@ const EN: Dict = {
 
   "combat.title": "⚔ Life theft",
   "combat.explain":
-    "HP are the thinking budget. Taking a devot's life takes away their thinking time: they think less, decide worse, then die.",
-  "combat.total": "{n} HP changed hands before your eyes.",
+    "A balance IS the thinking budget. Taking a devot's life takes away its thinking time: it thinks less, decides worse, then dies.",
+  "combat.total": "{n} changed hands before your eyes.",
   "combat.stranger": "a stranger",
 
   "creation.title": "Shape your founder",
@@ -124,7 +124,7 @@ const FR: Dict = {
   "combat.title": "⚔ Vol de vie",
   "combat.explain":
     "Les PV sont le budget de pensée. Prendre la vie d'un devot lui prend son temps de réflexion : il pense moins, décide plus mal, puis meurt.",
-  "combat.total": "{n} PV ont changé de mains sous tes yeux.",
+  "combat.total": "{n} a changé de mains sous tes yeux.",
   "combat.stranger": "un inconnu",
 
   "creation.title": "Façonne ton fondateur",

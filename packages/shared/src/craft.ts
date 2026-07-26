@@ -3,7 +3,7 @@ import type { StatKey, Stats } from "./appearance.js";
 /**
  * CRAFTING — thought becomes matter.
  *
- * Forging costs HP. And HP are the thinking budget: a devot who forges chooses
+ * Forging costs balance. And balance are the thinking budget: a devot who forges chooses
  * to think for less time in order to act more forcefully. It is the same
  * trade-off as the creation budget, but taken MID-LIFE, by the devot itself, and
  * paid out of what it has left to live.
@@ -18,7 +18,7 @@ export type ItemKind = (typeof ITEM_KINDS)[number];
 
 export interface Recipe {
   kind: ItemKind;
-  /** HP taken at the forge. */
+  /** balance taken at the forge. */
   cost: number;
   /** Stat strengthened, and by how many points. */
   stat: StatKey;
@@ -37,7 +37,7 @@ export interface Recipe {
  *
  * They were last rescaled when the pool was cut from 150,000 to 60,000. Left
  * untouched they would have swallowed a sixth of a life for two items, which a
- * test caught. If HP_MAX_DEFAULT moves again, these move with it.
+ * test caught. If CAPACITY_DEFAULT moves again, these move with it.
  */
 export const RECIPES: Record<ItemKind, Recipe> = {
   spear: {
@@ -83,7 +83,7 @@ export const MAX_CARRIED = 2;
  * economy would do exactly that.
  */
 /** A devot may never forge itself below this: the floor is what it lives on. */
-export const CRAFT_HP_FLOOR = 8_000;
+export const CRAFT_BALANCE_FLOOR = 8_000;
 
 export interface CraftRejection {
   reason: string;
@@ -101,7 +101,7 @@ export function recipeOf(kind: unknown): Recipe | null {
  */
 export function canCraft(
   kind: unknown,
-  hp: number,
+  balance: number,
   carried: readonly ItemKind[],
 ): CraftRejection | null {
   const recipe = recipeOf(kind);
@@ -112,9 +112,9 @@ export function canCraft(
   if (carried.includes(recipe.kind)) {
     return { reason: `You already carry a ${recipe.kind}.` };
   }
-  if (hp - recipe.cost < CRAFT_HP_FLOOR) {
+  if (balance - recipe.cost < CRAFT_BALANCE_FLOOR) {
     return {
-      reason: `Forging a ${recipe.kind} costs ${recipe.cost} HP, and too little would remain to live on.`,
+      reason: `Forging a ${recipe.kind} costs ${recipe.cost} balance, and too little would remain to live on.`,
     };
   }
   return null;
@@ -141,12 +141,12 @@ export function describeItems(carried: readonly ItemKind[]): string {
 export function craftRulesForPrompt(): string {
   const lines = ITEM_KINDS.map((k) => {
     const r = RECIPES[k];
-    return `- ${r.kind} (${r.cost} HP): ${r.description}`;
+    return `- ${r.kind}, ${r.cost} of your life: ${r.description}`;
   });
   return [
     'You can FORGE an item with the "craft" action. There is no raw material in',
-    "this world: the material is your life. Forging takes HP, so it takes thinking time.",
+    "this world: the material is your life. Forging spends your balance, and your balance is your thinking time.",
     ...lines,
-    `You may carry only ${MAX_CARRIED} items, and you must stay above ${CRAFT_HP_FLOOR} HP.`,
+    `You may carry only ${MAX_CARRIED} items, and you must stay above ${CRAFT_BALANCE_FLOOR}.`,
   ].join("\n");
 }

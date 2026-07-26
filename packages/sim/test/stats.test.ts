@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ATTACK_DRAIN_PER_TICK,
   DEVOT_SPEED,
-  HP_MAX_DEFAULT,
+  CAPACITY_DEFAULT,
   PERCEPTION_RADIUS,
   defaultIdentity,
   encodeIdentity,
@@ -40,8 +40,8 @@ function makeDevot(stats: Partial<Stats>, overrides: Partial<DevotEntity> = {}):
     wallet: "",
     name: `Devot${seq}`,
     pos: { x: 0, y: 0, z: 0 },
-    hp: 40_000,
-    hpMax: HP_MAX_DEFAULT,
+    balance: 40_000,
+    capacity: CAPACITY_DEFAULT,
     state: "alive",
     profile: "frugal",
     traits: [],
@@ -59,7 +59,7 @@ describe("stats come from the identity, never from anywhere else", () => {
   it("a devot with no identity falls back to the neutral profile", () => {
     const devot = makeDevot({}, { identityJson: "" });
     expect(statsOf(devot)).toEqual({ vitality: 3, power: 3, speed: 3, sight: 3 });
-    expect(hpMaxOf(devot)).toBe(HP_MAX_DEFAULT);
+    expect(hpMaxOf(devot)).toBe(CAPACITY_DEFAULT);
   });
 
   it("a tampered identity is ignored in favour of the neutral profile", () => {
@@ -78,13 +78,13 @@ describe("stats come from the identity, never from anywhere else", () => {
   });
 });
 
-describe("vigour — the HP, and therefore the thinking time", () => {
-  it("high vigour grants more maximum HP than low vigour", () => {
+describe("vigour — the balance, and therefore the thinking time", () => {
+  it("high vigour grants more maximum balance than low vigour", () => {
     const sturdy = makeDevot({ vitality: 5, sight: 1 });
     const frail = makeDevot({ vitality: 1, sight: 5 });
     expect(hpMaxOf(sturdy)).toBeGreaterThan(hpMaxOf(frail));
-    expect(hpMaxOf(sturdy)).toBe(Math.round(HP_MAX_DEFAULT * statMultiplier(5)));
-    expect(hpMaxOf(frail)).toBe(Math.round(HP_MAX_DEFAULT * statMultiplier(1)));
+    expect(hpMaxOf(sturdy)).toBe(Math.round(CAPACITY_DEFAULT * statMultiplier(5)));
+    expect(hpMaxOf(frail)).toBe(Math.round(CAPACITY_DEFAULT * statMultiplier(1)));
   });
 });
 
@@ -127,7 +127,7 @@ describe("sight — what enters the prompt", () => {
   });
 });
 
-describe("power — the HP stolen", () => {
+describe("power — the balance stolen", () => {
   it("a strong devot drains faster than a weak one", () => {
     const strong = makeDevot({ power: 5, sight: 1 });
     const weak = makeDevot({ power: 1, sight: 5 });
@@ -143,10 +143,10 @@ describe("power — the HP stolen", () => {
     world.devots.set(victim.id, victim);
     applyDecision(strong, { action: "attack", targetId: victim.id }, world);
 
-    const before = victim.hp;
+    const before = victim.balance;
     tick(world);
     // Metabolism also takes its share: we check the bite, not the total.
-    const lost = before - victim.hp;
+    const lost = before - victim.balance;
     expect(lost).toBeGreaterThan(drainOf(makeDevot({ power: 3 })));
   });
 });

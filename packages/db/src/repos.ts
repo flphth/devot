@@ -19,8 +19,8 @@ export class DevotRepo {
         godId: e.godId,
         isFounder: e.isFounder,
         name: e.name,
-        hp: e.hp,
-        hpMax: e.hpMax,
+        balance: e.balance,
+        capacity: e.capacity,
         cognitionProfile: e.profile,
         x: e.pos.x,
         y: e.pos.y,
@@ -36,12 +36,12 @@ export class DevotRepo {
       .run();
   }
 
-  /** Periodic snapshot of the hot state (positions, HP, age). */
+  /** Periodic snapshot of the hot state (positions, balance, age). */
   snapshot(e: DevotEntity): void {
     this.db
       .update(devots)
       .set({
-        hp: e.hp,
+        balance: e.balance,
         state: e.state,
         x: e.pos.x,
         y: e.pos.y,
@@ -62,7 +62,7 @@ export class DevotRepo {
   kill(devotId: string, cause: string): void {
     this.db
       .update(devots)
-      .set({ hp: 0, state: "dead", diedAt: Date.now() })
+      .set({ balance: 0, state: "dead", diedAt: Date.now() })
       .where(eq(devots.id, devotId))
       .run();
     this.db.delete(messages).where(eq(messages.devotId, devotId)).run();

@@ -7,7 +7,7 @@ import {
   DEVOT_SPEED,
   EAT_RADIUS,
   HUNGRY_THRESHOLD,
-  METABOLISM_HP_PER_TICK,
+  METABOLISM_PER_TICK,
   COMBAT_RESIDUE_FRACTION,
   PERCEPTION_RADIUS,
   THREAT_REALERT_MS,
@@ -30,7 +30,7 @@ export interface TickResult {
   triggers: Trigger[];
   /** `residue` is what the devot still held: it drops where it fell. */
   deaths: Array<{ devotId: string; cause: string; residue: number }>;
-  eaten: Array<{ devotId: string; foodId: string; hpValue: number }>;
+  eaten: Array<{ devotId: string; foodId: string; worth: number }>;
   combats: Array<{ attackerId: string; victimId: string; drained: number }>;
   /** Monsters brought down by devots. Their hoard has to go somewhere. */
   monsterDeaths: Array<{ monsterId: string; killerId: string; hoard: number; x: number; z: number }>;
@@ -78,11 +78,11 @@ export function tick(world: World, now: number = Date.now()): TickResult {
 
   // Existing costs more at night and through winter: this is what stops
   // standing still from being a dominant strategy.
-  const upkeep = METABOLISM_HP_PER_TICK * metabolismMultiplier(world.worldMs);
+  const upkeep = METABOLISM_PER_TICK * metabolismMultiplier(world.worldMs);
 
   for (const devot of world.aliveDevots()) {
     devot.age += 1;
-    devot.hp -= upkeep;
+    devot.balance -= upkeep;
 
     movementSystem(devot, world, dt);
     feedingSystem(devot, world, result);
@@ -167,7 +167,7 @@ function advance(devot: DevotEntity, ux: number, uz: number, step: number): void
   devot.pos.z += uz * s;
 }
 
-/** Vital predation: on contact, HP transfer from victim to attacker. */
+/** Vital predation: on contact, balance transfer from victim to attacker. */
 function combatSystem(
   devot: DevotEntity,
   world: World,
@@ -188,33 +188,33 @@ function combatSystem(
   // no further; what remains is the estate, and it drops on the ground when the
   // victim dies. Monsters have no estate to protect — draining one to nothing
   // is exactly how you get at its hoard.
-  const floor = monster ? 0 : victim.hpMax * COMBAT_RESIDUE_FRACTION;
-  const drained = Math.max(0, Math.min(drainOf(devot), victim.hp - floor));
-  victim.hp -= drained;
-  devot.hp = Math.min(devot.hpMax, devot.hp + drained * ATTACK_EFFICIENCY);
+  const floor = monster ? 0 : victim.capacity * COMBAT_RESIDUE_FRACTION;
+  const drained = Math.max(0, Math.min(drainOf(devot), victim.balance - floor));
+  victim.balance -= drained;
+  devot.balance = Math.min(devot.capacity, devot.balance + drained * ATTACK_EFFICIENCY);
   if (drained > 0) {
     result.combats.push({ attackerId: devot.id, victimId: victim.id, drained });
   }
 
   // Drained to the floor and still being struck: this is where it dies, and it
   // dies holding something.
-  if (!monster && victim.hp <= floor + 1e-6) {
+  if (!monster && victim.balance <= floor + 1e-6) {
     const prey = victim as DevotEntity;
     prey.state = "dead";
     devot.currentGoal = { kind: "wander" };
     result.deaths.push({
       devotId: prey.id,
       cause: `killed by ${devot.name}`,
-      residue: Math.max(0, Math.round(prey.hp)),
+      residue: Math.max(0, Math.round(prey.balance)),
     });
-    prey.hp = 0;
+    prey.balance = 0;
     return;
   }
 
   // Killing a monster is the one act in this world that pays: everything it
   // took from the devots it ate is released where it falls.
-  if (monster && monster.hp <= 0) {
-    monster.hp = 0;
+  if (monster && monster.balance <= 0) {
+    monster.balance = 0;
     monster.state = "dead";
     devot.currentGoal = { kind: "wander" };
     result.monsterDeaths.push({
@@ -240,7 +240,7 @@ function combatSystem(
     result.triggers.push({
       kind: "threat",
       devotId: prey.id,
-      eventText: `${devot.name} is attacking you and draining your life! You lose HP every moment of contact. They are at x=${devot.pos.x.toFixed(1)}, z=${devot.pos.z.toFixed(1)}.`,
+      eventText: `${devot.name} is attacking you and draining your life! You lose balance every moment of contact. They are at x=${devot.pos.x.toFixed(1)}, z=${devot.pos.z.toFixed(1)}.`,
       createdAt: now,
     });
   }
@@ -272,9 +272,9 @@ function feedingSystem(devot: DevotEntity, world: World, result: TickResult): vo
       break;
     }
     if (dist2(devot.pos, food.pos) <= EAT_RADIUS * EAT_RADIUS) {
-      devot.hp = Math.min(devot.hpMax, devot.hp + food.hpValue);
+      devot.balance = Math.min(devot.capacity, devot.balance + food.worth);
       world.food.delete(food.id);
-      result.eaten.push({ devotId: devot.id, foodId: food.id, hpValue: food.hpValue });
+      result.eaten.push({ devotId: devot.id, foodId: food.id, worth: food.worth });
       if (devot.currentGoal.kind === "seek_food" && devot.currentGoal.foodId === food.id) {
         devot.currentGoal = { kind: "wander" };
       }
@@ -285,11 +285,11 @@ function feedingSystem(devot: DevotEntity, world: World, result: TickResult): vo
 
 function hungerSystem(devot: DevotEntity, result: TickResult, now: number): void {
   // The dead do not get hungry. This runs before deathSystem and recomputes
-  // state from HP, so without the guard it quietly RESURRECTED a devot that
+  // state from balance, so without the guard it quietly RESURRECTED a devot that
   // combat had just killed — back to "dying", and then killed again a moment
   // later by deathSystem. The estate dropped twice.
   if (devot.state === "dead") return;
-  const ratio = devot.hp / devot.hpMax;
+  const ratio = devot.balance / devot.capacity;
   const prev = devot.state;
 
   if (ratio <= AGONIZING_THRESHOLD) devot.state = "dying";
@@ -324,8 +324,8 @@ function deathSystem(devot: DevotEntity, result: TickResult): void {
   // walking a list captured before the blow landed. Without this the victim is
   // reported dead twice — and its estate dropped twice with it.
   if (devot.state === "dead") return;
-  if (devot.hp <= 0) {
-    devot.hp = 0;
+  if (devot.balance <= 0) {
+    devot.balance = 0;
     devot.state = "dead";
     // Nothing left: it spent itself down to nothing, and leaves nothing.
     result.deaths.push({
@@ -485,14 +485,14 @@ export function describeSurroundings(
     const spoiling = left < 12_000 ? ", ROTTING — it will be gone in seconds" : "";
     if (f.type === "legacy") {
       // Worth saying plainly: this is not a meal. It will not feed the devot,
-      // and a mind told "food, 0 HP" would rightly ignore it.
+      // and a mind told "food, worth 0" would rightly ignore it.
       lines.push(
         `- a RELIC left by ${f.leftBy || "the dead"} (id "${f.id}"), holding ${Math.round(f.funds ?? 0)} in funds, ${d.toFixed(1)} away at x=${f.pos.x.toFixed(1)}, z=${f.pos.z.toFixed(1)}${spoiling}. It will NOT feed you — it goes to your god, who needs it to make more of you.`,
       );
       continue;
     }
     lines.push(
-      `- food (${f.type}, id "${f.id}"), worth ${Math.round(f.hpValue)} HP, ${d.toFixed(1)} away at x=${f.pos.x.toFixed(1)}, z=${f.pos.z.toFixed(1)}${spoiling}`,
+      `- food (${f.type}, id "${f.id}"), worth ${Math.round(f.worth)}, ${d.toFixed(1)} away at x=${f.pos.x.toFixed(1)}, z=${f.pos.z.toFixed(1)}${spoiling}`,
     );
   }
 
@@ -569,7 +569,7 @@ function reflexSystem(devot: DevotEntity, world: World): void {
 
   // Against a monster at any range the answer is the same: turn and fight. A
   // monster brought down is the richest thing in this world.
-  if (isMonster || devot.hp > attacker.hp) {
+  if (isMonster || devot.balance > attacker.balance) {
     devot.currentGoal = { kind: "attack", targetId: attackerId };
   } else {
     // Against another devot the instinct stays crude: strike back at something
@@ -596,15 +596,15 @@ function describeSelf(devot: DevotEntity, world: World): string {
   const lines: string[] = [];
 
   // Am I gaining or bleeding? The single most decision-changing fact about
-  // oneself, and one a snapshot of current HP cannot convey.
-  if (devot.hpAtLastThought !== undefined) {
-    const delta = Math.round(devot.hp - devot.hpAtLastThought);
+  // oneself, and one a snapshot of current balance cannot convey.
+  if (devot.balanceAtLastThought !== undefined) {
+    const delta = Math.round(devot.balance - devot.balanceAtLastThought);
     if (delta < -200) {
-      lines.push(`Since your last thought you have LOST ${-delta} HP. You are bleeding out.`);
+      lines.push(`Since your last thought you have LOST ${-delta} balance. You are bleeding out.`);
     } else if (delta > 200) {
-      lines.push(`Since your last thought you have gained ${delta} HP.`);
+      lines.push(`Since your last thought you have gained ${delta} balance.`);
     } else {
-      lines.push(`Since your last thought your life has barely moved (${delta >= 0 ? "+" : ""}${delta} HP).`);
+      lines.push(`Since your last thought your life has barely moved (${delta >= 0 ? "+" : ""}${delta} ).`);
     }
   }
 
@@ -654,10 +654,10 @@ export function applyDecision(devot: DevotEntity, decision: Decision, world: Wor
       // FORGING: the raw material is life. The cost is taken here, once, and
       // the item stays as long as the devot lives. Refusal is silent on the
       // simulation side; it is the room that tells the devot why.
-      const refusal = canCraft(decision.item, devot.hp, devot.items);
+      const refusal = canCraft(decision.item, devot.balance, devot.items);
       if (refusal) return;
       const recipe = recipeOf(decision.item)!;
-      devot.hp -= recipe.cost;
+      devot.balance -= recipe.cost;
       devot.items = [...devot.items, recipe.kind];
       devot.currentGoal = { kind: "idle" };
       break;

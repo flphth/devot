@@ -39,7 +39,7 @@ async function ask(body: Record<string, unknown>) {
   return { data, chatID: res.headers.get("ZG-Res-Key") ?? data.id };
 }
 
-const event = 'You see food (grain, id "food-7") nearby at x=3.0, z=1.5. You have 40% HP left. Decide.';
+const event = 'You see food (grain, id "food-7") nearby at x=3.0, z=1.5. You have 40% balance left. Decide.';
 
 // The question that decides whether MIND=0g is possible at all.
 const strict = await ask({

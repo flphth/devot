@@ -2,7 +2,7 @@
  * P0 — Mortal core (headless demo, no 3D).
  *
  * Proves the central mechanic: one devot, a 250 ms tick, structured inferences,
- * HP falling with real usage, death + destruction of the context.
+ * balance falling with real usage, death + destruction of the context.
  *
  * Mind backend (see .env.example): Claude Code subscription (default), Messages
  * API (MIND=api + key), or simulated (MIND=mock / --mock).
@@ -17,7 +17,7 @@ import { applyDecision, perceptionSystem, tick, World } from "@devot/sim";
 if (process.argv.includes("--mock")) process.env.MIND = "mock";
 const DB_PATH = new URL("../p0.sqlite", import.meta.url).pathname;
 const MAX_RUN_MS = 90_000;
-// hp_max lowered for the demo: ~4-5 thoughts before death.
+// capacity lowered for the demo: ~4-5 thoughts before death.
 const DEMO_HP_MAX = 6_000;
 
 function log(msg: string): void {
@@ -44,8 +44,8 @@ async function main(): Promise<void> {
     wallet: "",
     name: "Adam",
     pos: { x: 0, y: 0, z: 0 },
-    hp: DEMO_HP_MAX,
-    hpMax: DEMO_HP_MAX,
+    balance: DEMO_HP_MAX,
+    capacity: DEMO_HP_MAX,
     state: "alive",
     profile: "frugal",
     traits: ["curious", "sparing with their thoughts"],
@@ -59,7 +59,7 @@ async function main(): Promise<void> {
   world.devots.set(founder.id, founder);
   repos.devots.insertFromEntity(founder);
   repos.events.record("birth", [founder.id], { founder: true });
-  log(`Birth of ${founder.name} (${founder.hp} HP = $${(founder.hp / 1e6).toFixed(4)} of thinking)`);
+  log(`Birth of ${founder.name} (${founder.balance} balance = $${(founder.balance / 1e6).toFixed(4)} of thinking)`);
 
   // 2. The mind: Claude Code subscription (default), API (key), or mock.
   const { kind, mind } = createMind();
@@ -85,14 +85,14 @@ async function main(): Promise<void> {
         memory: repos.messages,
       };
     },
-    ({ devotId, decision, hpLoss }) => {
+    ({ devotId, decision, spent }) => {
       const d = world.devots.get(devotId);
       if (!d) return;
       applyDecision(d, decision, world);
       log(
         `${d.name} thought → ${decision.action}` +
           (decision.utterance ? ` "${decision.utterance}"` : "") +
-          ` | cost ${hpLoss.toFixed(0)} HP | ${Math.max(0, d.hp).toFixed(0)}/${d.hpMax} HP left`,
+          ` | cost ${spent.toFixed(0)} balance | ${Math.max(0, d.balance).toFixed(0)}/${d.capacity} balance left`,
       );
       if (decision.utterance) d.utterance = decision.utterance;
     },
@@ -109,7 +109,7 @@ async function main(): Promise<void> {
         z: (Math.random() - 0.5) * 30,
       },
       type: "grain",
-      hpValue: 800,
+      worth: 800,
       source: "spawn",
       spawnedAt: Date.now(),
       ttlMs: FOOD_TTL_MS.grain!,
@@ -127,10 +127,10 @@ async function main(): Promise<void> {
       tickCount++;
       const result = tick(world);
 
-      for (const { devotId, foodId, hpValue } of result.eaten) {
+      for (const { devotId, foodId, worth } of result.eaten) {
         const d = world.devots.get(devotId);
-        log(`${d?.name ?? devotId} eats ${foodId} (+${hpValue} HP -> ${d?.hp.toFixed(0)})`);
-        repos.events.record("meal", [devotId], { foodId, hpValue });
+        log(`${d?.name ?? devotId} eats ${foodId} (+${worth} balance -> ${d?.balance.toFixed(0)})`);
+        repos.events.record("meal", [devotId], { foodId, worth });
       }
 
       for (const t of [...result.triggers, ...perceptionSystem(world)]) {

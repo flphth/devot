@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  MONSTER_HP_MAX,
-  MONSTER_METABOLISM_HP_PER_TICK,
+  MONSTER_CAPACITY,
+  MONSTER_METABOLISM_PER_TICK,
   defaultIdentity,
   encodeIdentity,
   type DevotEntity,
@@ -25,8 +25,8 @@ function makeDevot(over: Partial<DevotEntity> = {}): DevotEntity {
     wallet: "",
     name: `Devot${seq}`,
     pos: { x: 0, y: 0, z: 0 },
-    hp: 100_000,
-    hpMax: 150_000,
+    balance: 100_000,
+    capacity: 150_000,
     state: "alive",
     profile: "frugal",
     traits: [],
@@ -50,7 +50,7 @@ describe("a monster hunts", () => {
     for (let i = 0; i < 40; i++) monsterSystem(world);
 
     expect(monster.targetId).toBe(prey.id);
-    expect(prey.hp, "the prey has been bled").toBeLessThan(100_000);
+    expect(prey.balance, "the prey has been bled").toBeLessThan(100_000);
     expect(monster.hoard, "and the hoard has grown").toBeGreaterThan(0);
   });
 
@@ -73,7 +73,7 @@ describe("a monster hunts", () => {
     const monster = spawnMonster(world, 0, 0);
     monsterSystem(world);
     expect(monster.targetId).toBeUndefined();
-    expect(far.hp).toBe(100_000);
+    expect(far.balance).toBe(100_000);
   });
 });
 
@@ -83,7 +83,7 @@ describe("a monster is not free to exist", () => {
     // that ends up holding everything anyone ever put in.
     const world = new World();
     const monster = spawnMonster(world, 0, 0);
-    const ticks = Math.ceil(MONSTER_HP_MAX / MONSTER_METABOLISM_HP_PER_TICK);
+    const ticks = Math.ceil(MONSTER_CAPACITY / MONSTER_METABOLISM_PER_TICK);
 
     let death;
     for (let i = 0; i <= ticks; i++) {
@@ -98,7 +98,7 @@ describe("a monster is not free to exist", () => {
     const world = new World();
     const monster = spawnMonster(world, 3, 4);
     monster.hoard = 12_345;
-    monster.hp = MONSTER_METABOLISM_HP_PER_TICK;
+    monster.balance = MONSTER_METABOLISM_PER_TICK;
 
     const death = monsterSystem(world).deaths[0];
     expect(death).toMatchObject({ hoard: 12_345, x: 3, z: 4 });
@@ -112,7 +112,7 @@ describe("a devot can fight back", () => {
     world.devots.set(hero.id, hero);
     const monster = spawnMonster(world, 0.5, 0);
     monster.hoard = 9_000;
-    monster.hp = 1; // one blow away
+    monster.balance = 1; // one blow away
 
     applyDecision(hero, { action: "attack", targetId: monster.id }, world);
     expect(hero.currentGoal, "the goal really points at the monster").toEqual({

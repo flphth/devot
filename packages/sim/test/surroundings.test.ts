@@ -18,8 +18,8 @@ function makeDevot(over: Partial<DevotEntity> = {}): DevotEntity {
     wallet: "",
     name: `Devot${seq}`,
     pos: { x: 0, y: 0, z: 0 },
-    hp: 100_000,
-    hpMax: 150_000,
+    balance: 100_000,
+    capacity: 150_000,
     state: "alive",
     profile: "frugal",
     traits: [],
@@ -94,7 +94,7 @@ describe("describeSurroundings — the boundary of what a mind may know", () => 
       id: "f1",
       pos: { x: 2, y: 0, z: 0 },
       type: "grain",
-      hpValue: 800,
+      worth: 800,
       source: "spawn",
       spawnedAt: Date.now(),
       ttlMs: 10 * 60_000,
@@ -115,7 +115,7 @@ describe("describeSurroundings — the boundary of what a mind may know", () => 
 
   it("keeps the self block bounded too — it rides in every single prompt", () => {
     const me = makeDevot();
-    me.hpAtLastThought = me.hp + 5000;
+    me.balanceAtLastThought = me.balance + 5000;
     me.attackedBy = ["a", "b", "c", "d"];
     const text = describeSurroundings(me, worldWith(me));
     expect(text.split("\n").filter((l) => l.startsWith("· ")).length).toBeLessThanOrEqual(4);

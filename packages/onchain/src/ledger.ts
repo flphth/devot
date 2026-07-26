@@ -1,7 +1,7 @@
 /**
  * THE LIFE DEPOSIT, SETTLED IN BATCHES.
  *
- * A devot's HP are its life and its thinking budget at once, and they move
+ * A devot's balance are its life and its thinking budget at once, and they move
  * several times a second: metabolism, a bite of food, a blow taken, the cost of
  * a thought. Settling each of those on a chain would put a network round-trip
  * inside the tick and make the simulation depend on an RPC to stay alive.
@@ -17,7 +17,7 @@
 export interface LifeMovement {
   devotId: string;
   address: string;
-  /** Net HP change since the last settlement. Negative is life spent. */
+  /** Net balance change since the last settlement. Negative is life spent. */
   delta: number;
   /** Where its balance stands after this batch. */
   balance: number;
@@ -63,16 +63,16 @@ export class LifeLedger {
   ) {}
 
   /** Notes where a devot's life stands. Cheap enough to call every tick. */
-  record(devotId: string, address: string, hp: number): void {
+  record(devotId: string, address: string, balance: number): void {
     const previous = this.pending.get(devotId);
     if (!previous) {
       // First sighting in this batch: its delta is measured from here, not
       // from zero, or the opening balance would look like a deposit.
-      this.pending.set(devotId, { address, delta: 0, balance: hp });
+      this.pending.set(devotId, { address, delta: 0, balance: balance });
       return;
     }
-    previous.delta += hp - previous.balance;
-    previous.balance = hp;
+    previous.delta += balance - previous.balance;
+    previous.balance = balance;
   }
 
   /**

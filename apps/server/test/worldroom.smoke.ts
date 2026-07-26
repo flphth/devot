@@ -58,7 +58,7 @@ async function main(): Promise<void> {
   const devotId: string = [...state().devots.keys()][0] as string;
   const devot = state().devots.get(devotId);
   check("le fondateur appartient au dieu", devot.godId === godId);
-  check("the founder is alive with HP", devot.hp > 0 && devot.state !== "dead");
+  check("the founder is alive with a balance", devot.balance > 0 && devot.state !== "dead");
 
   // 2. A second founder is refused while the first one lives
   room.send("createFounder", { traits: ["cautious", "pious"] });

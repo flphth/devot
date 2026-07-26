@@ -13,8 +13,8 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     generation: 1,
     wallet: "",
     name: `D${seq}`,
-    hp: 20_000,
-    hpMax: 60_000,
+    balance: 20_000,
+    capacity: 60_000,
     state: "alive",
     profile: "frugal",
     traits: [],
@@ -34,7 +34,7 @@ function relic(id: string, x: number, z: number, funds = 21_000): FoodEntity {
     id,
     pos: { x, y: terrainHeight(x, z), z },
     type: "legacy",
-    hpValue: 0,
+    worth: 0,
     source: "spawn",
     spawnedAt: Date.now(),
     ttlMs: 180_000,
@@ -48,7 +48,7 @@ function grain(id: string, x: number, z: number): FoodEntity {
     id,
     pos: { x, y: terrainHeight(x, z), z },
     type: "grain",
-    hpValue: 2_000,
+    worth: 2_000,
     source: "spawn",
     spawnedAt: Date.now(),
     ttlMs: 600_000,
@@ -97,11 +97,11 @@ describe("a relic is funds, not food", () => {
 
   it("is claimed on contact, and reports the funds rather than feeding", () => {
     const world = new World();
-    const devot = makeDevot({ hp: 20_000, pos: { x: 0, y: 0, z: 0 } });
+    const devot = makeDevot({ balance: 20_000, pos: { x: 0, y: 0, z: 0 } });
     world.devots.set(devot.id, devot);
     world.food.set("r1", relic("r1", 0.1, 0, 21_000));
 
-    const before = devot.hp;
+    const before = devot.balance;
     const result = tick(world);
 
     expect(result.claimed).toHaveLength(1);
@@ -109,7 +109,7 @@ describe("a relic is funds, not food", () => {
     expect(result.claimed[0]!.godId).toBe("g1");
     expect(result.eaten).toHaveLength(0);
     // It gained nothing to live on: the funds go to its god, not its body.
-    expect(devot.hp).toBeLessThan(before);
+    expect(devot.balance).toBeLessThan(before);
     expect(world.food.has("r1")).toBe(false);
   });
 
