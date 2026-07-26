@@ -63,9 +63,9 @@ const EN: Dict = {
   "combat.total": "{n} changed hands before your eyes.",
   "combat.stranger": "a stranger",
 
-  "creation.title": "Shape your founder",
+  "creation.title": "Create your Devot",
   "creation.subtitle":
-    "⚡ {god} — the first of your line. Everything you choose here follows them to the grave, and passes on to their descendants.",
+    "⚡ {god} — everything you choose here follows them to the grave, and passes on to their descendants.",
   "creation.soul": "Their soul",
   "creation.believe": "What they believe they are",
   "creation.soul-placeholder": '"I was born to protect my own"',
@@ -141,9 +141,9 @@ const FR: Dict = {
   "combat.total": "{n} a changé de mains sous tes yeux.",
   "combat.stranger": "un inconnu",
 
-  "creation.title": "Façonne ton fondateur",
+  "creation.title": "Crée ton Devot",
   "creation.subtitle":
-    "⚡ {god} — le premier de ta lignée. Tout ce que tu choisis ici le suivra jusqu'à la tombe, et passera à ses descendants.",
+    "⚡ {god} — tout ce que tu choisis ici le suivra jusqu'à la tombe, et passera à ses descendants.",
   "creation.soul": "Son âme",
   "creation.believe": "Ce qu'il croit être",
   "creation.soul-placeholder": '"Je suis né pour protéger les miens"',

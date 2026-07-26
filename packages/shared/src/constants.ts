@@ -175,6 +175,25 @@ export const BODY_RADIUS_MONSTER = 0.6;
 export const ATTACK_DRAIN_PER_TICK = 1200;
 export const ATTACK_EFFICIENCY = 0.7;
 /**
+ * WHAT A SECOND PAIR OF HANDS IS WORTH AGAINST A BEAST.
+ *
+ * A monster faces one thing at a time. Everyone else is behind it, striking a
+ * flank that cannot turn — so a pack does more than add its damage together,
+ * and ganging up becomes a real tactic rather than arithmetic.
+ *
+ * Only ever against monsters. Applied between devots it would make murder a
+ * mob sport and end every line the moment two rivals agreed on a target.
+ *
+ * Measured, not guessed, and the honest reading is that it saturates: two
+ * devots take a healthy beast in 7.8 s with no bonus, 7.0 s at 0.5, and 6.8 s
+ * at 1.0. Most of a fight is spent closing the distance, not exchanging blows,
+ * so the approach bounds what any damage bonus can buy. 0.5 is the value that
+ * still changes something before that ceiling.
+ */
+export const PACK_BONUS_PER_ALLY = 0.5;
+/** Beyond this many allies the beast is simply swamped; more changes nothing. */
+export const PACK_BONUS_MAX_ALLIES = 3;
+/**
  * How long before a victim still under attack is told again. Without this an
  * alert raised while the devot was already thinking was dropped by the queue
  * and never came back.

@@ -19,6 +19,8 @@ import {
   HUNGRY_THRESHOLD,
   METABOLISM_PER_TICK,
   COMBAT_RESIDUE_FRACTION,
+  PACK_BONUS_MAX_ALLIES,
+  PACK_BONUS_PER_ALLY,
   PERCEPTION_RADIUS,
   THREAT_REALERT_MS,
   hasLineOfSight,
@@ -183,6 +185,19 @@ export function tick(world: World, now: number = Date.now()): TickResult {
 
   decaySystem(world, result, now);
 
+  // WHO IS ON WHICH BEAST. Counted once, before any blow lands, so every
+  // attacker in a pack gets the same bonus — computed inside the loop, the
+  // devot that happened to be first in the map would fight alone and the last
+  // would fight with everyone.
+  const besetBy = new Map<string, number>();
+  for (const devot of world.aliveDevots()) {
+    if (devot.currentGoal.kind !== "attack") continue;
+    const beast = world.monsters.get(devot.currentGoal.targetId);
+    if (!beast || beast.state === "dead") continue;
+    if (dist2(devot.pos, beast.pos) > ATTACK_RADIUS * ATTACK_RADIUS) continue;
+    besetBy.set(beast.id, (besetBy.get(beast.id) ?? 0) + 1);
+  }
+
   // Existing costs more at night and through winter: this is what stops
   // standing still from being a dominant strategy.
   const upkeep = METABOLISM_PER_TICK * metabolismMultiplier(world.worldMs);
@@ -193,7 +208,7 @@ export function tick(world: World, now: number = Date.now()): TickResult {
 
     movementSystem(devot, world, dt);
     feedingSystem(devot, world, result);
-    combatSystem(devot, world, result, now);
+    combatSystem(devot, world, result, now, besetBy);
     hungerSystem(devot, world, result, now);
     deathSystem(devot, world, result, now);
   }
@@ -283,6 +298,7 @@ function combatSystem(
   world: World,
   result: TickResult,
   now: number,
+  besetBy: Map<string, number>,
 ): void {
   if (devot.currentGoal.kind !== "attack") return;
   const targetId = devot.currentGoal.targetId;
@@ -299,7 +315,11 @@ function combatSystem(
   // victim dies. Monsters have no estate to protect — draining one to nothing
   // is exactly how you get at its hoard.
   const floor = monster ? 0 : victim.capacity * COMBAT_RESIDUE_FRACTION;
-  const drained = Math.max(0, Math.min(drainOf(devot), victim.balance - floor));
+  // A beast can only face one of them. Everyone else is on a flank it cannot
+  // turn to, so a pack cuts it down faster than its numbers alone would say.
+  const allies = monster ? Math.min((besetBy.get(monster.id) ?? 1) - 1, PACK_BONUS_MAX_ALLIES) : 0;
+  const pack = 1 + Math.max(0, allies) * PACK_BONUS_PER_ALLY;
+  const drained = Math.max(0, Math.min(drainOf(devot) * pack, victim.balance - floor));
   victim.balance -= drained;
   devot.balance = Math.min(devot.capacity, devot.balance + drained * ATTACK_EFFICIENCY);
   if (drained > 0) {

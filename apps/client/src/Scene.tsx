@@ -274,6 +274,20 @@ function Sky({ worldMs }: { worldMs: number }) {
 
 // ── Rocks and flowers ───────────────────────────────────────────────────────
 
+/**
+ * WHERE WORLD LABELS SIT IN THE STACK.
+ *
+ * drei's <Html> defaults to a zIndexRange of [16777271, 0] — sixteen million,
+ * above every overlay this app has. Speech bubbles and monster names were
+ * therefore drawn ON TOP of the character creation screen and the language
+ * picker. A label attached to a thing in the world belongs under the
+ * interface, always, so the range is capped well below both.
+ *
+ * The order, for whoever adds the next panel: world labels 0-20, creation
+ * screen 50, language picker 60.
+ */
+const WORLD_LABEL_Z: [number, number] = [20, 0];
+
 const ROCK_LIT = new THREE.Color("#8d8f96");
 const ROCK_DARK = new THREE.Color("#2b3033");
 const FLOWER_LIT = ["#e8657f", "#f0d24c", "#c98ce8", "#f2f2f2"].map((c) => new THREE.Color(c));
@@ -383,6 +397,8 @@ function VoxelDevot({
   const limbs = useRef<Limbs>({ legL: null, legR: null, armL: null, armR: null });
   /** Phase of the walk cycle, advanced by DISTANCE covered rather than by time. */
   const stride = useRef(0);
+  /** How much of a walk is showing, 0 → 1. Eased, never switched. */
+  const gait = useRef(0);
   const dead = devot.state === "dead";
 
   target.current.set(devot.x, devot.y, devot.z);
@@ -399,9 +415,20 @@ function VoxelDevot({
     const speed = delta.length() / Math.max(dt, 1e-4);
     const moving = speed > 0.15 && !dead;
 
-    // Turn toward the direction of travel (damped).
-    if (moving) {
-      const desired = Math.atan2(delta.x, delta.z);
+    // WHICH WAY IT IS FACING.
+    //
+    // Turning used to be gated on the same threshold as the walk, so a body
+    // creeping uphill or easing into its last step kept the heading it had and
+    // slid sideways. Facing follows movement far sooner than the legs do — and
+    // a body in the middle of a blow faces what it is hitting, whatever it was
+    // walking towards a moment ago.
+    let desired: number | undefined;
+    if (lunge > 0 && strikeAt && !dead) {
+      desired = Math.atan2(strikeAt.x - g.position.x, strikeAt.z - g.position.z);
+    } else if (speed > 0.04 && !dead) {
+      desired = Math.atan2(delta.x, delta.z);
+    }
+    if (desired !== undefined) {
       let diff = desired - heading.current;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
@@ -417,7 +444,7 @@ function VoxelDevot({
       return;
     }
     // Walking: bob + sway. Hunger: trembling. Thinking: pulsing.
-    const bob = moving ? Math.abs(Math.sin(t * 9)) * 0.07 : 0;
+    const bob = Math.abs(Math.sin(stride.current)) * 0.07 * gait.current;
     const tremble =
       devot.state === "dying"
         ? Math.sin(t * 40) * 0.02
@@ -450,24 +477,41 @@ function VoxelDevot({
     b.position.x = tremble + lungeX + recoil;
     b.position.z = lungeZ;
     b.rotation.x = pitch;
-    b.rotation.z = (moving ? Math.sin(t * 9) * 0.06 : 0) + (struck ? 0.12 : 0);
+    b.rotation.z = Math.sin(stride.current) * 0.06 * gait.current + (struck ? 0.12 : 0);
     const pulse = devot.thinking ? 1 + Math.sin(t * 6) * 0.05 : 1;
     b.scale.setScalar(pulse);
 
     // THE WALK.
     //
-    // Advanced by the distance actually covered, not by the clock: a body that
-    // stops must stop walking, and one held up by a hill must slow down with it.
-    // Driving this off elapsed time gives a corpse that keeps marching on the
-    // spot, which is worse than no animation at all.
+    // The phase advances with the DISTANCE covered, never with the clock: a
+    // body that stops must stop walking, and one labouring up a hill must slow
+    // down with it. Driven off elapsed time you get a corpse marching on the
+    // spot, which reads worse than no animation at all.
+    //
+    // The AMPLITUDE is eased rather than switched. It used to be
+    // `moving ? swing : 0`, which snapped every limb to attention the instant a
+    // body stopped — and cut the walk out entirely below 0.15 u/s, so anything
+    // climbing or easing into its last step strobed between walking and frozen.
     stride.current += speed * dt * 4.2;
-    const swing = moving ? Math.sin(stride.current) * 0.55 : 0;
+    const wanted = Math.min(1, speed / 1.1);
+    gait.current += (wanted - gait.current) * Math.min(1, dt * 9);
+
+    const swing = Math.sin(stride.current) * 0.6 * gait.current;
     const l = limbs.current;
-    // Arms swing against the legs, which is what makes a walk read as a walk.
+    // Arms swing against the legs. That opposition is most of what makes a walk
+    // read as a walk rather than as a hop.
     if (l.legL) l.legL.rotation.x = swing;
     if (l.legR) l.legR.rotation.x = -swing;
     if (l.armL) l.armL.rotation.x = -swing * 0.7;
     if (l.armR) l.armR.rotation.x = swing * 0.7;
+    // The shoulders turn against the stride: a body that only swings its limbs
+    // looks like a puppet on rails.
+    b.rotation.y = -swing * 0.18;
+
+    // Standing still is not being switched off. A body at rest breathes, which
+    // is the difference between paused and alive.
+    const idle = 1 - gait.current;
+    b.position.y += idle * Math.sin(t * 1.7) * 0.012;
   });
 
   // Appearance comes from the identity frozen at birth; a devot from before
@@ -546,7 +590,13 @@ function VoxelDevot({
       )}
 
       {bubble ? (
-        <Html position={[0, 1.8, 0]} center distanceFactor={18} style={{ pointerEvents: "none" }}>
+        <Html
+          position={[0, 1.8, 0]}
+          center
+          distanceFactor={18}
+          zIndexRange={WORLD_LABEL_Z}
+          style={{ pointerEvents: "none" }}
+        >
           <div
             style={{
               background: "rgba(255,255,255,0.92)",
@@ -563,7 +613,13 @@ function VoxelDevot({
           </div>
         </Html>
       ) : innerVoice ? (
-        <Html position={[0, 1.8, 0]} center distanceFactor={18} style={{ pointerEvents: "none" }}>
+        <Html
+          position={[0, 1.8, 0]}
+          center
+          distanceFactor={18}
+          zIndexRange={WORLD_LABEL_Z}
+          style={{ pointerEvents: "none" }}
+        >
           <div
             style={{
               background: "rgba(28,32,40,0.75)",
@@ -749,6 +805,8 @@ function MonsterMesh({
   const jaw = useRef<THREE.Group>(null);
   const tail = useRef<THREE.Group>(null);
   const legs = useRef<Array<THREE.Group | null>>([null, null, null, null]);
+  /** How much of a gait is showing, 0 → 1. Eased, never switched. */
+  const gait = useRef(0);
   const ground = terrainHeight(monster.x, monster.z);
   const target = useRef(new THREE.Vector3(monster.x, ground, monster.z));
   const heading = useRef(0);
@@ -766,11 +824,13 @@ function MonsterMesh({
     const speed = delta.length() / Math.max(dt, 1e-4);
     const moving = speed > 0.15;
 
-    // Face where it is going — and, while biting, what it is biting.
+    // Face where it is going — and, while biting, what it is biting. The
+    // threshold here is far below the one the legs use, so a beast creeping up
+    // on something still turns to meet it instead of sliding in sideways.
     let desired: number | undefined;
     if (lunge > 0 && strikeAt) {
       desired = Math.atan2(strikeAt.x - g.position.x, strikeAt.z - g.position.z);
-    } else if (moving) {
+    } else if (speed > 0.04) {
       desired = Math.atan2(delta.x, delta.z);
     }
     if (desired !== undefined) {
@@ -783,10 +843,15 @@ function MonsterMesh({
 
     const t = clock.elapsedTime;
 
-    // The gait, advanced by ground covered rather than by the clock, so a beast
-    // that stops stops walking instead of marching on the spot.
+    // The gait: phase by ground covered, amplitude eased. A hard
+    // `moving ? swing : 0` snapped all four legs straight the instant it
+    // stopped, and switched off entirely below the threshold — so a beast
+    // stalking slowly had no legs at all.
     stride.current += speed * dt * 3.4;
-    const swing = moving ? Math.sin(stride.current) * 0.6 : 0;
+    const wanted = Math.min(1, speed / 1.3);
+    gait.current += (wanted - gait.current) * Math.min(1, dt * 9);
+
+    const swing = Math.sin(stride.current) * 0.65 * gait.current;
     // Diagonal pairs, the way four-legged things actually move: front-left with
     // back-right. In phase, it hops like a toy.
     const [fl, fr, bl, br] = legs.current;
@@ -794,13 +859,21 @@ function MonsterMesh({
     if (br) br.rotation.x = swing;
     if (fr) fr.rotation.x = -swing;
     if (bl) bl.rotation.x = -swing;
+    // The spine rolls with the diagonal, which is what stops four swinging
+    // boxes from reading as a table sliding along the floor.
+    b.rotation.z = swing * 0.08;
 
     // It lunges into the bite and drops back, like a devot does — the whole
     // point of reusing strikingAt/lungeProgress rather than inventing a second
     // system. Since the body is already turned to face its prey, the throw is
     // straight down local +Z.
     b.position.z = lunge * 0.5;
-    b.position.y = (moving ? Math.abs(Math.sin(stride.current)) * 0.05 : 0) - lunge * 0.08;
+    b.position.y =
+      Math.abs(Math.sin(stride.current)) * 0.05 * gait.current -
+      lunge * 0.08 +
+      // At rest it breathes, low and slow. A predator standing perfectly still
+      // reads as a prop rather than as something waiting.
+      (1 - gait.current) * Math.sin(t * 1.1) * 0.02;
     b.rotation.x = -lunge * 0.3;
 
     // The head leads: down and forward while hunting, thrown further on a bite.
@@ -942,7 +1015,7 @@ function MonsterMesh({
       </group>
 
       <Billboard position={[0, 1.5 * bulk, 0]}>
-        <Html center distanceFactor={16} style={{ pointerEvents: "none" }}>
+        <Html center distanceFactor={16} zIndexRange={WORLD_LABEL_Z} style={{ pointerEvents: "none" }}>
           <div
             style={{
               font: "700 11px system-ui, sans-serif",

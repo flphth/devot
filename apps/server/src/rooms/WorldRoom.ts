@@ -1302,16 +1302,29 @@ export class WorldRoom extends Room<WorldState> {
    */
   private dropCarrion(x: number, z: number, hoard: number): void {
     if (hoard < 1) return;
-    const food: FoodEntity = {
-      id: `food-carrion-${this.foodSeq++}`,
+    // A HOARD IS NOT A MEAL, AND DROPPING IT AS ONE DESTROYED IT.
+    //
+    // This used to be carrion — food — and food is eaten with
+    // `min(capacity, balance + worth)`. A beast carrying 138,000 taken from the
+    // devots it had eaten, brought down by a devot sitting at 45,000 of a
+    // 60,000 pool, paid out 15,000 and burned the other 123,000. "Killing a
+    // monster is the one act that pays" quietly did not pay.
+    //
+    // It is a relic instead: the life it stole from others, given back whole.
+    // Relics are claimed without a ceiling, which is exactly the point — the
+    // reward for bringing down a fat beast should be able to exceed a life.
+    const relic: FoodEntity = {
+      id: `hoard-${this.foodSeq++}`,
       pos: placeOnGround(x, z),
-      type: "carrion",
-      worth: Math.round(hoard),
+      type: "legacy",
+      worth: 0,
       source: "spawn",
       spawnedAt: Date.now(),
       ttlMs: rotsIn("carrion"),
+      funds: Math.round(hoard),
+      leftBy: "a slain beast",
     };
-    this.world.food.set(food.id, food);
+    this.world.food.set(relic.id, relic);
   }
 
   /** Copies the hot state (sim) into the synchronised state (schema). */

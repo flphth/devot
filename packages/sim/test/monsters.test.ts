@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  ATTACK_DRAIN_PER_TICK,
   CAPACITY_DEFAULT,
+  METABOLISM_PER_TICK,
   MONSTER_CAPACITY,
   MONSTER_MAX,
   TICK_MS,
@@ -275,5 +277,69 @@ describe("a monster is worth fighting, and worth fearing", () => {
       expect(r.seconds).toBeLessThan(20);
       expect(r.seconds).toBeGreaterThan(3); // nor an instant, invisible blink
     }
+  });
+});
+
+describe("a pack cuts a beast down faster than its numbers alone", () => {
+  it("hits harder per devot when several are on the same monster", () => {
+    // A monster faces one thing at a time; the rest are on a flank it cannot
+    // turn to. Measured as damage in a single tick, which is the only place the
+    // bonus lives — the length of a whole fight is dominated by the approach.
+    const solo = new World(30);
+    const alone = makeDevot({
+      pos: { x: 0.6, y: 0, z: 0 },
+      balance: CAPACITY_DEFAULT, bornWith: CAPACITY_DEFAULT, capacity: CAPACITY_DEFAULT,
+    });
+    solo.devots.set(alone.id, alone);
+    const beastA = spawnMonster(solo, 0, 0);
+    applyDecision(alone, { action: "attack", targetId: beastA.id }, solo);
+    const before = beastA.balance;
+    tick(solo);
+    const dealtAlone = before - beastA.balance;
+
+    const pack = new World(30);
+    const pair = [0.6, 0.75].map((x) => {
+      const d = makeDevot({
+        pos: { x, y: 0, z: 0 },
+        balance: CAPACITY_DEFAULT, bornWith: CAPACITY_DEFAULT, capacity: CAPACITY_DEFAULT,
+      });
+      pack.devots.set(d.id, d);
+      return d;
+    });
+    const beastB = spawnMonster(pack, 0, 0);
+    for (const d of pair) applyDecision(d, { action: "attack", targetId: beastB.id }, pack);
+    const before2 = beastB.balance;
+    tick(pack);
+    const dealtPair = before2 - beastB.balance;
+
+    // More than twice as much, which is the whole point: not merely additive.
+    expect(dealtPair).toBeGreaterThan(dealtAlone * 2);
+  });
+
+  it("gives no such bonus between devots", () => {
+    // Applied to devot duels it would make murder a mob sport and end a line
+    // the moment two rivals agreed on a target.
+    const world = new World(30);
+    const victim = makeDevot({
+      pos: { x: 0, y: 0, z: 0 },
+      balance: CAPACITY_DEFAULT, bornWith: CAPACITY_DEFAULT, capacity: CAPACITY_DEFAULT,
+    });
+    world.devots.set(victim.id, victim);
+    const mob = [0.5, 0.7].map((x) => {
+      const d = makeDevot({
+        pos: { x, y: 0, z: 0 },
+        balance: CAPACITY_DEFAULT, bornWith: CAPACITY_DEFAULT, capacity: CAPACITY_DEFAULT,
+      });
+      world.devots.set(d.id, d);
+      applyDecision(d, { action: "attack", targetId: victim.id }, world);
+      return d;
+    });
+    expect(mob).toHaveLength(2);
+
+    const before = victim.balance;
+    const drained = tick(world).combats.reduce((n, c) => n + c.drained, 0);
+    expect(drained).toBeCloseTo(before - victim.balance - METABOLISM_PER_TICK, 3);
+    // Exactly two plain bites, no flanking bonus.
+    expect(drained).toBeCloseTo(ATTACK_DRAIN_PER_TICK * 2, 3);
   });
 });
