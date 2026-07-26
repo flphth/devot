@@ -22,7 +22,12 @@ import type {
   SmiteFx,
   WorldSnapshot,
 } from "./useWorld.js";
-import { CombatEffects, recentlyBitten } from "./CombatFx.js";
+import {
+  CombatEffects,
+  lungeProgress,
+  recentlyBitten,
+  strikingAt,
+} from "./CombatFx.js";
 import { DevotModel } from "./creation/DevotModel.js";
 
 const GROUND_SIZE = 120;
@@ -356,6 +361,8 @@ function VoxelDevot({
   color,
   selected,
   bitten,
+  strikeAt,
+  lunge,
   onSelect,
 }: {
   devot: DevotView;
@@ -363,6 +370,10 @@ function VoxelDevot({
   selected: boolean;
   /** Just bitten: the body flags it — a dropping bar is not enough. */
   bitten: boolean;
+  /** Where this devot is striking, if it is. Drives the lunge. */
+  strikeAt?: { x: number; z: number };
+  /** How far through that lunge, 0 → 1 → 0. */
+  lunge: number;
   onSelect: (id: string) => void;
 }) {
   const group = useRef<THREE.Group>(null);
@@ -410,9 +421,33 @@ function VoxelDevot({
         : devot.state === "starving"
           ? Math.sin(t * 25) * 0.01
           : 0;
-    b.position.y = bob;
-    b.position.x = tremble;
-    b.rotation.z = moving ? Math.sin(t * 9) * 0.06 : 0;
+
+    // THE FIGHT ITSELF. Two bodies used to stand perfectly still while one
+    // emptied the other, with nothing but a beam between them to say so.
+    // A striker throws itself at what it is hitting; a body that has just been
+    // hit is knocked back off it. Both read instantly, from any camera angle.
+    let lungeX = 0;
+    let lungeZ = 0;
+    let pitch = 0;
+    if (lunge > 0 && strikeAt) {
+      const dx = strikeAt.x - g.position.x;
+      const dz = strikeAt.z - g.position.z;
+      const len = Math.hypot(dx, dz) || 1;
+      // In LOCAL space: the group is already turned to face its heading, so a
+      // world-space offset here would send the body sideways.
+      const facing = Math.atan2(dx / len, dz / len) - heading.current;
+      lungeX = Math.sin(facing) * lunge * 0.45;
+      lungeZ = Math.cos(facing) * lunge * 0.45;
+      pitch = -lunge * 0.35;
+    }
+    // Recoil: struck bodies snap away from the blow and shudder.
+    const recoil = struck ? Math.sin(t * 45) * 0.05 : 0;
+
+    b.position.y = bob + lunge * 0.12;
+    b.position.x = tremble + lungeX + recoil;
+    b.position.z = lungeZ;
+    b.rotation.x = pitch;
+    b.rotation.z = (moving ? Math.sin(t * 9) * 0.06 : 0) + (struck ? 0.12 : 0);
     const pulse = devot.thinking ? 1 + Math.sin(t * 6) * 0.05 : 1;
     b.scale.setScalar(pulse);
   });
@@ -560,7 +595,12 @@ function VoxelFood({
 
     if (food.kind === "legacy") {
       g.rotation.y = clock.elapsedTime * 1.6;
-      g.position.y = ground + 0.06 + Math.sin(clock.elapsedTime * 2.4) * 0.05;
+      // It is thrown clear of the body and settles: the moment money changes
+      // hands should be visible, not simply appear on the floor.
+      const born = (Date.now() - food.spawnedAt) / 900;
+      const arc = born < 1 ? Math.sin(born * Math.PI) * 1.1 : 0;
+      g.position.y = ground + 0.06 + arc + Math.sin(clock.elapsedTime * 2.4) * 0.05;
+      if (born < 1) g.scale.setScalar(Math.min(1, 0.2 + born * 1.6));
     }
     if (food.kind === "manna") {
       g.rotation.y = clock.elapsedTime * 1.2;
@@ -864,6 +904,8 @@ export function Scene({
           color={godColor(d.godId)}
           selected={d.id === selectedId}
           bitten={recentlyBitten(combats, d.id)}
+          strikeAt={strikingAt(combats, d.id)}
+          lunge={lungeProgress(combats, d.id)}
           onSelect={onSelect}
         />
       ))}
