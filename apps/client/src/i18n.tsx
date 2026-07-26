@@ -28,6 +28,8 @@ const EN: Dict = {
   "hud.treasury": "Treasury:",
   "hud.treasury-devots": "({n} devot(s) affordable)",
 
+  "creation.paying": "Paying the deposit on chain…",
+
   "feed.title": "The world thinks",
   "feed.empty": "Nobody has thought anything yet.",
 
@@ -96,6 +98,8 @@ const FR: Dict = {
 
   "hud.treasury": "Trésor :",
   "hud.treasury-devots": "({n} devot(s) finançable(s))",
+
+  "creation.paying": "Paiement du dépôt sur la chaîne…",
 
   "feed.title": "Le monde pense",
   "feed.empty": "Personne n'a encore pensé quoi que ce soit.",

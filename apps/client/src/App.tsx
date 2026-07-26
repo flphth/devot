@@ -23,6 +23,7 @@ export default function App() {
   const {
     snapshot,
     thoughtFeed,
+    creatingStage,
     godId,
     status,
     lastRejection,
@@ -149,6 +150,7 @@ export default function App() {
       />
       {creating && (
         <CreationScreen
+          paying={creatingStage === "paying"}
           godName={god?.name ?? godName}
           godColor={god?.color ?? "#4ca6e0"}
           rejection={lastRejection}

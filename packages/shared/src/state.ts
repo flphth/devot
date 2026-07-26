@@ -354,6 +354,16 @@ export interface LineageEndedMsg {
   eldest: number;
 }
 
+/**
+ * Progress on a creation that is waiting for something slow.
+ *
+ * A birth is a real transaction, so the creation screen has to stop pretending
+ * it is instant: it says what it is waiting for rather than freezing.
+ */
+export interface CreatingMsg {
+  stage: "paying";
+}
+
 /** Server response to rejected intents. */
 export interface ActionRejectedMsg {
   action: "createFounder" | "speak" | "feed" | "smite";

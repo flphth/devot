@@ -136,6 +136,8 @@ export interface WorldConnection {
   snapshot: WorldSnapshot;
   /** The world's monologues, newest last. Capped. */
   thoughtFeed: FeedEntry[];
+  /** Whether a birth is currently waiting on the chain. */
+  creatingStage: "idle" | "paying";
   godId: string | null;
   status: "connecting" | "connected" | "error";
   lastRejection: string | null;
@@ -161,6 +163,7 @@ export function useWorld(godName: string): WorldConnection {
   const [godId, setGodId] = useState<string | null>(null);
   const [status, setStatus] = useState<WorldConnection["status"]>("connecting");
   const [lastRejection, setLastRejection] = useState<string | null>(null);
+  const [creatingStage, setCreatingStage] = useState<"idle" | "paying">("idle");
   const [lastSmite, setLastSmite] = useState<SmiteFx | null>(null);
   const [combats, setCombats] = useState<CombatFx[]>([]);
   const [journals, setJournals] = useState<Record<string, JournalEntry[]>>({});
@@ -180,8 +183,12 @@ export function useWorld(godName: string): WorldConnection {
         setStatus("connected");
 
         room.onMessage("welcome", (msg: { godId: string }) => setGodId(msg.godId));
+        // A birth is a real transaction now, so the screen has to say what it
+        // is waiting on instead of appearing to hang.
+        room.onMessage("creating", () => setCreatingStage("paying"));
         room.onMessage("rejected", (msg: { reason: string }) => {
           setLastRejection(msg.reason);
+          setCreatingStage("idle");
           setTimeout(() => setLastRejection(null), 4000);
         });
         room.onMessage("smite", (msg: { devotId: string; x: number; z: number }) => {
@@ -307,6 +314,7 @@ export function useWorld(godName: string): WorldConnection {
   return {
     snapshot,
     thoughtFeed,
+    creatingStage,
     godId,
     status,
     lastRejection,

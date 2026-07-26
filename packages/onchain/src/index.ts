@@ -1,3 +1,4 @@
+export * from "./vault.js";
 export * from "./economy.js";
 export * from "./wallet.js";
 export * from "./ledger.js";

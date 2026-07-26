@@ -9,7 +9,9 @@ import {
 } from "@devot/agents";
 import { createRepos, openDb, type Repos } from "@devot/db";
 import {
-  Economy,
+  LifeVaultClient,
+  vaultConfigFromEnv,
+  type MintedDevot,
   FreeStubProvider,
   LifeLedger,
   LocalSettler,
@@ -31,8 +33,8 @@ import {
   MONSTER_THINK_INTERVAL_MS,
   SOUL_MAX_CHARS,
   statMultiplier,
+  DEFAULT_DEVOT_PROFILE,
   DEVOT_DEPOSIT,
-  GOD_ENDOWMENT,
   LEGACY_TTL_MS,
   FOOD_SPAWN_CHANCE_PER_TICK,
   FOOD_TARGET,
@@ -68,6 +70,7 @@ import {
   type FoodType,
   type JournalEntry,
   type JournalMsg,
+  type CreatingMsg,
   type JournalRequestMsg,
   type LineageEndedMsg,
   type SmiteMsg,
@@ -95,9 +98,9 @@ const GOD_COLORS = ["#e0b34c", "#4ca6e0", "#9c4ce0", "#4ce07a", "#e04c5f"];
  *
  * The deposit is the same for everyone; vitality decides how much living it
  * buys. That keeps the stat meaningful without letting a god buy a bigger
- * devot by paying more.
+ * devot simply by paying more.
  */
-function hpMaxFor(vitality: number): number {
+function capacityFor(vitality: number): number {
   return Math.round(DEVOT_DEPOSIT * statMultiplier(vitality));
 }
 
@@ -160,10 +163,11 @@ export class WorldRoom extends Room<WorldState> {
    * in batches — the simulation never waits for any of it.
    */
   /**
-   * Who can afford what. A god's treasury pays for every devot it creates, and
-   * only refills from relics its devots pick up off the ground.
+   * The chain, when it is configured. A birth is a real transaction against
+   * LifeVault; without it the world still runs, but it says so out loud rather
+   * than quietly handing out devots for nothing.
    */
-  private economy = new Economy();
+  private vault?: LifeVaultClient;
   /** Funds riding on relics, so what rots away is burned rather than lost track of. */
   private rottedFunds = new Map<string, number>();
   private ledger = new LifeLedger(
@@ -209,6 +213,21 @@ export class WorldRoom extends Room<WorldState> {
 
     const dbPath = process.env.DEVOT_DB ?? new URL("../../world.sqlite", import.meta.url).pathname;
     this.repos = createRepos(openDb(dbPath));
+
+    const vaultConfig = vaultConfigFromEnv();
+    if (vaultConfig) {
+      this.vault = new LifeVaultClient(vaultConfig);
+      void this.vault.funds().then((f) =>
+        console.log(
+          `[world] ⛓ births are paid on-chain from ${this.vault!.address} (${f} OG left)`,
+        ),
+      );
+    } else {
+      console.warn(
+        "[world] ⛓ NO CHAIN CONFIGURED — devots are born for nothing. " +
+          "Set LIFEVAULT_ADDRESS, ZG_PRIVATE_KEY and ZG_RPC_URL to make a birth cost something.",
+      );
+    }
 
     const { kind, mind, chronicler } = createMind();
     this.chronicler = chronicler;
@@ -292,7 +311,6 @@ export class WorldRoom extends Room<WorldState> {
       god.name = godName;
       god.color = GOD_COLORS[this.state.gods.size % GOD_COLORS.length]!;
       this.state.gods.set(godId, god);
-      this.economy.endow(godId, GOD_ENDOWMENT);
       this.repos.events.record("god_joined", [godId], { name: godName });
     }
     god.connected = true;
@@ -354,21 +372,38 @@ export class WorldRoom extends Room<WorldState> {
       signature: signatureOf(appearance, stats, traits, soul),
     };
 
-    // The deposit is the devot's life: a god who cannot pay does not get one.
-    if (!this.economy.canAfford(godId, DEVOT_DEPOSIT)) {
-      return this.reject(
-        client,
-        "createFounder",
-        `Your treasury holds ${Math.round(this.economy.balanceOf(godId))} — a devot costs ${DEVOT_DEPOSIT}. Send your living to gather what the dead left behind.`,
-      );
+    // THE DEPOSIT IS A TRANSACTION, AND IT IS WAITED FOR.
+    //
+    // Every other movement of value in this world is batched precisely so the
+    // simulation never blocks on a network. A birth is the exception: it is the
+    // one moment the god actually pays, and paying is not something to assume
+    // and reconcile afterwards. If the chain refuses, no devot is born.
+    let minted: MintedDevot | undefined;
+    if (this.vault) {
+      client.send("creating", { stage: "paying" } satisfies CreatingMsg);
+      try {
+        minted = await this.vault.createDevot(`${godId}:${Date.now()}`);
+        console.log(
+          `[world] ⛓ devot #${minted.tokenId} minted for ${godId} — ${minted.deposit} wei, tx ${minted.txHash}`,
+        );
+        this.repos.events.record("devot_minted", [godId], {
+          tokenId: minted.tokenId.toString(),
+          deposit: minted.deposit.toString(),
+          tx: minted.txHash,
+        });
+      } catch (err) {
+        console.error("[world] ⛓ the deposit failed:", err);
+        return this.reject(
+          client,
+          "createFounder",
+          "The chain refused the deposit. No devot was born.",
+        );
+      }
     }
 
     const receipt = await this.payments.chargeDevotCreation(godId);
     if (!receipt.ok) {
       return this.reject(client, "createFounder", "Payment refused.");
-    }
-    if (!this.economy.withdraw(godId, DEVOT_DEPOSIT)) {
-      return this.reject(client, "createFounder", "Your treasury is short.");
     }
 
     const devot = this.spawnDevot(godId, {
@@ -415,16 +450,16 @@ export class WorldRoom extends Room<WorldState> {
         opts.x ?? (Math.random() - 0.5) * this.world.size,
         opts.z ?? (Math.random() - 0.5) * this.world.size,
       ),
-      // Max balance follow from the chosen VITALITY: it is the heaviest stat, since
-      // balance are also the thinking budget. A hardy devot does not merely live
-      // longer, it thinks longer.
-      balance: hpMaxFor(identity.stats.vitality),
-      capacity: hpMaxFor(identity.stats.vitality),
+      // Capacity follows from the chosen VITALITY: the heaviest stat, since a
+      // balance IS the thinking budget. A hardy devot does not merely live
+      // longer, it thinks longer for the same deposit.
+      balance: capacityFor(identity.stats.vitality),
+      capacity: capacityFor(identity.stats.vitality),
       identityJson: encodeIdentity(identity),
       // A devot is born empty-handed: every item must be forged, and paid for.
       items: [],
       state: "alive",
-      profile: "frugal",
+      profile: DEFAULT_DEVOT_PROFILE,
       traits: opts.traits,
       generation: opts.generation ?? 1,
       // Its address, derived rather than stored: the world keeps one secret,
@@ -655,24 +690,26 @@ export class WorldRoom extends Room<WorldState> {
     const result = tick(this.world);
 
     for (const { godId, funds, leftBy, devotId, foodId } of result.claimed) {
-      this.economy.credit(godId, funds);
       // Claimed, so it can no longer rot: drop it from the pending-burn book.
       this.rottedFunds.delete(foodId);
-      this.repos.events.record("legacy_claimed", [devotId], { funds, leftBy });
       const finder = this.world.devots.get(devotId);
+      if (finder) {
+        // Straight into the body. There is no purse to put it in any more, and
+        // a balance IS a life — looting the dead is how a devot buys itself
+        // more time to think. It may end up holding more than it was born with.
+        finder.balance += funds;
+      }
+      this.repos.events.record("legacy_claimed", [devotId], { funds, leftBy, godId });
       console.log(
-        `[world] ⛏ ${finder?.name ?? devotId} recovers ${funds} left by ${leftBy} — ` +
-          `treasury of ${godId}: ${Math.round(this.economy.balanceOf(godId))}`,
+        `[world] ⛏ ${finder?.name ?? devotId} recovers ${funds} left by ${leftBy}` +
+          ` — it now holds ${Math.round(finder?.balance ?? 0)}`,
       );
     }
 
     // A relic that rots takes its funds with it: nobody came, nobody gets it.
     for (const foodId of result.rotted) {
-      const lost = this.rottedFunds.get(foodId);
-      if (lost) {
-        this.economy.burn(lost);
-        this.rottedFunds.delete(foodId);
-      }
+      // A relic nobody came for is simply gone: the world is poorer by it.
+      this.rottedFunds.delete(foodId);
     }
 
     for (const foodId of result.rotted) {
@@ -901,7 +938,9 @@ export class WorldRoom extends Room<WorldState> {
       god.generations = line.reduce((n, d) => Math.max(n, d.generation), 0);
       god.eldest = line.reduce((n, d) => Math.max(n, d.age), 0);
       god.lineageAlive = living.length > 0;
-      god.treasury = Math.round(this.economy.balanceOf(godId));
+      // No purse: what a god "has" is what its living are carrying, which is
+      // the only honest number now that value lives entirely in bodies.
+      god.treasury = Math.round(living.reduce((n, d) => n + Math.max(0, d.balance), 0));
 
       const startedAt = this.lineageStart.get(godId);
       if (startedAt === undefined) continue;
@@ -929,7 +968,6 @@ export class WorldRoom extends Room<WorldState> {
     // of it. The difference between the deposit and the estate was burned
     // living, one thought at a time.
     const funds = Math.max(0, Math.round(residue));
-    this.economy.burn(Math.max(0, DEVOT_DEPOSIT - funds));
     if (funds <= 0) return;
 
     const relic: FoodEntity = {

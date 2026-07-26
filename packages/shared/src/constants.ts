@@ -162,6 +162,20 @@ export const REPRO_RADIUS = 3; // max distance between partners
 export const CONTEXT_COMPACT_THRESHOLD_MSGS = 24;
 
 // Trait pool for mutations at birth.
+/**
+ * WHICH MIND A DEVOT IS BORN WITH.
+ *
+ * Balanced (Sonnet) rather than frugal (Haiku): they reason visibly better and
+ * weigh a whole panorama instead of reacting to the loudest line in it.
+ *
+ * It is not free, and the price is paid in life. Sonnet costs 3x Haiku on both
+ * input and output, so at the same cadence a devot spends its balance three
+ * times faster — roughly seventy thoughts in a life instead of two hundred.
+ * If lives feel too short, DEVOT_THINK_INTERVAL_MS then DEVOT_DEPOSIT are the
+ * dials, in that order.
+ */
+export const DEFAULT_DEVOT_PROFILE = "balanced" as const;
+
 export const TRAIT_POOL = [
   "curious",
   "cautious",

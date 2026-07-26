@@ -58,11 +58,14 @@ export function CreationScreen({
   godColor,
   rejection,
   onCreate,
+  paying,
 }: {
   godName: string;
   godColor: string;
   rejection: string | null;
   onCreate: (result: CreationResult) => void;
+  /** A birth is a real transaction; while it is in flight the screen says so. */
+  paying: boolean;
 }) {
   const { t } = useT();
   const [traits, setTraits] = useState<string[]>([]);
@@ -231,7 +234,7 @@ export function CreationScreen({
               <button
                 data-testid="create-founder"
                 onClick={() => onCreate({ traits, appearance, stats, soul: soul.trim() })}
-                disabled={!ready}
+                disabled={!ready || paying}
                 style={{
                   width: "100%",
                   marginTop: 12,
@@ -244,7 +247,9 @@ export function CreationScreen({
                   cursor: ready ? "pointer" : "default",
                 }}
               >
-                {traits.length < 2
+                {paying
+                  ? t("creation.paying")
+                  : traits.length < 2
                   ? t("creation.need-traits")
                   : left !== 0
                     ? t("creation.points-left", { n: left })
