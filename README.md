@@ -14,15 +14,29 @@
 
 ## The world
 
-A meadow with relief, boulders and weather, seen from above through a fog that only
-lifts around your own creatures. Devots wander it as small coloured bodies with a
-thought bubble above them; monsters as larger dark ones. On the right, a live feed
-carries every thought every creature in the world is having, as it has it — private
-monologue in italics, spoken words in plain text. Click a body and you get its whole
-life: the journal of everything it has thought, what each thought cost it, and the bar
-that is simultaneously its bank balance and its remaining time to live.
+![Devot: two creatures at nightfall, the ledger of life theft, and one of them deciding what to do about it](docs/media/world.jpg)
 
-<!-- Screenshots and the demo video: see docs/media/README.md for the ready-to-paste block. -->
+Everything in that screenshot is real. On the left, a line of six: three of them already
+dead at `0 / 60,000`, the survivors carrying `41,888` and `46,259` — and underneath each
+balance, **what it has cost in actual dollars of thinking so far**. Bottom left, the
+ledger of life theft: `150 Devot-3 → a stranger`, then `147 a stranger → Devot-3 ☠`,
+which is a devot being drained to death by something that was not its god's problem.
+
+In the middle, the Mind panel is showing the exact text a creature was handed —
+*"It is autumn. The world gives less than it did, and the cold is coming… Since your last
+thought you have LOST 4421 balance. You are bleeding out. Around you, as far as you can
+see: nothing and no one."* — and what it chose to do with it: **move**, marked *desperate*.
+The other one has given up and said so out loud: *"Nothing remains but silence — I hold
+still and wait for dawn or death."*
+
+Nobody wrote that line. It is what the model decided to say while running out of life.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/media/creation.jpg" alt="The creation screen"><br><em><strong>Shaping a founder.</strong> Traits go literally into its head — they are what it will decide with. The one sentence you write is the conviction it carries into every prompt it will ever receive. Stats come out of a fixed budget, because there is no devot who is good at everything, and the signature <code>DVT-0U6-BKY7</code> is derived from every choice. Bottom: the wallet the deposit will be paid from.</em></td>
+    <td width="50%"><img src="docs/media/birth.jpg" alt="A devot's first moments"><br><em><strong>The first ten seconds of a life.</strong> Fog of war: it knows only what is inside that circle. Its first prompt tells it the season, that it has just been born, and <em>that thinking costs it its life</em> — then lists the one thing it can see, a grain worth 2,000, 6.2 away. It answers <strong>eat</strong>, and says <em>"Food, close — I go."</em></em></td>
+  </tr>
+</table>
 
 ---
 
