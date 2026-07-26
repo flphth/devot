@@ -1,4 +1,4 @@
-import type { Decision, DevotEntity, Trigger } from "@devot/shared";
+import type { Decision, DevotEntity, FoodEntity, Trigger, Vec3 } from "@devot/shared";
 import {
   AGONIZING_THRESHOLD,
   ATTACK_DRAIN_PER_TICK,
@@ -10,6 +10,10 @@ import {
   METABOLISM_HP_PER_TICK,
   PERCEPTION_RADIUS,
   TICK_MS,
+  hasLineOfSight,
+  slopeSpeedFactor,
+  terrainGrade,
+  terrainHeight,
 } from "@devot/shared";
 import { clampToWorld, dist2, World } from "./world.js";
 
@@ -48,20 +52,19 @@ function movementSystem(devot: DevotEntity, world: World, dt: number): void {
 
   switch (goal.kind) {
     case "idle":
-      return;
+      break;
     case "wander": {
       // Smoothed wandering: the heading drifts slowly (deterministic from age)
       // instead of zigzagging — the body keeps its direction for several ticks.
       const angle = devot.id.length * 1.7 + devot.age * 0.045;
-      devot.pos.x += Math.cos(angle) * step * 0.5;
-      devot.pos.z += Math.sin(angle) * step * 0.5;
+      advance(devot, Math.cos(angle), Math.sin(angle), step * 0.5);
       break;
     }
     case "seek_food": {
       const food = world.food.get(goal.foodId);
       if (!food) {
         devot.currentGoal = { kind: "wander" };
-        return;
+        break;
       }
       stepToward(devot, food.pos.x, food.pos.z, step);
       break;
@@ -75,15 +78,14 @@ function movementSystem(devot: DevotEntity, world: World, dt: number): void {
       const dx = devot.pos.x - goal.from.x;
       const dz = devot.pos.z - goal.from.z;
       const len = Math.hypot(dx, dz) || 1;
-      devot.pos.x += (dx / len) * step * 1.5;
-      devot.pos.z += (dz / len) * step * 1.5;
+      advance(devot, dx / len, dz / len, step * 1.5);
       break;
     }
     case "attack": {
       const target = world.devots.get(goal.targetId);
       if (!target || target.state === "dead") {
         devot.currentGoal = { kind: "wander" };
-        return;
+        break;
       }
       // Hunt: close in until within striking range.
       if (dist2(devot.pos, target.pos) > ATTACK_RADIUS * ATTACK_RADIUS) {
@@ -93,6 +95,9 @@ function movementSystem(devot: DevotEntity, world: World, dt: number): void {
     }
   }
   clampToWorld(devot.pos, world.size);
+  // The ground is the only thing that decides altitude — bodies never fly and
+  // never sink, whatever moved them (walking, clamping, a god's hand).
+  devot.pos.y = terrainHeight(devot.pos.x, devot.pos.z);
 }
 
 /** Vital predation: on contact, HP transfers from victim → attacker. */
@@ -128,14 +133,24 @@ function combatSystem(
   }
 }
 
+/**
+ * Moves the body along a unit direction, slowed or helped by the slope it is
+ * about to walk into. A climb never becomes a wall and a descent never becomes
+ * a slide — slopeSpeedFactor keeps the pace inside sane bounds.
+ */
+function advance(devot: DevotEntity, ux: number, uz: number, step: number): void {
+  const grade = terrainGrade(devot.pos.x, devot.pos.z, ux, uz);
+  const s = step * slopeSpeedFactor(grade);
+  devot.pos.x += ux * s;
+  devot.pos.z += uz * s;
+}
+
 function stepToward(devot: DevotEntity, tx: number, tz: number, step: number): void {
   const dx = tx - devot.pos.x;
   const dz = tz - devot.pos.z;
   const len = Math.hypot(dx, dz);
   if (len < 1e-6) return;
-  const s = Math.min(step, len);
-  devot.pos.x += (dx / len) * s;
-  devot.pos.z += (dz / len) * s;
+  advance(devot, dx / len, dz / len, Math.min(step, len));
 }
 
 function feedingSystem(devot: DevotEntity, world: World, result: TickResult): void {
@@ -195,6 +210,23 @@ function deathSystem(devot: DevotEntity, result: TickResult): void {
 }
 
 /**
+ * Nearest food that is both within `maxDist2` and actually in sight — food
+ * behind a hill does not exist as far as the body is concerned.
+ */
+export function nearestVisibleFood(world: World, from: Vec3, maxDist2: number) {
+  let best: FoodEntity | undefined;
+  let bestD = maxDist2;
+  for (const f of world.food.values()) {
+    const d = dist2(from, f.pos);
+    if (d > bestD) continue;
+    if (!hasLineOfSight(from, f.pos)) continue;
+    bestD = d;
+    best = f;
+  }
+  return best;
+}
+
+/**
  * Perception system: reports visible food and devots.
  * An encounter between devots is reported only once (metDevots).
  */
@@ -210,7 +242,7 @@ export function perceptionSystem(world: World, now: number = Date.now()): Trigge
     for (const other of alive) {
       if (other.id === devot.id) continue;
       if (devot.metDevots?.includes(other.id)) continue;
-      if (dist2(devot.pos, other.pos) <= r2) {
+      if (dist2(devot.pos, other.pos) <= r2 && hasLineOfSight(devot.pos, other.pos)) {
         devot.metDevots = [...(devot.metDevots ?? []), other.id];
         const sameGod = other.godId === devot.godId;
         triggers.push({
@@ -224,8 +256,8 @@ export function perceptionSystem(world: World, now: number = Date.now()): Trigge
 
     if (devot.currentGoal.kind === "seek_food" || devot.currentGoal.kind === "move_to")
       continue;
-    const food = world.nearestFood(devot.pos);
-    if (food && dist2(devot.pos, food.pos) <= r2) {
+    const food = nearestVisibleFood(world, devot.pos, r2);
+    if (food) {
       triggers.push({
         kind: "encounter",
         devotId: devot.id,
@@ -262,14 +294,13 @@ export function applyDecision(devot: DevotEntity, decision: Decision, world: Wor
         devot.currentGoal = { kind: "seek_food", foodId };
       } else {
         // Fallback bounded by perception: the body does not "know" about food
-        // the devot cannot see.
-        const nearest = world.nearestFood(devot.pos);
-        if (
-          nearest &&
-          dist2(devot.pos, nearest.pos) <= PERCEPTION_RADIUS * PERCEPTION_RADIUS
-        ) {
-          devot.currentGoal = { kind: "seek_food", foodId: nearest.id };
-        }
+        // the devot cannot see — neither too far, nor behind a hill.
+        const nearest = nearestVisibleFood(
+          world,
+          devot.pos,
+          PERCEPTION_RADIUS * PERCEPTION_RADIUS,
+        );
+        if (nearest) devot.currentGoal = { kind: "seek_food", foodId: nearest.id };
       }
       break;
     }
