@@ -687,6 +687,17 @@ export class WorldRoom extends Room<WorldState> {
     // tick is told about the beast that is already upon it, not where it stood.
     const beasts = monsterSystem(this.world, Date.now());
 
+    for (const { monsterId, foodId, funds, leftBy } of beasts.scavenged) {
+      // Taken out of circulation: the funds ride on a monster's back now, and
+      // only come home if something brings it down.
+      this.rottedFunds.delete(foodId);
+      this.repos.events.record("legacy_scavenged", [], { monsterId, funds, leftBy });
+      const name = this.world.monsters.get(monsterId)?.name ?? monsterId;
+      console.log(
+        `[world] 🩸 ${name} scavenges ${funds} left by ${leftBy} — worth killing now.`,
+      );
+    }
+
     for (const t of [...result.triggers, ...beasts.triggers, ...perceptionSystem(this.world)]) {
       this.wake(t);
     }

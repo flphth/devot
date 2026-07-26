@@ -1,0 +1,48 @@
+# G1 — Preuve live : un devot pense via 0G Compute (TEE vérifié)
+# Réseau : 0G Galileo testnet (chain 16602) · RPC evmrpc-testnet.0g.ai
+# Wallet du dieu : 0x10EF82f63C9F673994218B17375EAee61A133073
+# Provider 0G : 0xa48f01287233509FD694a22Bf840225062E67836 · modèle qwen/qwen2.5-omni-7b
+# Capturé le : 2026-07-25T23:27:13Z
+# Commande : MIND=0g DEPOSIT_MICRO_USD=50000 MAX_CYCLES=3 pnpm mortal-core
+# ------------------------------------------------------------------
+
+
+🕯️  Devot mortal-core — MIND=0g  model=claude-haiku-4-5  dépôt=50,000 µ$
+   wallet du dieu (connecté à la création) : 0xG0d0000000000000000000000000000000000001
+
+Detected testnet (chain ID: 16602)
+┌─ Esprit de DVT-000-0001 — pensée #1 [vivant] qwen/qwen2.5-omni-7b
+│ Événement: Tu t'éveilles dans un monde inconnu. Rien ne bouge alentour.
+│ Pensée   : {"action": "idle"}
+│ Décision : idle
+│ Tokens   : 356 in / 8 out   →  coût 770 µ$
+│ Solde    : 49,230 µ$ / 50,000 µ$
+│ TEE      : ✓ VÉRIFIÉ  chatID=62954708-6e60-4859-b078-bf2d34597924  provider=0xa48f01287233509FD694a22Bf840225062E67836
+└────────────────────────────────────────────────────────────
+
+┌─ Esprit de DVT-000-0001 — pensée #2 [vivant] qwen/qwen2.5-omni-7b
+│ Événement: Un MONSTRE surgit juste devant toi et fond sur ta gorge.
+
+DANGER IMMÉDIAT : tu ne peux pas rester immobile. Réagis maintenant — fuis ou attaque.
+│ Pensée   : {"action": "attack", "targetId": "monster"}
+│ Décision : attack
+│ Tokens   : 414 in / 15 out   →  coût 941 µ$
+│ Solde    : 48,289 µ$ / 50,000 µ$
+│ TEE      : ✓ VÉRIFIÉ  chatID=2cec3eba-86b2-4138-acdd-f49d730ceb4f  provider=0xa48f01287233509FD694a22Bf840225062E67836
+└────────────────────────────────────────────────────────────
+
+┌─ Esprit de DVT-000-0001 — pensée #3 [vivant] qwen/qwen2.5-omni-7b
+│ Événement: Le calme revient. Le monde est vide et silencieux.
+│ Pensée   : {"action": "idle"}
+│ Décision : idle
+│ Tokens   : 452 in / 8 out   →  coût 961 µ$
+│ Solde    : 47,328 µ$ / 50,000 µ$
+│ TEE      : ✓ VÉRIFIÉ  chatID=ef8aec61-322f-4274-a051-a02e7ba6a9d3  provider=0xa48f01287233509FD694a22Bf840225062E67836
+└────────────────────────────────────────────────────────────
+
+
+═══ Vie de DVT-000-0001 ═══
+  pensées vécues : 3
+  dépensé        : 2,672 µ$ sur 50,000 µ$
+  solde final    : 47,328 µ$  (vivant)
+  pensées TEE-vérifiées : 3/3

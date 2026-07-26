@@ -1,0 +1,42 @@
+# G3 — LifeVault + DevotRegistry : invariant + devot NFT on-chain (0G Galileo 16602)
+# ============================================================================
+
+## 1. Invariant écrit AVANT le contrat, puis vérifié des DEUX côtés
+
+Σ soldes + brûlé + retiré == Σ déposé  (rien créé, rien détruit)
+
+- TS (packages/sim/test/vault.test.ts) : tenu après chaque pas d'une partie
+  scriptée complète (créations, combats, morts, retraits) ET sous un fuzz de
+  2000 opérations aléatoires.
+- Solidity (contracts/test/LifeVault.t.sol) — `forge test` :
+    [PASS] testCreateMintsNftAndBalance
+    [PASS] testClaimFollowsChecksEffectsInteractions
+    [PASS] testSettleBurnSweepsAndConserves
+    [PASS] testSettleRejectsForgedSignature
+    [PASS] invariant_conservation()  (runs: 64, calls: 2048, reverts: 0)
+      → depositedTotal == address(vault).balance + burnedTotal + withdrawnTotal
+
+## 2. Déploiement + mint sur le testnet 0G (chain 16602, RPC evmrpc-testnet.0g.ai)
+
+  god (dieu)     : 0x10EF82f63C9F673994218B17375EAee61A133073
+  LifeVault      : 0x30B5E767917695B9268948DB872aa3c22EBba62D
+  DevotRegistry  : 0x249A375B6E607f29beD4486bDBbe7977C7f07c54  (ERC-721 "Devot"/"DVT")
+  tx déploiement : 0x996ea6c98af929530efa57fccd2d511cb2bdcd9c66c5b2bc8d471b444d63a60e  (block 45974218, status 0x1)
+  tx createDevot : 0xc1875ae9f83135befdfac080c82b619db69805ec06f5e2908a9d54b550832a5c  (block 45974218, status 0x1)
+
+## 3. Vérification INDÉPENDANTE on-chain (cast call), pas la sortie du script
+
+  registry.name()                     : "Devot"
+  registry.symbol()                   : "DVT"
+  registry.ownerOf(1)                 : 0x10EF82f63C9F673994218B17375EAee61A133073  (le dieu)
+  registry.balanceOf(god)             : 1
+  registry.supportsInterface(0x80ac58cd) : true   → c'est un ERC-721
+  registry.tokenURI(1)                : "devot:0xaf97ec8dfa98ce2d1f4e06634783d467719d5e554233bd4a7dac96fa26c2f6fb"
+  vault.lifeOf(1)                     : 1000000000000000 wei  (0.001 OG déposés)
+  vault.depositedTotal()              : 1000000000000000 wei
+  vault code size                     : 4056 bytes (déployé)
+
+→ Un devot créé par createDevot(identityHash) payable existe comme NFT possédé
+  par le dieu sur le testnet 0G. Le serveur est l'autorité (soldes en mémoire) ;
+  la chaîne ne voit que création / mort / retrait (settle signé serveur, aucun
+  règlement au tick). claim suit checks-effects-interactions.

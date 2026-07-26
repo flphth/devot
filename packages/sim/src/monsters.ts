@@ -7,6 +7,7 @@ import {
   MONSTER_METABOLISM_HP_PER_TICK,
   MONSTER_SIGHT,
   MONSTER_SPEED,
+  EAT_RADIUS,
   TICK_MS,
   hasLineOfSight,
   monsterSightMultiplier,
@@ -64,15 +65,24 @@ export interface MonsterTickResult {
   combats: Array<{ attackerId: string; victimId: string; drained: number }>;
   deaths: Array<{ monsterId: string; hoard: number; x: number; z: number }>;
   kills: Array<{ monsterId: string; devotId: string }>;
+  /** Relics a monster took off the ground, into its hoard. */
+  scavenged: Array<{ monsterId: string; foodId: string; funds: number; leftBy: string }>;
 }
 
 export function monsterSystem(world: World, now: number = Date.now()): MonsterTickResult {
-  const result: MonsterTickResult = { triggers: [], combats: [], deaths: [], kills: [] };
+  const result: MonsterTickResult = {
+    triggers: [],
+    combats: [],
+    deaths: [],
+    kills: [],
+    scavenged: [],
+  };
   const dt = TICK_MS / 1000;
 
   for (const monster of world.aliveMonsters()) {
     // Hunting is not optional: this is what it costs to be a monster.
     monster.hp -= MONSTER_METABOLISM_HP_PER_TICK;
+    scavenge(monster, world, result);
     if (monster.hp <= 0) {
       monster.hp = 0;
       monster.state = "dead";
@@ -154,6 +164,31 @@ export function monsterSystem(world: World, now: number = Date.now()): MonsterTi
   }
 
   return result;
+}
+
+/**
+ * What a monster takes off the ground.
+ *
+ * A relic does not feed it — the funds go into its HOARD. That matters: a
+ * monster is the one thing in this world that takes money OUT of circulation,
+ * and the only way it comes back is if something kills the monster. A god whose
+ * relic was scavenged has not lost it forever; it has been moved somewhere
+ * dangerous.
+ */
+function scavenge(monster: MonsterEntity, world: World, result: MonsterTickResult): void {
+  for (const item of world.food.values()) {
+    if (item.type !== "legacy") continue;
+    if (dist2(monster.pos, item.pos) > EAT_RADIUS * EAT_RADIUS) continue;
+    world.food.delete(item.id);
+    monster.hoard += item.funds ?? 0;
+    result.scavenged.push({
+      monsterId: monster.id,
+      foodId: item.id,
+      funds: item.funds ?? 0,
+      leftBy: item.leftBy ?? "",
+    });
+    break; // one relic per tick, like everything else it takes
+  }
 }
 
 /**
