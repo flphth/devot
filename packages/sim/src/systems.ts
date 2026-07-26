@@ -8,6 +8,7 @@ import {
   EAT_RADIUS,
   HUNGRY_THRESHOLD,
   METABOLISM_HP_PER_TICK,
+  COMBAT_RESIDUE_FRACTION,
   PERCEPTION_RADIUS,
   THREAT_REALERT_MS,
   hasLineOfSight,
@@ -27,7 +28,8 @@ import { clampToWorld, dist2, World } from "./world.js";
 
 export interface TickResult {
   triggers: Trigger[];
-  deaths: Array<{ devotId: string; cause: string }>;
+  /** `residue` is what the devot still held: it drops where it fell. */
+  deaths: Array<{ devotId: string; cause: string; residue: number }>;
   eaten: Array<{ devotId: string; foodId: string; hpValue: number }>;
   combats: Array<{ attackerId: string; victimId: string; drained: number }>;
   /** Monsters brought down by devots. Their hoard has to go somewhere. */
@@ -182,10 +184,32 @@ function combatSystem(
   }
   if (dist2(devot.pos, victim.pos) > ATTACK_RADIUS * ATTACK_RADIUS) return;
 
-  const drained = Math.min(drainOf(devot), victim.hp);
+  // A killer cannot empty its victim. It drains down to the residue floor and
+  // no further; what remains is the estate, and it drops on the ground when the
+  // victim dies. Monsters have no estate to protect — draining one to nothing
+  // is exactly how you get at its hoard.
+  const floor = monster ? 0 : victim.hpMax * COMBAT_RESIDUE_FRACTION;
+  const drained = Math.max(0, Math.min(drainOf(devot), victim.hp - floor));
   victim.hp -= drained;
   devot.hp = Math.min(devot.hpMax, devot.hp + drained * ATTACK_EFFICIENCY);
-  result.combats.push({ attackerId: devot.id, victimId: victim.id, drained });
+  if (drained > 0) {
+    result.combats.push({ attackerId: devot.id, victimId: victim.id, drained });
+  }
+
+  // Drained to the floor and still being struck: this is where it dies, and it
+  // dies holding something.
+  if (!monster && victim.hp <= floor + 1e-6) {
+    const prey = victim as DevotEntity;
+    prey.state = "dead";
+    devot.currentGoal = { kind: "wander" };
+    result.deaths.push({
+      devotId: prey.id,
+      cause: `killed by ${devot.name}`,
+      residue: Math.max(0, Math.round(prey.hp)),
+    });
+    prey.hp = 0;
+    return;
+  }
 
   // Killing a monster is the one act in this world that pays: everything it
   // took from the devots it ate is released where it falls.
@@ -260,6 +284,11 @@ function feedingSystem(devot: DevotEntity, world: World, result: TickResult): vo
 }
 
 function hungerSystem(devot: DevotEntity, result: TickResult, now: number): void {
+  // The dead do not get hungry. This runs before deathSystem and recomputes
+  // state from HP, so without the guard it quietly RESURRECTED a devot that
+  // combat had just killed — back to "dying", and then killed again a moment
+  // later by deathSystem. The estate dropped twice.
+  if (devot.state === "dead") return;
   const ratio = devot.hp / devot.hpMax;
   const prev = devot.state;
 
@@ -291,10 +320,16 @@ function hungerSystem(devot: DevotEntity, result: TickResult, now: number): void
 }
 
 function deathSystem(devot: DevotEntity, result: TickResult): void {
+  // Combat can kill a devot part-way through this same tick, and the loop is
+  // walking a list captured before the blow landed. Without this the victim is
+  // reported dead twice — and its estate dropped twice with it.
+  if (devot.state === "dead") return;
   if (devot.hp <= 0) {
     devot.hp = 0;
     devot.state = "dead";
+    // Nothing left: it spent itself down to nothing, and leaves nothing.
     result.deaths.push({
+      residue: 0,
       devotId: devot.id,
       cause: devot.underAttackBy ? `devoured by ${devot.underAttackBy}` : "vital exhaustion",
     });
@@ -506,15 +541,34 @@ function reflexSystem(devot: DevotEntity, world: World): void {
     return;
   }
 
+  const isMonster = world.monsters.has(attackerId);
+  // A leash, not strict contact. Checking contact alone flickered: a devot
+  // that broke away for a single tick had its mind obeyed again, chose to run,
+  // and then ran forever while the beast trailed it — never fighting once.
+  const leash = ATTACK_RADIUS * 3;
+  const nearby = dist2(devot.pos, attacker.pos) <= leash * leash;
+
+  // A MONSTER ON YOU IS NOT A DECISION.
+  //
+  // The reflex used to yield to any goal a mind had chosen — and with devots
+  // thinking every ten seconds, one decision to flee stuck forever: they ran,
+  // the beast followed, and they never fought back once, all the way to being
+  // eaten. So while a monster that has drawn your blood is still on you, the
+  // body fights, whatever the mind last said.
+  //
+  // Break the leash and the mind is obeyed again. Choosing to run before a
+  // monster closes is a real choice, and a devot keeps it.
+  if (isMonster && nearby) {
+    devot.currentGoal = { kind: "attack", targetId: attackerId };
+    return;
+  }
+
   const goal = devot.currentGoal.kind;
   const passive = goal === "idle" || goal === "wander" || goal === "seek_food";
   if (!passive) return;
 
-  // Against a MONSTER there is no choice worth making: it moves faster than a
-  // devot does, so running is a slower death with the same ending. The body
-  // turns and fights, however bad the odds — and a monster brought down is the
-  // richest thing in this world.
-  const isMonster = world.monsters.has(attackerId);
+  // Against a monster at any range the answer is the same: turn and fight. A
+  // monster brought down is the richest thing in this world.
   if (isMonster || devot.hp > attacker.hp) {
     devot.currentGoal = { kind: "attack", targetId: attackerId };
   } else {

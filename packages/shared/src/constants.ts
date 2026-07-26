@@ -36,11 +36,18 @@ export const DEVOT_DEPOSIT = 60_000;
 /** A god's opening funds — four devots, before recovering anything. */
 export const GOD_ENDOWMENT = DEVOT_DEPOSIT * 4;
 /**
- * What death gives back. The rest is destroyed, and that is the whole point:
- * if death returned everything, the deposit would be a formality and a line
- * could churn devots for free.
+ * What violence CANNOT take.
+ *
+ * A killer drains its victim down to this share of the victim's maximum and no
+ * further; at that point the victim dies, and everything it still held drops
+ * where it fell. Without a floor an attacker emptied its victim to zero, so
+ * "the whole wallet drops on death" dropped nothing, always.
+ *
+ * It also changes what killing is FOR. Draining someone is no longer the
+ * efficient way to take their life — you get most of it by standing on the
+ * corpse afterwards, and so does everyone else who saw it happen.
  */
-export const DEATH_RESIDUE_FRACTION = 0.35;
+export const COMBAT_RESIDUE_FRACTION = 0.15;
 /** How long a relic lies where its owner fell. Long enough to be worth crossing for. */
 export const LEGACY_TTL_MS = 180_000;
 

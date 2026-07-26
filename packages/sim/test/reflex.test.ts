@@ -18,8 +18,8 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     generation: 1,
     wallet: "",
     name: `D${seq}`,
-    hp: 100_000,
-    hpMax: 150_000,
+    hp: 55_000,
+    hpMax: 60_000,
     state: "alive",
     profile: "frugal",
     traits: [],
@@ -42,7 +42,7 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
 describe("a body under attack reacts on its own", () => {
   it("strikes back at something weaker than it", () => {
     const world = new World();
-    const victim = makeDevot({ hp: 100_000, pos: { x: 0, y: 0, z: 0 } });
+    const victim = makeDevot({ hp: 55_000, pos: { x: 0, y: 0, z: 0 } });
     const bully = makeDevot({ hp: 20_000, pos: { x: 0.5, y: 0, z: 0 } });
     world.devots.set(victim.id, victim);
     world.devots.set(bully.id, bully);
@@ -55,8 +55,8 @@ describe("a body under attack reacts on its own", () => {
 
   it("runs from something stronger than it", () => {
     const world = new World();
-    const victim = makeDevot({ hp: 20_000, pos: { x: 0, y: 0, z: 0 } });
-    const bully = makeDevot({ hp: 100_000, pos: { x: 0.5, y: 0, z: 0 } });
+    const victim = makeDevot({ hp: 30_000, pos: { x: 0, y: 0, z: 0 } });
+    const bully = makeDevot({ hp: 55_000, pos: { x: 0.5, y: 0, z: 0 } });
     world.devots.set(victim.id, victim);
     world.devots.set(bully.id, bully);
 
@@ -71,7 +71,7 @@ describe("a body under attack reacts on its own", () => {
     // the same ending. The body fights whatever the odds — which is also the
     // only way anyone ever collects a monster's hoard.
     const world = new World();
-    const victim = makeDevot({ hp: 5_000, pos: { x: 0, y: 0, z: 0 } });
+    const victim = makeDevot({ hp: 30_000, pos: { x: 0, y: 0, z: 0 } });
     world.devots.set(victim.id, victim);
     const monster = spawnMonster(world, 0.4, 0);
 
@@ -85,8 +85,8 @@ describe("a body under attack reacts on its own", () => {
     // to walk somewhere keeps walking — overruling it would make the mind's
     // decisions meaningless.
     const world = new World();
-    const victim = makeDevot({ hp: 20_000, pos: { x: 0, y: 0, z: 0 } });
-    const bully = makeDevot({ hp: 100_000, pos: { x: 0.5, y: 0, z: 0 } });
+    const victim = makeDevot({ hp: 30_000, pos: { x: 0, y: 0, z: 0 } });
+    const bully = makeDevot({ hp: 55_000, pos: { x: 0.5, y: 0, z: 0 } });
     world.devots.set(victim.id, victim);
     world.devots.set(bully.id, bully);
     applyDecision(bully, { action: "attack", targetId: victim.id }, world);
@@ -98,7 +98,7 @@ describe("a body under attack reacts on its own", () => {
 
   it("stops reacting once the attacker is gone", () => {
     const world = new World();
-    const victim = makeDevot({ hp: 100_000, pos: { x: 0, y: 0, z: 0 } });
+    const victim = makeDevot({ hp: 55_000, pos: { x: 0, y: 0, z: 0 } });
     const bully = makeDevot({ hp: 20_000, pos: { x: 0.5, y: 0, z: 0 } });
     world.devots.set(victim.id, victim);
     world.devots.set(bully.id, bully);
@@ -143,5 +143,40 @@ describe("an alert that was missed is raised again", () => {
       (t) => t.kind === "threat",
     );
     expect(later).toHaveLength(1);
+  });
+});
+
+describe("a monster on you overrides what the mind decided", () => {
+  it("fights back even when the mind keeps choosing to run", () => {
+    // This is the bug that made devots look passive in play: the reflex only
+    // overrode PASSIVE goals, and with a devot thinking every ten seconds one
+    // decision to flee stuck forever. It ran, the beast followed, and it never
+    // fought back once — all the way to being eaten.
+    const world = new World();
+    const victim = makeDevot({ hp: 55_000, pos: { x: 0, y: 0, z: 0 } });
+    world.devots.set(victim.id, victim);
+    spawnMonster(world, 0.4, 0);
+
+    let fought = 0;
+    for (let i = 0; i < 12; i++) {
+      applyDecision(victim, { action: "flee", direction: { x: 1, z: 0 } }, world);
+      tick(world);
+      monsterSystem(world);
+      if (victim.currentGoal.kind === "attack") fought++;
+    }
+    expect(fought).toBeGreaterThanOrEqual(10);
+  });
+
+  it("but lets a devot run from a monster that is not on it yet", () => {
+    // Choosing to leave before it closes is a real decision, and it keeps it.
+    const world = new World();
+    const victim = makeDevot({ hp: 55_000, pos: { x: 0, y: 0, z: 0 } });
+    world.devots.set(victim.id, victim);
+    spawnMonster(world, 25, 25);
+
+    applyDecision(victim, { action: "flee", direction: { x: -1, z: -1 } }, world);
+    tick(world);
+    monsterSystem(world);
+    expect(victim.currentGoal.kind).toBe("flee");
   });
 });

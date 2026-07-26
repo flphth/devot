@@ -31,7 +31,6 @@ import {
   MONSTER_THINK_INTERVAL_MS,
   SOUL_MAX_CHARS,
   statMultiplier,
-  DEATH_RESIDUE_FRACTION,
   DEVOT_DEPOSIT,
   GOD_ENDOWMENT,
   LEGACY_TTL_MS,
@@ -454,12 +453,13 @@ export class WorldRoom extends Room<WorldState> {
       return this.reject(client, "smite", "They are already dead.");
     }
 
+    // Lightning kills outside deathSystem, so this death never reaches the
+    // tick's list. It also kills a devot that was perfectly healthy, so the
+    // whole of what it held drops — smiting your own is expensive, and it
+    // feeds whoever is nearest.
+    this.dropLegacy(devot.id, devot.hp);
     devot.hp = 0;
     devot.state = "dead";
-    // Lightning kills outside deathSystem, so this death never reaches the
-    // tick's list: without this the devot's deposit simply vanished — no relic
-    // on the ground, no burn in the books.
-    this.dropLegacy(devot.id);
     this.repos.devots.kill(devot.id, "divine lightning");
     this.repos.events.record("smite", [devot.id], { godId });
     console.log(`[world] ⚡ ${devot.name} smitten by their god — context destroyed.`);
@@ -687,6 +687,15 @@ export class WorldRoom extends Room<WorldState> {
     // tick is told about the beast that is already upon it, not where it stood.
     const beasts = monsterSystem(this.world, Date.now());
 
+    for (const { devotId, residue, monsterId } of beasts.kills) {
+      this.dropLegacy(devotId, residue);
+      this.repos.devots.kill(devotId, `taken by ${monsterId}`);
+      const name = this.world.devots.get(devotId)?.name ?? devotId;
+      console.log(`[world] ☠ ${name} was taken by a monster — it leaves ${residue}.`);
+      const st = this.state.devots.get(devotId);
+      if (st) st.utterance = "";
+    }
+
     for (const { monsterId, foodId, funds, leftBy } of beasts.scavenged) {
       // Taken out of circulation: the funds ride on a monster's back now, and
       // only come home if something brings it down.
@@ -769,8 +778,8 @@ export class WorldRoom extends Room<WorldState> {
       });
     }
 
-    for (const { devotId, cause } of result.deaths) {
-      this.dropLegacy(devotId);
+    for (const { devotId, cause, residue } of result.deaths) {
+      this.dropLegacy(devotId, residue);
       this.repos.devots.kill(devotId, cause);
       const s = this.state.devots.get(devotId);
       const name = this.world.devots.get(devotId)?.name ?? devotId;
@@ -912,11 +921,16 @@ export class WorldRoom extends Room<WorldState> {
    * of what it touches, which is what stops a line from churning devots for
    * free and what makes a corpse worth crossing the map for.
    */
-  private dropLegacy(devotId: string): void {
+  private dropLegacy(devotId: string, residue: number): void {
     const devot = this.world.devots.get(devotId);
     if (!devot) return;
-    const funds = Math.round(DEVOT_DEPOSIT * DEATH_RESIDUE_FRACTION);
-    this.economy.burn(DEVOT_DEPOSIT - funds);
+    // What it still held is what drops. A devot that spent itself down to
+    // nothing leaves nothing; one cut down while it still had life leaves all
+    // of it. The difference between the deposit and the estate was burned
+    // living, one thought at a time.
+    const funds = Math.max(0, Math.round(residue));
+    this.economy.burn(Math.max(0, DEVOT_DEPOSIT - funds));
+    if (funds <= 0) return;
 
     const relic: FoodEntity = {
       id: `legacy-${devot.id}`,

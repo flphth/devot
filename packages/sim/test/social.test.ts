@@ -8,6 +8,7 @@ import {
   REPRO_SOLO_COST_FRACTION,
   REPRO_TRANSFER_EFFICIENCY,
   encodeIdentity,
+  COMBAT_RESIDUE_FRACTION,
 } from "@devot/shared";
 import { applyDecision, perceptionSystem, resolveReproduction, tick, World } from "../src/index.js";
 
@@ -84,7 +85,7 @@ describe("combat — vital predation", () => {
     expect(result.combats).toHaveLength(0); // not in contact yet
   });
 
-  it("a victim killed in combat dies 'devoured'", () => {
+  it("a victim killed in combat dies once, holding its estate", () => {
     const world = new World();
     const attacker = makeDevot();
     const victim = makeDevot({ pos: { x: 0.5, y: 0, z: 0 }, hp: 100 });
@@ -93,8 +94,38 @@ describe("combat — vital predation", () => {
     applyDecision(attacker, { action: "attack", targetId: victim.id }, world);
 
     const result = tick(world);
+    // Once. hungerSystem used to recompute a dead devot's state from its HP
+    // before deathSystem ran, resurrecting it just long enough to be killed a
+    // second time — and its estate dropped twice with it.
     expect(result.deaths).toHaveLength(1);
-    expect(result.deaths[0]!.cause).toContain("devoured");
+    expect(result.deaths[0]!.cause).toContain("killed by");
+    expect(result.deaths[0]!.residue).toBe(100);
+  });
+
+  it("an attacker cannot drain a victim below the residue floor", () => {
+    // What a killer cannot take is exactly what will be lying on the ground
+    // afterwards, for anyone who saw the fight — the killer included, if it
+    // stays. Draining someone is no longer the efficient way to take a life.
+    const world = new World();
+    const attacker = makeDevot({ hp: 60_000, hpMax: 60_000 });
+    const victim = makeDevot({ pos: { x: 0.5, y: 0, z: 0 }, hp: 60_000, hpMax: 60_000 });
+    world.devots.set(attacker.id, attacker);
+    world.devots.set(victim.id, victim);
+    applyDecision(attacker, { action: "attack", targetId: victim.id }, world);
+
+    const floor = Math.round(60_000 * COMBAT_RESIDUE_FRACTION);
+    let death;
+    for (let i = 0; i < 4000 && !death; i++) {
+      death = tick(world).deaths.find((d) => d.devotId === victim.id);
+      // While it lives, the attacker has never pushed it under the floor.
+      if (!death) expect(victim.hp).toBeGreaterThanOrEqual(floor - 1);
+    }
+
+    expect(death).toBeDefined();
+    expect(death!.cause).toContain("killed by");
+    // Its own metabolism nibbles at the floor too, so this is close, not exact.
+    expect(death!.residue).toBeGreaterThan(floor * 0.8);
+    expect(death!.residue).toBeLessThanOrEqual(floor);
   });
 
   it("you cannot attack yourself", () => {

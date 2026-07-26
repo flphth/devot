@@ -7,6 +7,7 @@ import {
   MONSTER_METABOLISM_HP_PER_TICK,
   MONSTER_SIGHT,
   MONSTER_SPEED,
+  COMBAT_RESIDUE_FRACTION,
   EAT_RADIUS,
   TICK_MS,
   hasLineOfSight,
@@ -64,7 +65,8 @@ export interface MonsterTickResult {
   /** Drains to broadcast, so the client draws the same beam as devot combat. */
   combats: Array<{ attackerId: string; victimId: string; drained: number }>;
   deaths: Array<{ monsterId: string; hoard: number; x: number; z: number }>;
-  kills: Array<{ monsterId: string; devotId: string }>;
+  /** `residue` is what the prey still held when it fell. */
+  kills: Array<{ monsterId: string; devotId: string; residue: number }>;
   /** Relics a monster took off the ground, into its hoard. */
   scavenged: Array<{ monsterId: string; foodId: string; funds: number; leftBy: string }>;
 }
@@ -141,7 +143,11 @@ export function monsterSystem(world: World, now: number = Date.now()): MonsterTi
       continue;
     }
 
-    const drained = Math.min(MONSTER_DRAIN_PER_TICK, prey.hp);
+    // A monster cannot empty its prey either: it drains to the floor, the prey
+    // dies there, and what it still held drops for whoever comes next —
+    // including the monster itself, which will scavenge it.
+    const floor = prey.hpMax * COMBAT_RESIDUE_FRACTION;
+    const drained = Math.max(0, Math.min(MONSTER_DRAIN_PER_TICK, prey.hp - floor));
     prey.hp -= drained;
     // It absorbs only a share; the rest swells the hoard, which is what makes a
     // long-lived monster worth hunting rather than merely worth avoiding.
@@ -155,12 +161,24 @@ export function monsterSystem(world: World, now: number = Date.now()): MonsterTi
       result.triggers.push({
         kind: "threat",
         devotId: prey.id,
-        eventText: `A monster, ${monster.name} (id "${monster.id}"), has fallen upon you and is tearing your life away. It is at x=${monster.pos.x.toFixed(1)}, z=${monster.pos.z.toFixed(1)}. It is FASTER than you: running only postpones this. Killing it would give you everything it has taken from others.`,
+        eventText: `A monster, ${monster.name} (id "${monster.id}"), has fallen upon you and is tearing your life away. It is at x=${monster.pos.x.toFixed(1)}, z=${monster.pos.z.toFixed(1)}. You cannot shake it off while it has hold of you — your body will fight back on its own until you break away. Killing it would give you everything it has taken from others.`,
         createdAt: now,
       });
     }
 
-    if (prey.hp <= 0) result.kills.push({ monsterId: monster.id, devotId: prey.id });
+    // Drained to the floor: the prey dies HERE, holding its estate. Without
+    // this it would sit at the floor forever — deathSystem only ever sees hp
+    // reach zero, and the floor is above zero by construction.
+    if (prey.hp <= floor + 1e-6) {
+      prey.state = "dead";
+      result.kills.push({
+        monsterId: monster.id,
+        devotId: prey.id,
+        residue: Math.max(0, Math.round(prey.hp)),
+      });
+      prey.hp = 0;
+      monster.targetId = undefined;
+    }
   }
 
   return result;

@@ -70,7 +70,9 @@ describe("reactive layer (0 tokens)", () => {
     world.devots.set(devot.id, devot);
 
     const result = tick(world);
-    expect(result.deaths).toEqual([{ devotId: "d1", cause: "vital exhaustion" }]);
+    expect(result.deaths).toEqual([
+      { devotId: "d1", cause: "vital exhaustion", residue: 0 },
+    ]);
     expect(devot.state).toBe("dead");
     expect(devot.hp).toBe(0);
   });
