@@ -44,6 +44,21 @@ export const MAX_CONCURRENT_INFERENCES = 4;
 // Global token bucket: server spending ceiling (µ$ per minute).
 export const GLOBAL_BUDGET_UHP_PER_MIN = 500_000; // 0,50 $/min max
 
+/**
+ * How often a devot with nothing happening to it thinks anyway.
+ *
+ * Devots used to think only when something poked them, and drifted on autopilot
+ * in between. They are now always in the loop: looking at where they are and
+ * deciding what to do about it, on this cadence, with triggers still cutting
+ * in front when something urgent happens.
+ *
+ * This is the most expensive number in the game. A thought runs ~1,500 HP
+ * against a 60,000 pool, so at 10 s a devot that never eats thinks itself to
+ * death in about seven minutes — and every devot alive draws on the same
+ * inference budget. Raise it to slow the world down and spend less.
+ */
+export const DEVOT_THINK_INTERVAL_MS = 10_000;
+
 // Body
 export const DEVOT_SPEED = 2; // units per second
 export const EAT_RADIUS = 0.75;

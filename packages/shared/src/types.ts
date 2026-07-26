@@ -110,6 +110,8 @@ export interface DevotEntity {
   alertedAt?: number;
   /** HP at the end of its previous thought, so it can feel a trend. */
   hpAtLastThought?: number;
+  /** When its mind last ran. The idle loop is paced off this. */
+  lastThoughtAt?: number;
   /** Everyone who has ever drawn its life. Capped; survives between thoughts. */
   attackedBy?: string[];
   /** Devots already met (one encounter = a single trigger). */

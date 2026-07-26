@@ -26,6 +26,7 @@ import {
   PATCH_RATE_MS,
   PERCEPTION_RADIUS,
   TICK_MS,
+  DEVOT_THINK_INTERVAL_MS,
   MONSTER_THINK_INTERVAL_MS,
   SOUL_MAX_CHARS,
   statMultiplier,
@@ -557,9 +558,43 @@ export class WorldRoom extends Room<WorldState> {
    * Appending the surroundings to every thought fixes that without buying more
    * thoughts — the picture rides along with the one we were already paying for.
    */
+  /**
+   * KEEPS EVERY DEVOT IN THE LOOP.
+   *
+   * A devot used to think only when something poked it, and coasted on its
+   * last decision in between — which meant most of them, most of the time,
+   * were not really present. Now each one looks at where it is and decides
+   * what to do about it on a cadence, whether or not the world has bothered it.
+   *
+   * Triggers still cut in front: a threat displaces a queued musing, so being
+   * always-on does not mean being slow to react.
+   *
+   * The guards that already existed carry the cost: a devot below the floor
+   * cost abstains, the global token bucket throttles under pressure, and only
+   * MAX_CONCURRENT_INFERENCES run at once. This adds pressure to that system
+   * rather than bypassing it.
+   */
+  private keepThinking(): void {
+    const now = Date.now();
+    for (const devot of this.world.aliveDevots()) {
+      if (devot.thinking) continue;
+      if (now - (devot.lastThoughtAt ?? 0) < DEVOT_THINK_INTERVAL_MS) continue;
+      this.wake({
+        kind: "idle_reflection",
+        devotId: devot.id,
+        eventText:
+          "Nothing has happened to you. Look at where you are and decide what to do about it — including doing nothing, which costs you almost nothing.",
+        createdAt: now,
+      });
+    }
+  }
+
   private wake(trigger: Trigger): void {
     const devot = this.world.devots.get(trigger.devotId);
     if (!devot) return;
+    // Stamped on every wake, whatever woke it: the cadence measures time since
+    // the devot last thought at all, not since it was last bored.
+    devot.lastThoughtAt = Date.now();
     // The sky comes first: the hour and the season change what every other
     // line in the picture is worth.
     const eventText = [
@@ -689,6 +724,7 @@ export class WorldRoom extends Room<WorldState> {
     }
 
     this.wakeMonsters();
+    this.keepThinking();
 
     for (const d of this.world.devots.values()) {
       if (d.state === "dead") continue;
