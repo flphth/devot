@@ -94,6 +94,8 @@ describe("describeSurroundings — the boundary of what a mind may know", () => 
       type: "grain",
       hpValue: 800,
       source: "spawn",
+      spawnedAt: Date.now(),
+      ttlMs: 10 * 60_000,
     });
     expect(describeSurroundings(me, world)).toContain('id "f1"');
   });

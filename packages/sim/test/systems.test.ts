@@ -25,7 +25,15 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
 }
 
 function makeFood(id: string, x: number, z: number, hpValue = 500): FoodEntity {
-  return { id, pos: { x, y: 0, z }, type: "grain", hpValue, source: "spawn" };
+  return {
+    id,
+    pos: { x, y: 0, z },
+    type: "grain",
+    hpValue,
+    source: "spawn",
+    spawnedAt: Date.now(),
+    ttlMs: 10 * 60_000, // long enough that decay never interferes with a test
+  };
 }
 
 describe("reactive layer (0 tokens)", () => {
@@ -160,5 +168,60 @@ describe("watertight perception — nothing beyond the radius leaks", () => {
       (v1.x * v2.x + v1.z * v2.z) /
       (Math.hypot(v1.x, v1.z) * Math.hypot(v2.x, v2.z));
     expect(dot).toBeGreaterThan(0.95);
+  });
+});
+
+describe("food rots", () => {
+  it("removes food that outlived its ttl, and reports it", () => {
+    const world = new World();
+    const food = makeFood("f-old", 5, 5);
+    food.spawnedAt = Date.now() - 60_000;
+    food.ttlMs = 30_000;
+    world.food.set(food.id, food);
+
+    const result = tick(world);
+    expect(result.rotted).toEqual(["f-old"]);
+    expect(world.food.has("f-old")).toBe(false);
+  });
+
+  it("leaves food that is still fresh alone", () => {
+    const world = new World();
+    const food = makeFood("f-fresh", 5, 5);
+    food.spawnedAt = Date.now() - 1_000;
+    food.ttlMs = 30_000;
+    world.food.set(food.id, food);
+
+    expect(tick(world).rotted).toEqual([]);
+    expect(world.food.has("f-fresh")).toBe(true);
+  });
+
+  it("a devot walking to food that rots gives up instead of chasing a ghost", () => {
+    const world = new World();
+    const devot = makeDevot({ currentGoal: { kind: "seek_food", foodId: "f-gone" } });
+    world.devots.set(devot.id, devot);
+    const food = makeFood("f-gone", 10, 0);
+    food.spawnedAt = Date.now() - 60_000;
+    food.ttlMs = 1_000;
+    world.food.set(food.id, food);
+
+    tick(world);
+    expect(devot.currentGoal.kind).toBe("wander");
+  });
+
+  it("rotting cannot resurrect a meal: it is gone, not eaten", () => {
+    // Decay runs before the bodies move, so a devot standing on a meal the
+    // instant it expires loses it rather than winning an invisible race.
+    const world = new World();
+    const devot = makeDevot({ hp: 1000 });
+    world.devots.set(devot.id, devot);
+    const food = makeFood("f-race", 0, 0, 500);
+    food.spawnedAt = Date.now() - 60_000;
+    food.ttlMs = 1_000;
+    world.food.set(food.id, food);
+
+    const result = tick(world);
+    expect(result.rotted).toEqual(["f-race"]);
+    expect(result.eaten).toEqual([]);
+    expect(devot.hp).toBeLessThan(1000);
   });
 });

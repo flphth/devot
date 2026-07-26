@@ -127,12 +127,18 @@ export interface MonsterEntity {
   targetId?: string;
 }
 
+export type FoodType = "grain" | "fruit" | "manna" | "tainted" | "carrion";
+
 export interface FoodEntity {
   id: string;
   pos: Vec3;
-  type: "grain" | "fruit" | "manna" | "tainted" | "carrion";
+  type: FoodType;
   hpValue: number;
   source: "spawn" | "god";
+  /** When it appeared. Food that is not eaten rots away. */
+  spawnedAt: number;
+  /** How long it lasts, in ms, before it is gone for good. */
+  ttlMs: number;
 }
 
 export interface InferenceUsage {

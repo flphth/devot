@@ -15,6 +15,10 @@ import {
   TICK_MS,
   SOUL_MAX_CHARS,
   statMultiplier,
+  FOOD_SPAWN_CHANCE_PER_TICK,
+  FOOD_TARGET,
+  FOOD_TTL_JITTER,
+  FOOD_TTL_MS,
   TRAIT_POOL,
   defaultIdentity,
   resolveRockCollisions,
@@ -37,6 +41,7 @@ import {
   type DevotEntity,
   type FeedMsg,
   type FoodEntity,
+  type FoodType,
   type JournalEntry,
   type JournalMsg,
   type JournalRequestMsg,
@@ -62,11 +67,15 @@ const GOD_COLORS = ["#e0b34c", "#4ca6e0", "#9c4ce0", "#4ce07a", "#e04c5f"];
 function hpMaxFor(vitality: number): number {
   return Math.round(HP_MAX_DEFAULT * statMultiplier(vitality));
 }
-const FOOD_TARGET = 8;
-const FOOD_SPAWN_EVERY_TICKS = 16; // ~4 s
 
 interface WorldRoomOptions {
   godName?: string;
+}
+
+/** How long a given kind of food lasts, spread so nothing vanishes in waves. */
+function rotsIn(type: FoodType): number {
+  const base = FOOD_TTL_MS[type] ?? 45_000;
+  return base * (1 + (Math.random() - 0.5) * 2 * FOOD_TTL_JITTER);
 }
 
 /**
@@ -463,6 +472,10 @@ export class WorldRoom extends Room<WorldState> {
     this.tickCount++;
     const result = tick(this.world);
 
+    for (const foodId of result.rotted) {
+      this.repos.events.record("food_rotted", [], { foodId });
+    }
+
     for (const { devotId, foodId, hpValue } of result.eaten) {
       this.repos.events.record("meal", [devotId], { foodId, hpValue });
     }
@@ -545,7 +558,12 @@ export class WorldRoom extends Room<WorldState> {
       if (s) s.utterance = "";
     }
 
-    if (this.tickCount % FOOD_SPAWN_EVERY_TICKS === 0 && this.world.food.size < FOOD_TARGET) {
+    // Food appears at random rather than on a metronome, so the world never
+    // settles into a rhythm a devot could learn to wait out.
+    if (
+      this.world.food.size < FOOD_TARGET &&
+      Math.random() < FOOD_SPAWN_CHANCE_PER_TICK
+    ) {
       this.spawnFood("spawn");
     }
 
@@ -588,7 +606,10 @@ export class WorldRoom extends Room<WorldState> {
       type: at ? kind : rare ? "manna" : Math.random() < 0.3 ? "fruit" : "grain",
       hpValue: hpValue ?? 0,
       source,
+      spawnedAt: Date.now(),
+      ttlMs: 0,
     };
+    f.ttlMs = rotsIn(f.type);
     if (f.hpValue === 0) {
       f.hpValue = f.type === "manna" ? HP_MAX_DEFAULT : f.type === "fruit" ? 6000 : 2000;
     }
@@ -611,6 +632,8 @@ export class WorldRoom extends Room<WorldState> {
       type: "carrion",
       hpValue: Math.round(hoard),
       source: "spawn",
+      spawnedAt: Date.now(),
+      ttlMs: rotsIn("carrion"),
     };
     this.world.food.set(food.id, food);
   }
@@ -671,6 +694,8 @@ export class WorldRoom extends Room<WorldState> {
         s.source = f.source;
         s.x = f.pos.x;
         s.z = f.pos.z;
+        s.spawnedAt = f.spawnedAt;
+        s.ttlMs = f.ttlMs;
         this.state.food.set(id, s);
       }
     }

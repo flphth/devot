@@ -11,7 +11,7 @@ import { CognitionOrchestrator, createMind } from "@devot/agents";
 import { createRepos, openDb } from "@devot/db";
 import { FreeStubProvider } from "@devot/onchain";
 import type { DevotEntity, FoodEntity } from "@devot/shared";
-import { TICK_MS } from "@devot/shared";
+import { FOOD_TTL_MS, TICK_MS } from "@devot/shared";
 import { applyDecision, perceptionSystem, tick, World } from "@devot/sim";
 
 if (process.argv.includes("--mock")) process.env.MIND = "mock";
@@ -101,6 +101,8 @@ async function main(): Promise<void> {
       type: "grain",
       hpValue: 800,
       source: "spawn",
+      spawnedAt: Date.now(),
+      ttlMs: FOOD_TTL_MS.grain!,
     };
     world.food.set(f.id, f);
   };

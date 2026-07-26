@@ -57,6 +57,23 @@ export const AGONIZING_THRESHOLD = 0.15;
 // weakened accordingly.
 export const METABOLISM_HP_PER_TICK = 1;
 
+// Food: it appears on its own, and it rots. A meal left uneaten is a meal
+// lost — waiting is never free, and the map is never a stable larder.
+export const FOOD_TARGET = 8; // ceiling on natural food lying around
+export const FOOD_SPAWN_CHANCE_PER_TICK = 0.05; // ~1 every 5 s, at random
+/** How long each kind lasts before rotting away, in ms. */
+export const FOOD_TTL_MS: Record<string, number> = {
+  grain: 60_000,
+  fruit: 42_000,
+  manna: 24_000, // divine and precious, therefore fleeting
+  tainted: 90_000,
+  // A carcass is the richest thing in the world and the one worth crossing it
+  // for: it lasts long enough that the news of a kill can travel.
+  carrion: 120_000,
+};
+/** Random spread applied to a TTL, so food does not vanish in synchronised waves. */
+export const FOOD_TTL_JITTER = 0.35;
+
 // Combat: vital predation (HP transfer from victim to attacker).
 export const ATTACK_RADIUS = 1.5;
 // HP taken from the victim per tick. Absolute value: with the pool tripled,

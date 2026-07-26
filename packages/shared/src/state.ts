@@ -84,6 +84,9 @@ export class FoodState extends Schema {
   declare kind: string;
   declare hpValue: number;
   declare source: string;
+  /** Sent so the client can wilt the food as its end approaches. */
+  declare spawnedAt: number;
+  declare ttlMs: number;
 
   constructor() {
     super();
@@ -93,6 +96,8 @@ export class FoodState extends Schema {
     this.kind = "grain";
     this.hpValue = 0;
     this.source = "spawn";
+    this.spawnedAt = 0;
+    this.ttlMs = 0;
   }
 }
 defineTypes(FoodState, {
@@ -102,6 +107,8 @@ defineTypes(FoodState, {
   kind: "string",
   hpValue: "number",
   source: "string",
+  spawnedAt: "number",
+  ttlMs: "number",
 });
 
 export class GodState extends Schema {
