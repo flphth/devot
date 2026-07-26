@@ -58,6 +58,7 @@ import {
   type JournalEntry,
   type JournalMsg,
   type JournalRequestMsg,
+  type LineageEndedMsg,
   type SmiteMsg,
   type SpeakMsg,
   type Trigger,
@@ -121,6 +122,14 @@ export class WorldRoom extends Room<WorldState> {
    * and the messages table only accepts rows belonging to a devot.
    */
   private monsterMemory = new EphemeralMemory();
+  /**
+   * When each line began, in world time. The score is how long it has endured
+   * since, so this is the only thing that has to be remembered — everything
+   * else is counted off the world itself.
+   */
+  private lineageStart = new Map<string, number>();
+  /** Gods whose line was standing last tick, to catch the moment it stops. */
+  private livingLines = new Set<string>();
 
   /**
    * Hands the orchestrator whatever thinks under this id, devot or monster.
@@ -309,6 +318,8 @@ export class WorldRoom extends Room<WorldState> {
       identity,
     });
     this.repos.events.record("birth", [devot.id], { founder: true, godId });
+    // A new founder restarts the line: the previous one is over and scored.
+    this.lineageStart.set(godId, this.world.worldMs);
 
     this.wake({
       kind: "idle_reflection",
@@ -327,6 +338,7 @@ export class WorldRoom extends Room<WorldState> {
       isFounder: boolean;
       x?: number;
       z?: number;
+      generation?: number;
       /** Absente pour une naissance par reproduction ou en mode god. */
       identity?: Identity;
     },
@@ -354,6 +366,7 @@ export class WorldRoom extends Room<WorldState> {
       state: "alive",
       profile: "frugal",
       traits: opts.traits,
+      generation: opts.generation ?? 1,
       age: 0,
       thinking: false,
       utterance: "",
@@ -639,6 +652,9 @@ export class WorldRoom extends Room<WorldState> {
     }
 
     this.wakeMonsters();
+
+    this.detectExtinctions();
+    this.scoreLineages();
     this.syncState();
   }
 
@@ -685,6 +701,77 @@ export class WorldRoom extends Room<WorldState> {
         });
       }
     }
+  }
+
+  /**
+   * Notices the moment a line stops existing.
+   *
+   * Watches the TRANSITION in world state rather than the deaths reported by
+   * the tick. Reading deaths missed every way of dying that does not go through
+   * deathSystem — divine lightning, most obviously, so a god who struck down
+   * their own last devot never saw their run end.
+   */
+  private detectExtinctions(): void {
+    const standing = new Set<string>();
+    for (const d of this.world.devots.values()) {
+      if (d.state !== "dead") standing.add(d.godId);
+    }
+    for (const godId of this.livingLines) {
+      if (!standing.has(godId)) this.onLineageEnded(godId);
+    }
+    this.livingLines = standing;
+  }
+
+  /**
+   * Recomputes what each god is playing for.
+   *
+   * Counted off the world rather than tallied as events happen: a counter that
+   * is incremented in five places is a counter that drifts, and this is the
+   * number the whole run is judged on.
+   */
+  private scoreLineages(): void {
+    for (const [godId, god] of this.state.gods) {
+      const line = [...this.world.devots.values()].filter((d) => d.godId === godId);
+      const living = line.filter((d) => d.state !== "dead");
+
+      god.born = line.length;
+      god.lost = line.length - living.length;
+      god.generations = line.reduce((n, d) => Math.max(n, d.generation), 0);
+      god.eldest = line.reduce((n, d) => Math.max(n, d.age), 0);
+      god.lineageAlive = living.length > 0;
+
+      const startedAt = this.lineageStart.get(godId);
+      if (startedAt === undefined) continue;
+      // The clock stops when the last of them dies: a dead line does not go on
+      // scoring while its god watches.
+      if (living.length > 0) {
+        god.lineageCycles = Math.floor((this.world.worldMs - startedAt) / TICK_MS);
+      }
+    }
+  }
+
+  /** The last of a line has died. The run is over, and the world remembers. */
+  private onLineageEnded(godId: string): void {
+    const god = this.state.gods.get(godId);
+    if (!god) return;
+    this.lineageStart.delete(godId);
+    this.repos.events.record("lineage_ended", [godId], {
+      cycles: god.lineageCycles,
+      generations: god.generations,
+      born: god.born,
+      eldest: god.eldest,
+    });
+    console.log(
+      `[world] ⌛ the line of ${god.name} is extinct — ${god.lineageCycles} cycles, ` +
+        `${god.generations} generation(s), ${god.born} born.`,
+    );
+    this.broadcast("lineageEnded", {
+      godId,
+      cycles: god.lineageCycles,
+      generations: god.generations,
+      born: god.born,
+      eldest: god.eldest,
+    } satisfies LineageEndedMsg);
   }
 
   private onDevotSpoke(speaker: DevotEntity, utterance: string): void {

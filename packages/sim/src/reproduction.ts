@@ -106,6 +106,9 @@ function makeChild(
     state: "alive",
     profile: a.profile,
     traits,
+    // One deeper than the parent who started it — the line's depth is the
+    // thing being scored, so it has to be carried, not recomputed.
+    generation: a.generation + 1,
     identityJson: encodeIdentity(identity),
     // A child is born empty-handed: an item is forged at the price of ITS OWN
     // life, it is not handed down (T6 will deal with what drops on death).

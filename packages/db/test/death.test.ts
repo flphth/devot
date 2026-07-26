@@ -7,6 +7,7 @@ function makeDevot(id: string): DevotEntity {
     id,
     godId: "god-1",
     isFounder: true,
+    generation: 1,
     name: "Test",
     pos: { x: 0, y: 0, z: 0 },
     hp: 1000,

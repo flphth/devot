@@ -24,6 +24,7 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     id: `d${++seq}`,
     godId: "g1",
     isFounder: false,
+    generation: 1,
     name: `Devot${seq}`,
     pos: { x: 0, y: 0, z: 0 },
     hp: 40_000,

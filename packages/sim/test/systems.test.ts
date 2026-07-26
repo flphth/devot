@@ -7,6 +7,7 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     id: "d1",
     godId: "g1",
     isFounder: true,
+    generation: 1,
     name: "Test",
     pos: { x: 0, y: 0, z: 0 },
     hp: 10_000,

@@ -40,6 +40,7 @@ async function main(): Promise<void> {
     id: "devot-adam",
     godId,
     isFounder: true,
+    generation: 1,
     name: "Adam",
     pos: { x: 0, y: 0, z: 0 },
     hp: DEMO_HP_MAX,

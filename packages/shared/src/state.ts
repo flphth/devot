@@ -118,6 +118,20 @@ export class GodState extends Schema {
   /** Authoritative: the client only renders the countdown. */
   declare lastSpeakAt: number;
   declare connected: boolean;
+  /**
+   * THE SCORE. How long this line has endured, in world cycles since its
+   * founder opened its eyes. It stops when the last of them dies.
+   */
+  declare lineageCycles: number;
+  /** How deep the line has gone. A founder alone is 1. */
+  declare generations: number;
+  /** Everyone ever born into it, and everyone it has lost. */
+  declare born: number;
+  declare lost: number;
+  /** The most cycles any single one of them managed. */
+  declare eldest: number;
+  /** False once the last of them is dead: the run is over. */
+  declare lineageAlive: boolean;
 
   constructor() {
     super();
@@ -126,6 +140,12 @@ export class GodState extends Schema {
     this.color = "#ffffff";
     this.lastSpeakAt = 0;
     this.connected = true;
+    this.lineageCycles = 0;
+    this.generations = 0;
+    this.born = 0;
+    this.lost = 0;
+    this.eldest = 0;
+    this.lineageAlive = false;
   }
 }
 defineTypes(GodState, {
@@ -134,6 +154,12 @@ defineTypes(GodState, {
   color: "string",
   lastSpeakAt: "number",
   connected: "boolean",
+  lineageCycles: "number",
+  generations: "number",
+  born: "number",
+  lost: "number",
+  eldest: "number",
+  lineageAlive: "boolean",
 });
 
 /**
@@ -292,6 +318,18 @@ export interface FeedMsg {
   devotId?: string;
   x?: number;
   z?: number;
+}
+
+/**
+ * A line has died out. Broadcast because it is the end of a run: the score is
+ * final, and nothing that god had left is alive to change it.
+ */
+export interface LineageEndedMsg {
+  godId: string;
+  cycles: number;
+  generations: number;
+  born: number;
+  eldest: number;
 }
 
 /** Server response to rejected intents. */
