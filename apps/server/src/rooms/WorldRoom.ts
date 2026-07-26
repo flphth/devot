@@ -17,6 +17,9 @@ import {
   statMultiplier,
   TRAIT_POOL,
   defaultIdentity,
+  resolveRockCollisions,
+  terrainHeight,
+  type Vec3,
   encodeIdentity,
   signatureOf,
   validateAppearance,
@@ -64,6 +67,17 @@ const FOOD_SPAWN_EVERY_TICKS = 16; // ~4 s
 
 interface WorldRoomOptions {
   godName?: string;
+}
+
+/**
+ * Puts something down where the ground actually is, and never inside a
+ * boulder. Height is never stored on the wire: both sides recompute it.
+ */
+function placeOnGround(x: number, z: number): Vec3 {
+  const pos: Vec3 = { x, y: 0, z };
+  resolveRockCollisions(pos);
+  pos.y = terrainHeight(pos.x, pos.z);
+  return pos;
 }
 
 export class WorldRoom extends Room<WorldState> {
@@ -261,11 +275,10 @@ export class WorldRoom extends Room<WorldState> {
       godId,
       isFounder: opts.isFounder,
       name: (opts.name ?? `Devot-${this.devotSeq}`).slice(0, 24),
-      pos: {
-        x: opts.x ?? (Math.random() - 0.5) * this.world.size,
-        y: 0,
-        z: opts.z ?? (Math.random() - 0.5) * this.world.size,
-      },
+      pos: placeOnGround(
+        opts.x ?? (Math.random() - 0.5) * this.world.size,
+        opts.z ?? (Math.random() - 0.5) * this.world.size,
+      ),
       // Max HP follow from the chosen VITALITY: it is the heaviest stat, since
       // HP are also the thinking budget. A hardy devot does not merely live
       // longer, it thinks longer.
@@ -568,11 +581,10 @@ export class WorldRoom extends Room<WorldState> {
     const rare = Math.random() < 0.06;
     const f: FoodEntity = {
       id: `food-${++this.foodSeq}`,
-      pos: {
-        x: at?.x ?? (Math.random() - 0.5) * 2 * this.world.size * 0.9,
-        y: 0,
-        z: at?.z ?? (Math.random() - 0.5) * 2 * this.world.size * 0.9,
-      },
+      pos: placeOnGround(
+        at?.x ?? (Math.random() - 0.5) * 2 * this.world.size * 0.9,
+        at?.z ?? (Math.random() - 0.5) * 2 * this.world.size * 0.9,
+      ),
       type: at ? kind : rare ? "manna" : Math.random() < 0.3 ? "fruit" : "grain",
       hpValue: hpValue ?? 0,
       source,
@@ -595,7 +607,7 @@ export class WorldRoom extends Room<WorldState> {
     if (hoard < 1) return;
     const food: FoodEntity = {
       id: `food-carrion-${this.foodSeq++}`,
-      pos: { x, y: 0, z },
+      pos: placeOnGround(x, z),
       type: "carrion",
       hpValue: Math.round(hoard),
       source: "spawn",

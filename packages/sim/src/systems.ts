@@ -1,4 +1,4 @@
-import type { Decision, DevotEntity, Trigger } from "@devot/shared";
+import type { Decision, DevotEntity, FoodEntity, Trigger, Vec3 } from "@devot/shared";
 import {
   AGONIZING_THRESHOLD,
   ATTACK_DRAIN_PER_TICK,
@@ -9,6 +9,11 @@ import {
   HUNGRY_THRESHOLD,
   METABOLISM_HP_PER_TICK,
   PERCEPTION_RADIUS,
+  hasLineOfSight,
+  resolveRockCollisions,
+  slopeSpeedFactor,
+  terrainGrade,
+  terrainHeight,
   TICK_MS,
   canCraft,
   describeIdentity,
@@ -55,20 +60,19 @@ function movementSystem(devot: DevotEntity, world: World, dt: number): void {
 
   switch (goal.kind) {
     case "idle":
-      return;
+      break;
     case "wander": {
       // Smoothed wandering: the heading drifts slowly (deterministic on age)
       // instead of zigzagging — the body keeps its direction for several ticks.
       const angle = devot.id.length * 1.7 + devot.age * 0.045;
-      devot.pos.x += Math.cos(angle) * step * 0.5;
-      devot.pos.z += Math.sin(angle) * step * 0.5;
+      advance(devot, Math.cos(angle), Math.sin(angle), step * 0.5);
       break;
     }
     case "seek_food": {
       const food = world.food.get(goal.foodId);
       if (!food) {
         devot.currentGoal = { kind: "wander" };
-        return;
+        break;
       }
       stepToward(devot, food.pos.x, food.pos.z, step);
       break;
@@ -82,15 +86,14 @@ function movementSystem(devot: DevotEntity, world: World, dt: number): void {
       const dx = devot.pos.x - goal.from.x;
       const dz = devot.pos.z - goal.from.z;
       const len = Math.hypot(dx, dz) || 1;
-      devot.pos.x += (dx / len) * step * 1.5;
-      devot.pos.z += (dz / len) * step * 1.5;
+      advance(devot, dx / len, dz / len, step * 1.5);
       break;
     }
     case "attack": {
       const target = world.devots.get(goal.targetId) ?? world.monsters.get(goal.targetId);
       if (!target || target.state === "dead") {
         devot.currentGoal = { kind: "wander" };
-        return;
+        break;
       }
       // Hunting: close in until within striking range.
       if (dist2(devot.pos, target.pos) > ATTACK_RADIUS * ATTACK_RADIUS) {
@@ -100,6 +103,22 @@ function movementSystem(devot: DevotEntity, world: World, dt: number): void {
     }
   }
   clampToWorld(devot.pos, world.size);
+  resolveRockCollisions(devot.pos);
+  // The ground is the only thing that decides altitude — bodies never fly and
+  // never sink, whatever moved them (walking, clamping, a boulder, a god).
+  devot.pos.y = terrainHeight(devot.pos.x, devot.pos.z);
+}
+
+/**
+ * Moves the body along a unit direction, slowed or helped by the slope it is
+ * about to walk into. A climb never becomes a wall and a descent never becomes
+ * a slide — slopeSpeedFactor keeps the pace inside sane bounds.
+ */
+function advance(devot: DevotEntity, ux: number, uz: number, step: number): void {
+  const grade = terrainGrade(devot.pos.x, devot.pos.z, ux, uz);
+  const s = step * slopeSpeedFactor(grade);
+  devot.pos.x += ux * s;
+  devot.pos.z += uz * s;
 }
 
 /** Vital predation: on contact, HP transfer from victim to attacker. */
@@ -162,9 +181,7 @@ function stepToward(devot: DevotEntity, tx: number, tz: number, step: number): v
   const dz = tz - devot.pos.z;
   const len = Math.hypot(dx, dz);
   if (len < 1e-6) return;
-  const s = Math.min(step, len);
-  devot.pos.x += (dx / len) * s;
-  devot.pos.z += (dz / len) * s;
+  advance(devot, dx / len, dz / len, Math.min(step, len));
 }
 
 function feedingSystem(devot: DevotEntity, world: World, result: TickResult): void {
@@ -241,7 +258,7 @@ export function perceptionSystem(world: World, now: number = Date.now()): Trigge
     for (const other of alive) {
       if (other.id === devot.id) continue;
       if (devot.metDevots?.includes(other.id)) continue;
-      if (dist2(devot.pos, other.pos) <= r2) {
+      if (dist2(devot.pos, other.pos) <= r2 && hasLineOfSight(devot.pos, other.pos)) {
         devot.metDevots = [...(devot.metDevots ?? []), other.id];
         const sameGod = other.godId === devot.godId;
         triggers.push({
@@ -259,8 +276,8 @@ export function perceptionSystem(world: World, now: number = Date.now()): Trigge
 
     if (devot.currentGoal.kind === "seek_food" || devot.currentGoal.kind === "move_to")
       continue;
-    const food = world.nearestFood(devot.pos);
-    if (food && dist2(devot.pos, food.pos) <= r2) {
+    const food = nearestVisibleFood(world, devot.pos, r2);
+    if (food) {
       triggers.push({
         kind: "encounter",
         devotId: devot.id,
@@ -270,6 +287,24 @@ export function perceptionSystem(world: World, now: number = Date.now()): Trigge
     }
   }
   return triggers;
+}
+
+
+/**
+ * Nearest food that is both within `maxDist2` and actually in sight — food
+ * behind a hill does not exist as far as the body is concerned.
+ */
+export function nearestVisibleFood(world: World, from: Vec3, maxDist2: number) {
+  let best: FoodEntity | undefined;
+  let bestD = maxDist2;
+  for (const f of world.food.values()) {
+    const d = dist2(from, f.pos);
+    if (d > bestD) continue;
+    if (!hasLineOfSight(from, f.pos)) continue;
+    bestD = d;
+    best = f;
+  }
+  return best;
 }
 
 /**
@@ -295,7 +330,12 @@ export function describeSurroundings(devot: DevotEntity, world: World): string {
 
   const others = world
     .aliveDevots()
-    .filter((o) => o.id !== devot.id && dist2(devot.pos, o.pos) <= r2)
+    .filter(
+      (o) =>
+        o.id !== devot.id &&
+        dist2(devot.pos, o.pos) <= r2 &&
+        hasLineOfSight(devot.pos, o.pos),
+    )
     .sort((a, b) => dist2(devot.pos, a.pos) - dist2(devot.pos, b.pos));
 
   for (const o of others.slice(0, SEEN_DEVOTS_MAX)) {
@@ -322,7 +362,7 @@ export function describeSurroundings(devot: DevotEntity, world: World): string {
   // about: it is the only neighbour that will kill it for nothing in return.
   for (const m of world
     .aliveMonsters()
-    .filter((m) => dist2(devot.pos, m.pos) <= r2)
+    .filter((m) => dist2(devot.pos, m.pos) <= r2 && hasLineOfSight(devot.pos, m.pos))
     .sort((a, b) => dist2(devot.pos, a.pos) - dist2(devot.pos, b.pos))) {
     const d = Math.sqrt(dist2(devot.pos, m.pos));
     const hunting = m.targetId === devot.id ? " — HUNTING YOU" : "";
@@ -332,7 +372,7 @@ export function describeSurroundings(devot: DevotEntity, world: World): string {
   }
 
   const foods = [...world.food.values()]
-    .filter((f) => dist2(devot.pos, f.pos) <= r2)
+    .filter((f) => dist2(devot.pos, f.pos) <= r2 && hasLineOfSight(devot.pos, f.pos))
     .sort((a, b) => dist2(devot.pos, a.pos) - dist2(devot.pos, b.pos));
   for (const f of foods.slice(0, SEEN_FOOD_MAX)) {
     const d = Math.sqrt(dist2(devot.pos, f.pos));

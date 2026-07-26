@@ -1,12 +1,16 @@
-import { Billboard, Grid, Html, OrbitControls } from "@react-three/drei";
+import { Billboard, Html, OrbitControls } from "@react-three/drei";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import {
   DEFAULT_APPEARANCE,
   DEFAULT_STATS,
+  WORLD_HALF,
+  hasLineOfSight,
   sightRadiusFromStats,
   decodeIdentity,
+  terrainHeight,
+  worldProps,
   type ItemKind,
 } from "@devot/shared";
 import type {
@@ -20,8 +24,9 @@ import type {
 import { CombatEffects, recentlyBitten } from "./CombatFx.js";
 import { DevotModel } from "./creation/DevotModel.js";
 
-const WORLD_HALF = 30;
 const GROUND_SIZE = 120;
+/** Quads across the ground. The relief is only as sharp as this grid is fine. */
+const GROUND_SEGMENTS = 160;
 const GRASS_COUNT = 900;
 
 // Palette prairie / voxel, couleurs plates.
@@ -48,10 +53,14 @@ type VisionCircle = { x: number; z: number; r: number };
 
 function isVisible(x: number, z: number, vision: VisionCircle[], godMode: boolean): boolean {
   if (godMode) return true;
+  const target = { x, y: 0, z };
   return vision.some((v) => {
     const dx = x - v.x;
     const dz = z - v.z;
-    return dx * dx + dz * dz <= v.r * v.r;
+    if (dx * dx + dz * dz > v.r * v.r) return false;
+    // Same rule the server applies: the player never sees a creature their
+    // devots are blind to, whether it is too far or behind a ridge.
+    return hasLineOfSight({ x: v.x, y: 0, z: v.z }, target);
   });
 }
 
@@ -85,9 +94,11 @@ function PrairieGround({
         },
         vertexShader: /* glsl */ `
           varying vec2 vWorld;
+          varying vec3 vNormal;
           void main() {
             vec4 world = modelMatrix * vec4(position, 1.0);
             vWorld = world.xz;
+            vNormal = normalize(mat3(modelMatrix) * normal);
             gl_Position = projectionMatrix * viewMatrix * world;
           }
         `,
@@ -98,6 +109,7 @@ function PrairieGround({
           uniform vec3 uLit;
           uniform vec3 uDark;
           varying vec2 vWorld;
+          varying vec3 vNormal;
 
           float hash(vec2 p) {
             return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -107,6 +119,13 @@ function PrairieGround({
             // Meadow-patchwork hue variation (flat areas, no fine noise).
             float n = hash(floor(vWorld * 0.8));
             vec3 grass = uLit * (0.92 + 0.16 * n);
+
+            // Without this the relief is invisible: a flat-shaded hill and flat
+            // ground paint the exact same pixels. Slopes facing the sun read
+            // bright, the far sides of hills read dark.
+            vec3 sun = normalize(vec3(0.45, 0.8, 0.35));
+            float lambert = clamp(dot(normalize(vNormal), sun), 0.0, 1.0);
+            grass *= 0.62 + 0.38 * lambert;
 
             float vis = uAllLit;
             for (int i = 0; i < ${MAX_VISION}; i++) {
@@ -122,6 +141,25 @@ function PrairieGround({
     [],
   );
 
+  // Built once: the relief never changes, so the displaced grid is static
+  // geometry. Same terrainHeight the server walks its devots on.
+  const geometry = useMemo(() => {
+    const g = new THREE.PlaneGeometry(
+      GROUND_SIZE,
+      GROUND_SIZE,
+      GROUND_SEGMENTS,
+      GROUND_SEGMENTS,
+    );
+    g.rotateX(-Math.PI / 2);
+    const pos = g.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i++) {
+      pos.setY(i, terrainHeight(pos.getX(i), pos.getZ(i)));
+    }
+    pos.needsUpdate = true;
+    g.computeVertexNormals();
+    return g;
+  }, []);
+
   useFrame(() => {
     const arr = material.uniforms.uVision!.value as THREE.Vector3[];
     for (let i = 0; i < MAX_VISION; i++) {
@@ -134,14 +172,12 @@ function PrairieGround({
 
   return (
     <mesh
-      rotation={[-Math.PI / 2, 0, 0]}
+      geometry={geometry}
       material={material}
       onClick={onClick}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-    >
-      <planeGeometry args={[GROUND_SIZE, GROUND_SIZE]} />
-    </mesh>
+    />
   );
 }
 
@@ -174,7 +210,7 @@ function GrassTufts({ vision, godMode }: { vision: VisionCircle[]; godMode: bool
     const m = new THREE.Matrix4();
     tufts.forEach((t, i) => {
       m.makeRotationY(t.r);
-      m.setPosition(t.x, 0.09 * t.s, t.z);
+      m.setPosition(t.x, terrainHeight(t.x, t.z) + 0.09 * t.s, t.z);
       m.scale(new THREE.Vector3(t.s, t.s, t.s));
       mesh.setMatrixAt(i, m);
     });
@@ -200,6 +236,88 @@ function GrassTufts({ vision, godMode }: { vision: VisionCircle[]; godMode: bool
   );
 }
 
+// ── Rocks and flowers ───────────────────────────────────────────────────────
+
+const ROCK_LIT = new THREE.Color("#8d8f96");
+const ROCK_DARK = new THREE.Color("#2b3033");
+const FLOWER_LIT = ["#e8657f", "#f0d24c", "#c98ce8", "#f2f2f2"].map((c) => new THREE.Color(c));
+const FLOWER_DARK = new THREE.Color("#2a2733");
+
+/** Boulders. Solid in the simulation too — bodies slide around them. */
+function Rocks({ vision, godMode }: { vision: VisionCircle[]; godMode: boolean }) {
+  const ref = useRef<THREE.InstancedMesh>(null);
+  const rocks = useMemo(() => worldProps().rocks, []);
+
+  useEffect(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    rocks.forEach((r, i) => {
+      // Squashed and tilted, so a field of boulders never looks like a field
+      // of identical balls.
+      q.setFromEuler(new THREE.Euler(r.rotation * 0.2, r.rotation, r.rotation * 0.15));
+      scale.set(r.scale, r.scale * (0.6 + (r.variant % 3) * 0.18), r.scale);
+      m.compose(new THREE.Vector3(r.x, r.y + r.scale * 0.28, r.z), q, scale);
+      mesh.setMatrixAt(i, m);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+  }, [rocks]);
+
+  useEffect(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    rocks.forEach((r, i) => {
+      mesh.setColorAt(i, isVisible(r.x, r.z, vision, godMode) ? ROCK_LIT : ROCK_DARK);
+    });
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [rocks, vision, godMode]);
+
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, rocks.length]} frustumCulled={false}>
+      <dodecahedronGeometry args={[0.62, 0]} />
+      <meshStandardMaterial flatShading />
+    </instancedMesh>
+  );
+}
+
+/** Flowers. Pure decoration: nothing in the simulation knows they exist. */
+function Flowers({ vision, godMode }: { vision: VisionCircle[]; godMode: boolean }) {
+  const ref = useRef<THREE.InstancedMesh>(null);
+  const flowers = useMemo(() => worldProps().flowers, []);
+
+  useEffect(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    const m = new THREE.Matrix4();
+    flowers.forEach((f, i) => {
+      m.makeRotationY(f.rotation);
+      m.setPosition(f.x, f.y + 0.22 * f.scale, f.z);
+      m.scale(new THREE.Vector3(f.scale, f.scale, f.scale));
+      mesh.setMatrixAt(i, m);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+  }, [flowers]);
+
+  useEffect(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    flowers.forEach((f, i) => {
+      const lit = isVisible(f.x, f.z, vision, godMode);
+      mesh.setColorAt(i, lit ? FLOWER_LIT[f.variant % FLOWER_LIT.length]! : FLOWER_DARK);
+    });
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [flowers, vision, godMode]);
+
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, flowers.length]} frustumCulled={false}>
+      <boxGeometry args={[0.16, 0.16, 0.16]} />
+      <meshStandardMaterial flatShading />
+    </instancedMesh>
+  );
+}
+
 // ── Devot voxel ─────────────────────────────────────────────────────────────
 
 function VoxelDevot({
@@ -218,11 +336,11 @@ function VoxelDevot({
 }) {
   const group = useRef<THREE.Group>(null);
   const bodyGroup = useRef<THREE.Group>(null);
-  const target = useRef(new THREE.Vector3(devot.x, 0, devot.z));
+  const target = useRef(new THREE.Vector3(devot.x, devot.y, devot.z));
   const heading = useRef(0);
   const dead = devot.state === "dead";
 
-  target.current.set(devot.x, 0, devot.z);
+  target.current.set(devot.x, devot.y, devot.z);
 
   useFrame(({ clock }, dt) => {
     const g = group.current;
@@ -290,7 +408,7 @@ function VoxelDevot({
   const innerVoice = !devot.thinking && !devot.utterance ? devot.thought : "";
 
   return (
-    <group ref={group} position={[devot.x, 0, devot.z]}>
+    <group ref={group} position={[devot.x, devot.y, devot.z]}>
       <group
         ref={bodyGroup}
         onClick={(e) => {
@@ -392,8 +510,9 @@ function VoxelFood({
   onDragStart: (id: string) => void;
 }) {
   const ref = useRef<THREE.Group>(null);
-  const target = useRef(new THREE.Vector3(food.x, 0, food.z));
-  target.current.set(food.x, 0, food.z);
+  const ground = terrainHeight(food.x, food.z);
+  const target = useRef(new THREE.Vector3(food.x, ground, food.z));
+  target.current.set(food.x, ground, food.z);
 
   useFrame(({ clock }, dt) => {
     const g = ref.current;
@@ -409,7 +528,7 @@ function VoxelFood({
   return (
     <group
       ref={ref}
-      position={[food.x, 0, food.z]}
+      position={[food.x, ground, food.z]}
       onPointerDown={(e) => {
         if (!godModeRef.current) return;
         e.stopPropagation();
@@ -464,7 +583,7 @@ function LightningFx({ fx }: { fx: SmiteFx }) {
     });
   });
   return (
-    <group ref={ref} position={[fx.x, 0, fx.z]}>
+    <group ref={ref} position={[fx.x, terrainHeight(fx.x, fx.z), fx.z]}>
       <mesh position={[0, 6, 0]}>
         <cylinderGeometry args={[0.08, 0.25, 12, 5]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={1} />
@@ -490,8 +609,9 @@ function MonsterMesh({
   onSelect: (id: string) => void;
 }) {
   const group = useRef<THREE.Group>(null);
-  const target = useRef(new THREE.Vector3(monster.x, 0, monster.z));
-  target.current.set(monster.x, 0, monster.z);
+  const ground = terrainHeight(monster.x, monster.z);
+  const target = useRef(new THREE.Vector3(monster.x, ground, monster.z));
+  target.current.set(monster.x, ground, monster.z);
 
   useFrame((_, dt) => {
     if (group.current) group.current.position.lerp(target.current, 1 - Math.exp(-dt * 7));
@@ -504,7 +624,7 @@ function MonsterMesh({
   return (
     <group
       ref={group}
-      position={[monster.x, 0, monster.z]}
+      position={[monster.x, ground, monster.z]}
       onClick={(e) => {
         e.stopPropagation();
         onSelect(monster.id);
@@ -678,14 +798,8 @@ export function Scene({
         onPointerUp={() => setDraggingFood(null)}
       />
       <GrassTufts vision={vision} godMode={godMode} />
-      {/* Le maillage reste visible par-dessus la prairie — choix de style. */}
-      <Grid
-        args={[GROUND_SIZE, GROUND_SIZE]}
-        position={[0, 0.02, 0]}
-        cellColor="#3a5236"
-        sectionColor="#2c3f2a"
-        fadeDistance={95}
-      />
+      <Rocks vision={vision} godMode={godMode} />
+      <Flowers vision={vision} godMode={godMode} />
 
       {visibleDevots.map((d) => (
         <VoxelDevot

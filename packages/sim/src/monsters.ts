@@ -7,6 +7,11 @@ import {
   MONSTER_SIGHT,
   MONSTER_SPEED,
   TICK_MS,
+  hasLineOfSight,
+  resolveRockCollisions,
+  slopeSpeedFactor,
+  terrainGrade,
+  terrainHeight,
   type MonsterEntity,
   type Trigger,
 } from "@devot/shared";
@@ -35,7 +40,7 @@ export function spawnMonster(world: World, x: number, z: number): MonsterEntity 
   const monster: MonsterEntity = {
     id: `monster-${Date.now()}-${++seq}`,
     name: `Beast-${seq}`,
-    pos: { x, y: 0, z },
+    pos: { x, y: terrainHeight(x, z), z },
     hp: MONSTER_HP_MAX,
     hpMax: MONSTER_HP_MAX,
     hoard: 0,
@@ -81,10 +86,15 @@ export function monsterSystem(world: World, now: number = Date.now()): MonsterTi
       const dx = prey.pos.x - monster.pos.x;
       const dz = prey.pos.z - monster.pos.z;
       const len = Math.hypot(dx, dz) || 1;
-      const step = MONSTER_SPEED * dt;
+      // Slopes cost a monster exactly what they cost a devot: a hunt uphill
+      // is a hunt that may not catch up.
+      const grade = terrainGrade(monster.pos.x, monster.pos.z, dx / len, dz / len);
+      const step = MONSTER_SPEED * dt * slopeSpeedFactor(grade);
       monster.pos.x += (dx / len) * step;
       monster.pos.z += (dz / len) * step;
       clampToWorld(monster.pos, world.size);
+      resolveRockCollisions(monster.pos);
+      monster.pos.y = terrainHeight(monster.pos.x, monster.pos.z);
       continue;
     }
 
@@ -113,17 +123,28 @@ export function monsterSystem(world: World, now: number = Date.now()): MonsterTi
   return result;
 }
 
-/** Keeps its current prey while that prey is alive and in sight; else takes the nearest. */
+/**
+ * Keeps its current prey while that prey is alive and in sight; else takes the
+ * nearest. Hills blind a monster exactly as they blind a devot — prey that has
+ * put a ridge between itself and the beast has genuinely escaped its notice.
+ */
 function acquireTarget(monster: MonsterEntity, world: World) {
   const r2 = MONSTER_SIGHT * MONSTER_SIGHT;
   const current = monster.targetId ? world.devots.get(monster.targetId) : undefined;
-  if (current && current.state !== "dead" && dist2(monster.pos, current.pos) <= r2) return current;
+  if (
+    current &&
+    current.state !== "dead" &&
+    dist2(monster.pos, current.pos) <= r2 &&
+    hasLineOfSight(monster.pos, current.pos)
+  ) {
+    return current;
+  }
 
   let best;
   let bestD = Infinity;
   for (const devot of world.aliveDevots()) {
     const d = dist2(monster.pos, devot.pos);
-    if (d <= r2 && d < bestD) {
+    if (d <= r2 && d < bestD && hasLineOfSight(monster.pos, devot.pos)) {
       bestD = d;
       best = devot;
     }
