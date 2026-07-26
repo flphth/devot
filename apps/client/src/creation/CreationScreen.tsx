@@ -76,6 +76,8 @@ export function CreationScreen({
   onCreate,
   paying,
   wallet,
+  dismissible = false,
+  onClose,
 }: {
   godName: string;
   godColor: string;
@@ -85,6 +87,9 @@ export function CreationScreen({
   paying: boolean;
   /** The god's own wallet: nothing can be created until it has paid. */
   wallet: Wallet;
+  /** True when a line is still standing, so there is a world to go back to. */
+  dismissible?: boolean;
+  onClose?: () => void;
 }) {
   const { t } = useT();
   const [traits, setTraits] = useState<string[]>([]);
@@ -264,6 +269,40 @@ export function CreationScreen({
               )}
               {walletError && (
                 <div style={{ fontSize: 12, color: "#ffb3a7", marginTop: 8 }}>{walletError}</div>
+              )}
+
+              {dismissible && (
+                <div
+                  style={{
+                    marginTop: 12,
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    background: "rgba(90,110,140,0.12)",
+                    border: "1px solid #3a4657",
+                    color: "#9fb0c8",
+                    fontSize: 12,
+                  }}
+                >
+                  {t("creation.line-alive")}
+                  <button
+                    data-testid="close-creation"
+                    onClick={() => onClose?.()}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      marginTop: 8,
+                      padding: "7px 10px",
+                      borderRadius: 8,
+                      border: "1px solid #4a5769",
+                      background: "transparent",
+                      color: "#c6cede",
+                      font: "600 12px system-ui, sans-serif",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {t("creation.close")}
+                  </button>
+                </div>
               )}
 
               <button

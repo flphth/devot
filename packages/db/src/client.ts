@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS devots (
   balance REAL NOT NULL,
   capacity REAL NOT NULL,
   born_with REAL NOT NULL DEFAULT 0,
+  generation INTEGER NOT NULL DEFAULT 1,
+  items_json TEXT NOT NULL DEFAULT '[]',
   cognition_profile TEXT NOT NULL,
   x REAL NOT NULL DEFAULT 0,
   y REAL NOT NULL DEFAULT 0,
@@ -68,7 +70,28 @@ CREATE TABLE IF NOT EXISTS food (
   hp_value REAL NOT NULL,
   source TEXT NOT NULL,
   spawned_at INTEGER NOT NULL,
+  ttl_ms REAL NOT NULL DEFAULT 0,
+  funds REAL NOT NULL DEFAULT 0,
+  left_by TEXT NOT NULL DEFAULT '',
   consumed_by TEXT
+);
+CREATE TABLE IF NOT EXISTS monsters (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  x REAL NOT NULL,
+  y REAL NOT NULL DEFAULT 0,
+  z REAL NOT NULL,
+  balance REAL NOT NULL,
+  capacity REAL NOT NULL,
+  hoard REAL NOT NULL DEFAULT 0,
+  state TEXT NOT NULL DEFAULT 'alive',
+  age INTEGER NOT NULL DEFAULT 0,
+  target_id TEXT NOT NULL DEFAULT '',
+  last_thought_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS world_state (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS mint_receipts (
   tx_hash TEXT PRIMARY KEY,
@@ -150,6 +173,53 @@ const MIGRATIONS: Array<(db: Sqlite) => void> = [
   (db) => {
     addColumnIfMissing(db, "devots", "born_with", "REAL NOT NULL DEFAULT 0");
     db.exec("UPDATE devots SET born_with = capacity WHERE born_with = 0");
+  },
+
+  // 7 — The world is reloaded from here now, so everything it is made of has to
+  //     be written down. Generation and forged items were only ever held in
+  //     memory; food had no lifetime, no funds and no owner; monsters and the
+  //     clock had nowhere to live at all.
+  (db) => {
+    addColumnIfMissing(db, "devots", "generation", "INTEGER NOT NULL DEFAULT 1");
+    addColumnIfMissing(db, "devots", "items_json", "TEXT NOT NULL DEFAULT '[]'");
+    addColumnIfMissing(db, "food", "ttl_ms", "REAL NOT NULL DEFAULT 0");
+    addColumnIfMissing(db, "food", "funds", "REAL NOT NULL DEFAULT 0");
+    addColumnIfMissing(db, "food", "left_by", "TEXT NOT NULL DEFAULT ''");
+    // CREATE TABLE IF NOT EXISTS in the DDL already reaches old databases, so
+    // the two new tables need nothing here. Listed so the next reader does not
+    // go looking for the migration that creates them.
+  },
+
+  // 8 — Lay the ghosts to rest, once.
+  //
+  //     Devot rows have been written since the first release and never read
+  //     back, so the table holds every creature of every session that ever ran
+  //     — fifty of them here, all still marked alive, belonging to worlds that
+  //     were destroyed the moment their room disposed. The first boot that
+  //     restores from this table would resurrect the lot, and fifty devots each
+  //     thinking every ten seconds is both an unplayable world and a real bill.
+  //
+  //     `last_action_at` is the only honest signal available: the periodic
+  //     snapshot stamps it, so anything genuinely running was touched seconds
+  //     ago. Ten minutes is far outside that and far inside "a session from
+  //     another day". Anything older is recorded as dead, with a cause that
+  //     says what actually happened to it.
+  (db) => {
+    const cutoff = Date.now() - 10 * 60_000;
+    const stale = db
+      .prepare(
+        `SELECT count(*) AS n FROM devots
+         WHERE died_at IS NULL AND state != 'dead' AND last_action_at < ?`,
+      )
+      .get(cutoff) as { n: number };
+    if (stale.n === 0) return;
+    db.prepare(
+      `UPDATE devots SET state = 'dead', died_at = ?
+       WHERE died_at IS NULL AND state != 'dead' AND last_action_at < ?`,
+    ).run(Date.now(), cutoff);
+    console.warn(
+      `[db] laid ${stale.n} devot(s) to rest: their worlds ended before the world was persistent`,
+    );
   },
 ];
 

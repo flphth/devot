@@ -130,6 +130,17 @@ function placeOnGround(x: number, z: number): Vec3 {
 }
 
 export class WorldRoom extends Room<WorldState> {
+  /**
+   * THE WORLD OUTLIVES THE BROWSER TAB.
+   *
+   * Colyseus disposes a room when its last client leaves, and a page reload IS
+   * the last client leaving. So refreshing the page destroyed the world — every
+   * devot, every relic, every monster — while the database quietly filled with
+   * creatures nobody would ever see again. The room stays up now, and what it
+   * holds is written down and read back so a server restart does not end the
+   * world either.
+   */
+  autoDispose = false;
   private world = new World(30);
   private repos!: Repos;
   private payments: PaymentProvider = new FreeStubProvider();
@@ -217,6 +228,7 @@ export class WorldRoom extends Room<WorldState> {
 
     const dbPath = process.env.DEVOT_DB ?? new URL("../../world.sqlite", import.meta.url).pathname;
     this.repos = createRepos(openDb(dbPath));
+    this.restoreWorld();
 
     const vaultConfig = vaultConfigFromEnv();
     if (vaultConfig) {
@@ -302,6 +314,170 @@ export class WorldRoom extends Room<WorldState> {
     });
 
     this.setSimulationInterval(() => this.simulate(), TICK_MS);
+  }
+
+  onDispose(): void {
+    // Last chance: a clean shutdown must not lose the five seconds since the
+    // last periodic save.
+    this.persistWorld();
+    console.log("[world] 💾 world saved on dispose");
+  }
+
+  /**
+   * Writes down everything the world is made of.
+   *
+   * Devot rows were already being written and never read. The rest — relics on
+   * the ground, monsters and the hoards they carry, the world's own clock —
+   * had nowhere to live at all, so a restart destroyed real value: a relic
+   * holds a devot's whole birth deposit, and a fat monster holds several.
+   */
+  private persistWorld(): void {
+    for (const d of this.world.devots.values()) this.repos.devots.snapshot(d);
+    this.repos.world.saveFood(
+      [...this.world.food.values()].map((f) => ({
+        id: f.id,
+        x: f.pos.x,
+        y: f.pos.y,
+        z: f.pos.z,
+        type: f.type,
+        worth: f.worth,
+        source: f.source,
+        spawnedAt: f.spawnedAt,
+        ttlMs: f.ttlMs,
+        funds: f.funds ?? 0,
+        leftBy: f.leftBy ?? "",
+      })),
+    );
+    this.repos.world.saveMonsters(
+      this.world.aliveMonsters().map((m) => ({
+        id: m.id,
+        name: m.name,
+        x: m.pos.x,
+        y: m.pos.y,
+        z: m.pos.z,
+        balance: m.balance,
+        capacity: m.capacity,
+        hoard: m.hoard,
+        state: m.state,
+        age: m.age,
+        targetId: m.targetId ?? "",
+        lastThoughtAt: m.lastThoughtAt,
+      })),
+    );
+    this.repos.world.put("worldMs", this.world.worldMs);
+    this.repos.world.put("lineageStart", [...this.lineageStart.entries()]);
+  }
+
+  /**
+   * Rebuilds the world from what was written down.
+   *
+   * Timestamps are the subtlety. Everything perishable is stamped with
+   * Date.now() — when food rots, when a mind last ran — and a world that was
+   * shut down overnight would come back with every meal already rotten and
+   * every creature owing a thought. So the ages are rebased onto now: the world
+   * did not live through the time the server was off.
+   */
+  private restoreWorld(): void {
+    const now = Date.now();
+    const rows = this.repos.world.livingDevots();
+
+    for (const r of rows) {
+      let goal: DevotEntity["currentGoal"] = { kind: "wander" };
+      try {
+        const parsed = r.currentGoal ? JSON.parse(r.currentGoal) : null;
+        if (parsed && typeof parsed.kind === "string") goal = parsed;
+      } catch {
+        // A goal we cannot read is a goal it no longer has. It wanders.
+      }
+      const devot: DevotEntity = {
+        id: r.id,
+        godId: r.godId,
+        isFounder: r.isFounder,
+        name: r.name,
+        pos: placeOnGround(r.x, r.z),
+        balance: r.balance,
+        bornWith: r.bornWith || r.capacity,
+        capacity: r.capacity,
+        identityJson: r.identityJson,
+        items: safeJson<string[]>(r.itemsJson, []) as DevotEntity["items"],
+        state: (r.state as DevotEntity["state"]) ?? "alive",
+        profile: (r.cognitionProfile as DevotEntity["profile"]) ?? DEFAULT_DEVOT_PROFILE,
+        traits: safeJson<string[]>(r.traitsJson, []),
+        generation: r.generation,
+        wallet: r.wallet,
+        age: r.age,
+        thinking: false,
+        utterance: "",
+        currentGoal: goal,
+        // It has not thought since the world came back, and it does not owe the
+        // downtime as a debt: the cadence starts again from here.
+        lastThoughtAt: now,
+      };
+      this.world.devots.set(devot.id, devot);
+      this.devotSeq++;
+      this.walletSeq++;
+
+      let god = this.state.gods.get(devot.godId);
+      if (!god) {
+        god = new GodState();
+        god.id = devot.godId;
+        god.name = devot.godId.replace(/^god-/, "");
+        god.color = GOD_COLORS[this.state.gods.size % GOD_COLORS.length]!;
+        this.state.gods.set(god.id, god);
+      }
+    }
+
+    for (const f of this.repos.world.loadFood()) {
+      this.world.food.set(f.id, {
+        id: f.id,
+        pos: placeOnGround(f.x, f.z),
+        type: f.type as FoodType,
+        worth: f.worth,
+        source: f.source as FoodEntity["source"],
+        // Rebased: a meal does not rot while the server is off.
+        spawnedAt: now,
+        ttlMs: f.ttlMs,
+        funds: f.funds,
+        leftBy: f.leftBy,
+      });
+    }
+
+    for (const m of this.repos.world.loadMonsters()) {
+      this.world.monsters.set(m.id, {
+        id: m.id,
+        name: m.name,
+        pos: placeOnGround(m.x, m.z),
+        balance: m.balance,
+        capacity: m.capacity,
+        hoard: m.hoard,
+        state: m.state as MonsterEntity["state"],
+        age: m.age,
+        thinking: false,
+        utterance: "",
+        targetId: m.targetId || undefined,
+        lastThoughtAt: now,
+      });
+    }
+
+    this.world.worldMs = this.repos.world.get<number>("worldMs") ?? 0;
+    this.state.worldMs = this.world.worldMs;
+    for (const [godId, at] of this.repos.world.get<Array<[string, number]>>("lineageStart") ?? []) {
+      this.lineageStart.set(godId, at);
+    }
+    // Otherwise the first tick reads an empty set, sees the restored lines
+    // standing, and declares nothing — but a line that died during the downtime
+    // would never be noticed either.
+    for (const d of this.world.devots.values()) {
+      if (d.state !== "dead") this.livingLines.add(d.godId);
+    }
+
+    if (rows.length || this.world.monsters.size) {
+      console.log(
+        `[world] 💾 restored ${rows.length} devot(s), ${this.world.monsters.size} monster(s), ` +
+          `${this.world.food.size} thing(s) on the ground — the world kept going`,
+      );
+    }
+    this.syncState();
   }
 
   onJoin(client: Client, options: WorldRoomOptions): void {
@@ -676,6 +852,17 @@ export class WorldRoom extends Room<WorldState> {
    * rather than bypassing it.
    */
   private keepThinking(): void {
+    // NOBODY IS WATCHING, SO NOBODY THINKS.
+    //
+    // Keeping the room alive across a reload also keeps it alive across a
+    // closed laptop. Twenty devots thinking every ten seconds, forever, with
+    // no god connected, is a real bill against the subscription for a world
+    // nobody can see.
+    //
+    // The world itself does NOT stop: the clock runs, bodies burn metabolism,
+    // monsters hunt, food rots. Only the minds sleep, and they wake the moment
+    // somebody opens the tab again.
+    if (this.clients.length === 0) return;
     const now = Date.now();
     for (const devot of this.world.aliveDevots()) {
       if (devot.thinking) continue;
@@ -862,9 +1049,7 @@ export class WorldRoom extends Room<WorldState> {
       this.spawnFood("spawn");
     }
 
-    if (this.tickCount % 20 === 0) {
-      for (const d of this.world.devots.values()) this.repos.devots.snapshot(d);
-    }
+    if (this.tickCount % 20 === 0) this.persistWorld();
 
     this.spawnMonsters();
     this.wakeMonsters();
@@ -919,6 +1104,7 @@ export class WorldRoom extends Room<WorldState> {
    * four times a second and spend the whole budget between them.
    */
   private wakeMonsters(): void {
+    if (this.clients.length === 0) return; // see keepThinking: no audience, no inference
     const now = Date.now();
     for (const monster of this.world.aliveMonsters()) {
       if (monster.thinking) continue;
@@ -1196,5 +1382,16 @@ export class WorldRoom extends Room<WorldState> {
     for (const id of this.state.food.keys()) {
       if (!this.world.food.has(id)) this.state.food.delete(id);
     }
+  }
+}
+
+/** JSON that may be anything, or missing, or written by an older version. */
+function safeJson<T>(raw: string | null | undefined, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw) as T;
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
   }
 }

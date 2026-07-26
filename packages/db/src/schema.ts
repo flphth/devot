@@ -18,6 +18,9 @@ export const devots = sqliteTable("devots", {
   capacity: real("capacity").notNull(),
   /** What it was given at birth. Its relic is worth exactly this. */
   bornWith: real("born_with").notNull().default(0),
+  generation: integer("generation").notNull().default(1),
+  /** Forged items. Paid for in life, so they must survive a restart. */
+  itemsJson: text("items_json").notNull().default("[]"),
   cognitionProfile: text("cognition_profile").notNull(),
   x: real("x").notNull().default(0),
   y: real("y").notNull().default(0),
@@ -68,7 +71,33 @@ export const food = sqliteTable("food", {
   worth: real("hp_value").notNull(),
   source: text("source").notNull(), // spawn | god
   spawnedAt: integer("spawned_at").notNull(),
+  ttlMs: real("ttl_ms").notNull().default(0),
+  /** What a relic holds. Real value: losing this on a restart destroys it. */
+  funds: real("funds").notNull().default(0),
+  leftBy: text("left_by").notNull().default(""),
   consumedBy: text("consumed_by"),
+});
+
+/** Monsters. Their hoards hold value, so they cannot be allowed to evaporate. */
+export const monsters = sqliteTable("monsters", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  x: real("x").notNull(),
+  y: real("y").notNull().default(0),
+  z: real("z").notNull(),
+  balance: real("balance").notNull(),
+  capacity: real("capacity").notNull(),
+  hoard: real("hoard").notNull().default(0),
+  state: text("state").notNull().default("alive"),
+  age: integer("age").notNull().default(0),
+  targetId: text("target_id").notNull().default(""),
+  lastThoughtAt: integer("last_thought_at").notNull().default(0),
+});
+
+/** Anything the world needs that is not an entity: its clock, its lineages. */
+export const worldState = sqliteTable("world_state", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
 });
 
 /**

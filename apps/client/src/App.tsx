@@ -50,7 +50,19 @@ export default function App() {
   // it is the first contact with the game, and the only moment of shaping.
   const god = snapshot.gods.find((g) => g.id === godId) ?? null;
   const hasLiving = snapshot.devots.some((d) => d.godId === godId && d.state !== "dead");
-  const creating = status === "connected" && godId !== null && !hasLiving;
+  /**
+   * ESCAPE OPENS THE CREATION SCREEN, AND CLOSES IT AGAIN.
+   *
+   * It used to appear only when a god had nobody left, which meant a player who
+   * simply wanted to look at it — at the traits, at the signature, at what a
+   * different body would cost — had to wait for their whole line to die.
+   *
+   * It stays forced open only while it is asked for. The moment a line is
+   * extinct it comes back on its own, exactly as before, and Escape cannot
+   * dismiss it then: there is nothing behind it to go back to.
+   */
+  const [creationAsked, setCreationAsked] = useState(false);
+  const creating = status === "connected" && godId !== null && (!hasLiving || creationAsked);
 
   /**
    * Look at the founder the moment it is born.
@@ -90,20 +102,31 @@ export default function App() {
     };
   });
 
-  // Key 1: god mode (debug/creative) — ignored while typing text.
+  // Keys: 1 toggles god mode, Escape opens or closes the creation screen.
+  // Both ignored while typing — Escape especially, since the soul field is a
+  // textarea a player is very likely to be in when they hit it.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "1") return;
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
-      setGodMode((g) => {
-        godModeRef.current = !g;
-        return !g;
-      });
+      if (e.key === "1") {
+        setGodMode((g) => {
+          godModeRef.current = !g;
+          return !g;
+        });
+        return;
+      }
+      if (e.key === "Escape") setCreationAsked((open) => !open);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // A birth closes the screen, however it was opened: the player asked for a
+  // devot and got one, and leaving the panel up over it would hide the answer.
+  useEffect(() => {
+    if (hasLiving && creationAsked) setCreationAsked(false);
+  }, [hasLiving, creationAsked]);
 
   // Journal of the selected devot: loaded on selection, then refreshed.
   useEffect(() => {
@@ -152,6 +175,8 @@ export default function App() {
       />
       {creating && (
         <CreationScreen
+          dismissible={hasLiving}
+          onClose={() => setCreationAsked(false)}
           paying={creatingStage === "paying"}
           godName={god?.name ?? godName}
           godColor={god?.color ?? "#4ca6e0"}
