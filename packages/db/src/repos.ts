@@ -28,6 +28,7 @@ export class DevotRepo {
         state: e.state,
         traitsJson: JSON.stringify(e.traits),
         identityJson: e.identityJson ?? "",
+        wallet: e.wallet ?? "",
         parentA: parents?.a,
         parentB: parents?.b,
         bornAt: Date.now(),

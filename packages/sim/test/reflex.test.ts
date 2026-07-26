@@ -16,6 +16,7 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     godId: "g1",
     isFounder: false,
     generation: 1,
+    wallet: "",
     name: `D${seq}`,
     hp: 100_000,
     hpMax: 150_000,

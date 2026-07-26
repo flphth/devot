@@ -33,6 +33,8 @@ export class DevotState extends Schema {
   declare identity: string;
   /** Forged items, comma-separated. Rarely changes. */
   declare items: string;
+  /** Its wallet address. Frozen at birth, like everything else that names it. */
+  declare wallet: string;
 
   constructor() {
     super();
@@ -54,6 +56,7 @@ export class DevotState extends Schema {
     this.age = 0;
     this.identity = "";
     this.items = "";
+    this.wallet = "";
   }
 }
 defineTypes(DevotState, {
@@ -75,6 +78,7 @@ defineTypes(DevotState, {
   age: "number",
   identity: "string",
   items: "string",
+  wallet: "string",
 });
 
 export class FoodState extends Schema {

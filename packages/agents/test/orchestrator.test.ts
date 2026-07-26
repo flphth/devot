@@ -12,6 +12,7 @@ function makeDevot(id: string, hp = 10_000): DevotEntity {
     godId: "g1",
     isFounder: true,
     generation: 1,
+    wallet: "",
     name: id,
     pos: { x: 0, y: 0, z: 0 },
     hp,

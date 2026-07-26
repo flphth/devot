@@ -26,6 +26,8 @@ export const devots = sqliteTable("devots", {
   traitsJson: text("traits_json").notNull().default("[]"),
   /** Appearance, stats, soul and signature, as JSON. Frozen at birth. */
   identityJson: text("identity_json").notNull().default(""),
+  /** The devot's wallet address. Derived at birth, never a key. */
+  wallet: text("wallet").notNull().default(""),
   parentA: text("parent_a"),
   parentB: text("parent_b"),
   bornAt: integer("born_at").notNull(),

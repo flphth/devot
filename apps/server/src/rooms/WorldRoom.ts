@@ -8,7 +8,13 @@ import {
   type Thinker,
 } from "@devot/agents";
 import { createRepos, openDb, type Repos } from "@devot/db";
-import { FreeStubProvider, type PaymentProvider } from "@devot/onchain";
+import {
+  FreeStubProvider,
+  LifeLedger,
+  LocalSettler,
+  WalletForge,
+  type PaymentProvider,
+} from "@devot/onchain";
 import {
   DevotState,
   DIVINE_MSG_COOLDOWN_MS,
@@ -130,6 +136,27 @@ export class WorldRoom extends Room<WorldState> {
   private lineageStart = new Map<string, number>();
   /** Gods whose line was standing last tick, to catch the moment it stops. */
   private livingLines = new Set<string>();
+  /**
+   * Where this world's wallets come from. A seed in the env makes them stable
+   * across restarts; without one they are real addresses that live and die with
+   * the process, which is the right default for a world nobody has funded.
+   */
+  private wallets = new WalletForge(process.env.DEVOT_WALLET_SEED);
+  private walletSeq = 0;
+  /**
+   * Life moves several times a second. Settling each movement would put a
+   * network round-trip inside the tick, so they are netted per devot and go out
+   * in batches — the simulation never waits for any of it.
+   */
+  private ledger = new LifeLedger(
+    new LocalSettler((batch) =>
+      this.repos.events.record(
+        "life_settled",
+        batch.movements.map((m) => m.devotId),
+        { net: batch.net, count: batch.movements.length },
+      ),
+    ),
+  );
 
   /**
    * Hands the orchestrator whatever thinks under this id, devot or monster.
@@ -369,6 +396,9 @@ export class WorldRoom extends Room<WorldState> {
       profile: "frugal",
       traits: opts.traits,
       generation: opts.generation ?? 1,
+      // Its address, derived rather than stored: the world keeps one secret,
+      // not one per creature.
+      wallet: this.wallets.addressAt(this.walletSeq++),
       age: 0,
       thinking: false,
       utterance: "",
@@ -615,6 +645,11 @@ export class WorldRoom extends Room<WorldState> {
     if (!this.reproInFlight) {
       this.reproInFlight = true;
       void processReproductions(this.world, this.repos, this.chronicler, (birth) => {
+        // A child is born without an address; the world assigns it here,
+        // because only the world knows how many have come before.
+        if (!birth.child.wallet) {
+          birth.child.wallet = this.wallets.addressAt(this.walletSeq++);
+        }
         console.log(
           `[world] ✚ naissance de ${birth.child.name} (${birth.mode}, dieu ${birth.child.godId})`,
         );
@@ -654,6 +689,12 @@ export class WorldRoom extends Room<WorldState> {
     }
 
     this.wakeMonsters();
+
+    for (const d of this.world.devots.values()) {
+      if (d.state === "dead") continue;
+      this.ledger.record(d.id, d.wallet, Math.max(0, d.hp));
+    }
+    void this.ledger.flush();
 
     this.detectExtinctions();
     this.scoreLineages();
@@ -855,6 +896,7 @@ export class WorldRoom extends Room<WorldState> {
         // Identity is written ONCE, when entering the state: it never changes,
         // and resynchronising it every tick would be absurd.
         s.identity = d.identityJson;
+        s.wallet = d.wallet;
         this.state.devots.set(d.id, s);
       }
       s.x = d.pos.x;

@@ -102,6 +102,8 @@ export interface DevotEntity {
   pendingReproduction?: { partnerId?: string };
   /** Which generation of its line this is. A founder is 1. */
   generation: number;
+  /** Its wallet address: the onchain identity it is born with and dies as. */
+  wallet: string;
   /** Id of the last reported attacker (avoids re-triggering every tick). */
   underAttackBy?: string;
   /** When that alert was last raised, so a lost one can be raised again. */

@@ -129,7 +129,11 @@ importers:
         specifier: ^7.6.13
         version: 7.6.13
 
-  packages/onchain: {}
+  packages/onchain:
+    dependencies:
+      ethers:
+        specifier: ^6.17.0
+        version: 6.17.0
 
   packages/shared:
     dependencies:

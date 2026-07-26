@@ -41,6 +41,7 @@ async function main(): Promise<void> {
     godId,
     isFounder: true,
     generation: 1,
+    wallet: "",
     name: "Adam",
     pos: { x: 0, y: 0, z: 0 },
     hp: DEMO_HP_MAX,

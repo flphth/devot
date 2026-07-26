@@ -1,3 +1,6 @@
+export * from "./wallet.js";
+export * from "./ledger.js";
+
 /**
  * Onchain hook point (deferred — ARCHITECTURE.md §10).
  * Only the free stub exists today; the chain, the nature of the payment and

@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS devots (
   age INTEGER NOT NULL DEFAULT 0,
   traits_json TEXT NOT NULL DEFAULT '[]',
   identity_json TEXT NOT NULL DEFAULT '',
+  wallet TEXT NOT NULL DEFAULT '',
   parent_a TEXT,
   parent_b TEXT,
   born_at INTEGER NOT NULL,
@@ -115,6 +116,9 @@ const MIGRATIONS: Array<(db: Sqlite) => void> = [
       ["equilibre", "balanced"],
       ["prophete", "prophet"],
     ]),
+
+  // 4 — Every devot is a wallet: its address, derived at birth.
+  (db) => addColumnIfMissing(db, "devots", "wallet", "TEXT NOT NULL DEFAULT ''"),
 ];
 
 function migrate(db: Sqlite): void {
