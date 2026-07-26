@@ -11,7 +11,7 @@ import { CognitionOrchestrator, PROFILES, createMind } from "@devot/agents";
 import { createRepos, openDb } from "@devot/db";
 import { FreeStubProvider } from "@devot/onchain";
 import type { DevotEntity, FoodEntity } from "@devot/shared";
-import { FOOD_TTL_MS, TICK_MS, devotSubject } from "@devot/shared";
+import { DEFAULT_IDENTITY, FOOD_TTL_MS, TICK_MS, devotSubject } from "@devot/shared";
 import { applyDecision, perceptionSystem, tick, World } from "@devot/sim";
 
 if (process.argv.includes("--mock")) process.env.MIND = "mock";
@@ -47,6 +47,7 @@ async function main(): Promise<void> {
     state: "alive",
     profile: "frugal",
     traits: ["curious", "sparing with their thoughts"],
+    identity: DEFAULT_IDENTITY,
     age: 0,
     thinking: false,
     utterance: "",

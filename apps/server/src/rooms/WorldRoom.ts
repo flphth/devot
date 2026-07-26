@@ -23,6 +23,7 @@ import {
   FOOD_TTL_MS,
   FoodState,
   GodState,
+  DEFAULT_IDENTITY,
   HP_MAX_DEFAULT,
   PATCH_RATE_MS,
   PERCEPTION_RADIUS,
@@ -30,15 +31,21 @@ import {
   TRAIT_POOL,
   WorldState,
   devotSubject,
+  hpMaxFor,
+  makeSignature,
   monsterSubject,
   resolveRockCollisions,
+  sanitizeAppearance,
+  sanitizeStats,
   terrainHeight,
+  validateStats,
   type ActionRejectedMsg,
   type CreateFounderMsg,
   type DebugMoveFoodMsg,
   type DebugSpawnDevotMsg,
   type DebugSpawnMonsterMsg,
   type DevotEntity,
+  type DevotIdentity,
   type MonsterEntity,
   type FeedMsg,
   type FoodEntity,
@@ -246,6 +253,13 @@ export class WorldRoom extends Room<WorldState> {
       return this.reject(client, "createFounder", "Invalid traits.");
     }
 
+    // Appearance is coerced into something legal; a bad stat spread is
+    // refused outright, because it is the one part a client could cheat with.
+    const statsCheck = validateStats(msg.stats);
+    if (!statsCheck.ok) {
+      return this.reject(client, "createFounder", `Invalid stats (${statsCheck.reason}).`);
+    }
+
     const receipt = await this.payments.chargeDevotCreation(godId);
     if (!receipt.ok) {
       return this.reject(client, "createFounder", "Payment refused.");
@@ -255,6 +269,11 @@ export class WorldRoom extends Room<WorldState> {
       name: msg.name,
       traits: ["first of their line", ...traits],
       isFounder: true,
+      identity: {
+        appearance: sanitizeAppearance(msg.appearance),
+        stats: sanitizeStats(msg.stats),
+        signature: "",
+      },
     });
     this.repos.events.record("birth", [devot.id], { founder: true, godId });
 
@@ -269,28 +288,45 @@ export class WorldRoom extends Room<WorldState> {
 
   private spawnDevot(
     godId: string,
-    opts: { name?: string; traits: string[]; isFounder: boolean; x?: number; z?: number },
+    opts: {
+      name?: string;
+      traits: string[];
+      isFounder: boolean;
+      x?: number;
+      z?: number;
+      identity?: DevotIdentity;
+    },
   ): DevotEntity {
+    const id = `devot-${godId}-${Date.now()}-${++this.devotSeq}`;
+    const identity: DevotIdentity = {
+      appearance: opts.identity?.appearance ?? DEFAULT_IDENTITY.appearance,
+      stats: opts.identity?.stats ?? DEFAULT_IDENTITY.stats,
+      // The signature is the server's to hand out — a client cannot claim one.
+      signature: makeSignature(id),
+    };
+    const x = opts.x ?? (Math.random() - 0.5) * this.world.size;
+    const z = opts.z ?? (Math.random() - 0.5) * this.world.size;
+    const hpMax = hpMaxFor(identity.stats);
     const devot: DevotEntity = {
-      id: `devot-${godId}-${Date.now()}-${++this.devotSeq}`,
+      id,
       godId,
       isFounder: opts.isFounder,
       name: (opts.name ?? `Devot-${this.devotSeq}`).slice(0, 24),
-      pos: {
-        x: opts.x ?? (Math.random() - 0.5) * this.world.size,
-        y: 0,
-        z: opts.z ?? (Math.random() - 0.5) * this.world.size,
-      },
-      hp: HP_MAX_DEFAULT,
-      hpMax: HP_MAX_DEFAULT,
+      pos: { x, y: terrainHeight(x, z), z },
+      hp: hpMax,
+      hpMax,
       state: "alive",
       profile: "frugal",
       traits: opts.traits,
+      identity,
       age: 0,
       thinking: false,
       utterance: "",
       currentGoal: { kind: "wander" },
     };
+    // Never born inside a boulder.
+    resolveRockCollisions(devot.pos);
+    devot.pos.y = terrainHeight(devot.pos.x, devot.pos.z);
     this.world.devots.set(devot.id, devot);
     this.repos.devots.insertFromEntity(devot);
     return devot;
@@ -658,6 +694,7 @@ export class WorldRoom extends Room<WorldState> {
         s.isFounder = d.isFounder;
         s.profile = d.profile;
         s.hpMax = d.hpMax;
+        s.identityJson = JSON.stringify(d.identity);
         this.state.devots.set(d.id, s);
       }
       s.x = d.pos.x;

@@ -25,6 +25,8 @@ export class DevotState extends Schema {
   declare emotion: string;
   declare thought: string;
   declare age: number;
+  /** DevotIdentity as JSON — nested schemas would buy nothing here. */
+  declare identityJson: string;
 
   constructor() {
     super();
@@ -44,6 +46,7 @@ export class DevotState extends Schema {
     this.emotion = "";
     this.thought = "";
     this.age = 0;
+    this.identityJson = "";
   }
 }
 defineTypes(DevotState, {
@@ -63,6 +66,7 @@ defineTypes(DevotState, {
   emotion: "string",
   thought: "string",
   age: "number",
+  identityJson: "string",
 });
 
 export class FoodState extends Schema {
@@ -196,6 +200,9 @@ export interface CreateFounderMsg {
   name?: string;
   /** 2 to 3 traits picked from TRAIT_POOL (validated server-side). */
   traits?: string[];
+  /** Appearance and stats from the creation screen. Validated server-side. */
+  appearance?: unknown;
+  stats?: unknown;
 }
 
 export interface SmiteMsg {

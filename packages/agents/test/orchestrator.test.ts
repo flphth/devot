@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DevotEntity } from "@devot/shared";
+import { DEFAULT_IDENTITY } from "@devot/shared";
 import { THOUGHT_COST_FLOOR_HP, devotSubject } from "@devot/shared";
 import { createRepos, openDb } from "@devot/db";
 import { MockMind } from "../src/mind.js";
@@ -18,6 +19,7 @@ function makeDevot(id: string, hp = 10_000): DevotEntity {
     state: "alive",
     profile: "frugal",
     traits: [],
+    identity: DEFAULT_IDENTITY,
     age: 0,
     thinking: false,
     utterance: "",

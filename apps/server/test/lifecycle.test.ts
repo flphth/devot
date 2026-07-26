@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MockChronicler, MockMind, CognitionOrchestrator, PROFILES } from "@devot/agents";
 import { createRepos, openDb } from "@devot/db";
 import type { DevotEntity } from "@devot/shared";
+import { DEFAULT_IDENTITY } from "@devot/shared";
 import { CONTEXT_COMPACT_THRESHOLD_MSGS, devotSubject } from "@devot/shared";
 import { World } from "@devot/sim";
 import { canRecreateFounder, processReproductions } from "../src/lifecycle.js";
@@ -19,6 +20,7 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     state: "alive",
     profile: "frugal",
     traits: ["curious"],
+    identity: DEFAULT_IDENTITY,
     age: 0,
     thinking: false,
     utterance: "",

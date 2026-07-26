@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DevotEntity } from "@devot/shared";
+import { DEFAULT_IDENTITY } from "@devot/shared";
 import {
   CARRION_HP_FRACTION,
   MONSTER_ATTACK_DRAIN_PER_TICK,
@@ -29,6 +30,7 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     state: "alive",
     profile: "frugal",
     traits: [],
+    identity: DEFAULT_IDENTITY,
     age: 0,
     thinking: false,
     utterance: "",

@@ -1,4 +1,5 @@
 import type { ModelId } from "./constants.js";
+import type { DevotIdentity } from "./identity.js";
 
 export type DevotLifeState = "alive" | "starving" | "dying" | "dead";
 
@@ -100,6 +101,8 @@ export interface DevotEntity {
   state: DevotLifeState;
   profile: CognitionProfileName;
   traits: string[];
+  /** Appearance and stats, chosen at creation and frozen at birth. */
+  identity: DevotIdentity;
   age: number; // cycles lived
   thinking: boolean; // an inference is in flight
   utterance: string; // last spoken words (bubble)

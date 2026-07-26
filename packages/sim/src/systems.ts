@@ -1,18 +1,18 @@
 import type { Decision, DevotEntity, FoodEntity, Trigger, Vec3 } from "@devot/shared";
 import {
   AGONIZING_THRESHOLD,
-  ATTACK_DRAIN_PER_TICK,
   ATTACK_EFFICIENCY,
   ATTACK_RADIUS,
-  DEVOT_SPEED,
   EAT_RADIUS,
   HUNGRY_THRESHOLD,
   METABOLISM_HP_PER_TICK,
-  PERCEPTION_RADIUS,
   TICK_MS,
+  attackDrainFor,
   hasLineOfSight,
+  perceptionFor,
   resolveRockCollisions,
   slopeSpeedFactor,
+  speedFor,
   terrainGrade,
   terrainHeight,
 } from "@devot/shared";
@@ -88,7 +88,8 @@ function decaySystem(world: World, result: TickResult, now: number): void {
 
 function movementSystem(devot: DevotEntity, world: World, dt: number): void {
   const goal = devot.currentGoal;
-  const step = DEVOT_SPEED * dt;
+  // Speed is the devot's own, not the species': the stat chosen at creation.
+  const step = speedFor(devot.identity.stats) * dt;
 
   switch (goal.kind) {
     case "idle":
@@ -157,7 +158,7 @@ function combatSystem(
   }
   if (dist2(devot.pos, victim.pos) > ATTACK_RADIUS * ATTACK_RADIUS) return;
 
-  const drained = Math.min(ATTACK_DRAIN_PER_TICK, victim.hp);
+  const drained = Math.min(attackDrainFor(devot.identity.stats), victim.hp);
   victim.hp -= drained;
   devot.hp = Math.min(devot.hpMax, devot.hp + drained * ATTACK_EFFICIENCY);
   result.combats.push({ attackerId: devot.id, victimId: victim.id, drained });
@@ -274,11 +275,13 @@ export function nearestVisibleFood(world: World, from: Vec3, maxDist2: number) {
  */
 export function perceptionSystem(world: World, now: number = Date.now()): Trigger[] {
   const triggers: Trigger[] = [];
-  const r2 = PERCEPTION_RADIUS * PERCEPTION_RADIUS;
   const alive = world.aliveDevots();
 
   for (const devot of alive) {
     if (devot.thinking) continue;
+    // Each devot sees as far as its own sight stat allows.
+    const reach = perceptionFor(devot.identity.stats);
+    const r2 = reach * reach;
 
     // Encountering another devot (including one from a rival lineage).
     for (const other of alive) {
@@ -351,11 +354,8 @@ export function applyDecision(devot: DevotEntity, decision: Decision, world: Wor
       } else {
         // Fallback bounded by perception: the body does not "know" about food
         // the devot cannot see — neither too far, nor behind a hill.
-        const nearest = nearestVisibleFood(
-          world,
-          devot.pos,
-          PERCEPTION_RADIUS * PERCEPTION_RADIUS,
-        );
+        const reach = perceptionFor(devot.identity.stats);
+        const nearest = nearestVisibleFood(world, devot.pos, reach * reach);
         if (nearest) devot.currentGoal = { kind: "seek_food", foodId: nearest.id };
       }
       break;

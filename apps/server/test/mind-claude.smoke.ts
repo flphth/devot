@@ -4,7 +4,7 @@
  */
 import { AgentSdkMind, PROFILES } from "@devot/agents";
 import type { DevotEntity } from "@devot/shared";
-import { devotSubject } from "@devot/shared";
+import { DEFAULT_IDENTITY, devotSubject } from "@devot/shared";
 
 const devot: DevotEntity = {
   id: "devot-smoke",
@@ -17,6 +17,7 @@ const devot: DevotEntity = {
   state: "alive",
   profile: "frugal",
   traits: ["curious", "thrifty"],
+  identity: DEFAULT_IDENTITY,
   age: 12,
   thinking: false,
   utterance: "",

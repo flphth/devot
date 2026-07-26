@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DevotEntity, FoodEntity } from "@devot/shared";
+import { DEFAULT_IDENTITY } from "@devot/shared";
 import { applyDecision, tick, World } from "../src/index.js";
 
 function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
@@ -14,6 +15,7 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     state: "alive",
     profile: "frugal",
     traits: [],
+    identity: DEFAULT_IDENTITY,
     age: 0,
     thinking: false,
     utterance: "",

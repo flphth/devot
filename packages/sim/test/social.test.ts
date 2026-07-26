@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DevotEntity } from "@devot/shared";
+import { DEFAULT_IDENTITY, attackDrainFor } from "@devot/shared";
 import {
   ATTACK_DRAIN_PER_TICK,
   ATTACK_EFFICIENCY,
@@ -23,6 +24,7 @@ function makeDevot(overrides: Partial<DevotEntity> = {}): DevotEntity {
     state: "alive",
     profile: "frugal",
     traits: ["curious"],
+    identity: DEFAULT_IDENTITY,
     age: 0,
     thinking: false,
     utterance: "",
@@ -43,12 +45,11 @@ describe("combat — vital predation", () => {
     const result = tick(world);
 
     expect(result.combats).toHaveLength(1);
+    // The drain is the attacker's own, not the species': its power stat.
+    const drain = attackDrainFor(attacker.identity.stats);
     // Victim: -drain -metabolism; attacker: +drain×efficiency -metabolism.
-    expect(victim.hp).toBeCloseTo(20_000 - ATTACK_DRAIN_PER_TICK - 1, 5);
-    expect(attacker.hp).toBeCloseTo(
-      20_000 + ATTACK_DRAIN_PER_TICK * ATTACK_EFFICIENCY - 1,
-      5,
-    );
+    expect(victim.hp).toBeCloseTo(20_000 - drain - 1, 5);
+    expect(attacker.hp).toBeCloseTo(20_000 + drain * ATTACK_EFFICIENCY - 1, 5);
   });
 
   it("alerts the victim only once (threat trigger)", () => {
