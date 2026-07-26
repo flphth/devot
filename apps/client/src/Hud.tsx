@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  DEVOT_DEPOSIT,
   DIVINE_MSG_COOLDOWN_MS,
   DIVINE_MSG_MAX_CHARS,
   TRAIT_POOL,
@@ -232,6 +233,21 @@ export function Hud({
         <div style={{ fontWeight: 700, marginBottom: 6 }}>
           {god ? `⚡ ${god.name}` : t("pantheon.connecting")}
         </div>
+        {god && (
+          // The treasury is the only hard limit on a god: no funds, no devots.
+          <div style={{ fontSize: 12, marginBottom: 4 }}>
+            <span style={{ opacity: 0.7 }}>{t("hud.treasury")} </span>
+            <b style={{ color: god.treasury >= DEVOT_DEPOSIT ? "#5ee07a" : "#e0634c" }}>
+              {Math.round(god.treasury).toLocaleString()}
+            </b>
+            <span style={{ opacity: 0.5 }}>
+              {" "}
+              {t("hud.treasury-devots", {
+                n: Math.floor(god.treasury / DEVOT_DEPOSIT),
+              })}
+            </span>
+          </div>
+        )}
         {/* Creation now lives in its own full-screen, centred view
             (CreationScreen): this panel is nothing but the pantheon. */}
         {myDevots.map((d) => (

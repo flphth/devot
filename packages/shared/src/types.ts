@@ -180,7 +180,7 @@ export interface ThoughtSubject {
   hoard?: number;
 }
 
-export type FoodType = "grain" | "fruit" | "manna" | "tainted" | "carrion";
+export type FoodType = "grain" | "fruit" | "manna" | "tainted" | "carrion" | "legacy";
 
 export interface FoodEntity {
   id: string;
@@ -192,6 +192,14 @@ export interface FoodEntity {
   spawnedAt: number;
   /** How long it lasts, in ms, before it is gone for good. */
   ttlMs: number;
+  /**
+   * A relic only. Funds released by a death, claimable by ANY devot — they go
+   * to the finder's god, not into the finder's own life. Chasing one keeps your
+   * line going; it does not keep you alive.
+   */
+  funds?: number;
+  /** Whose death left it, for the record and for the story. */
+  leftBy?: string;
 }
 
 export interface InferenceUsage {

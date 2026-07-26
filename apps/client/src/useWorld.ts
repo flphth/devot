@@ -37,6 +37,8 @@ export interface DevotView {
 }
 
 export interface FoodView {
+  funds: number;
+  leftBy: string;
   id: string;
   x: number;
   z: number;
@@ -62,6 +64,7 @@ export interface MonsterView {
 }
 
 export interface GodView {
+  treasury: number;
   id: string;
   name: string;
   color: string;
@@ -230,6 +233,8 @@ export function useWorld(godName: string): WorldConnection {
               source: f.source,
               spawnedAt: f.spawnedAt,
               ttlMs: f.ttlMs,
+              funds: f.funds ?? 0,
+              leftBy: f.leftBy ?? "",
             });
           });
           const gods: GodView[] = [];
@@ -240,6 +245,7 @@ export function useWorld(godName: string): WorldConnection {
               color: g.color,
               lastSpeakAt: g.lastSpeakAt,
               connected: g.connected,
+              treasury: g.treasury ?? 0,
             });
           });
           const monsters: MonsterView[] = [];

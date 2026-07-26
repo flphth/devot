@@ -558,6 +558,10 @@ function VoxelFood({
       g.scale.setScalar(wilt);
     }
 
+    if (food.kind === "legacy") {
+      g.rotation.y = clock.elapsedTime * 1.6;
+      g.position.y = ground + 0.06 + Math.sin(clock.elapsedTime * 2.4) * 0.05;
+    }
     if (food.kind === "manna") {
       g.rotation.y = clock.elapsedTime * 1.2;
       g.position.y = ground + 0.15 + Math.sin(clock.elapsedTime * 2) * 0.08;
@@ -584,6 +588,20 @@ function VoxelFood({
           <mesh position={[0, 0.34, 0]}>
             <boxGeometry args={[0.06, 0.12, 0.06]} />
             <meshStandardMaterial color="#4c8a3f" flatShading />
+          </mesh>
+        </group>
+      ) : food.kind === "legacy" ? (
+        // A relic reads as treasure, not as a meal: a coin standing on edge,
+        // turning, catching the light even at night.
+        <group>
+          <mesh position={[0, 0.3, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.22, 0.22, 0.06, 12]} />
+            <meshStandardMaterial
+              color={color}
+              emissive={color}
+              emissiveIntensity={0.55}
+              flatShading
+            />
           </mesh>
         </group>
       ) : food.kind === "manna" ? (

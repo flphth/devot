@@ -27,6 +27,39 @@ export const UTTERANCE_MAX_CHARS = 140;
 export const HP_MAX_DEFAULT = 60_000;
 export const LETHALITY = 1e6; // usd → µ$ (HP)
 
+/**
+ * A god cannot conjure devots: each one is paid for out of the treasury, and
+ * the deposit becomes that devot's life. Vitality decides how much life the
+ * same deposit buys, so the stat still matters.
+ */
+export const DEVOT_DEPOSIT = 60_000;
+/** A god's opening funds — four devots, before recovering anything. */
+export const GOD_ENDOWMENT = DEVOT_DEPOSIT * 4;
+/**
+ * What death gives back. The rest is destroyed, and that is the whole point:
+ * if death returned everything, the deposit would be a formality and a line
+ * could churn devots for free.
+ */
+export const DEATH_RESIDUE_FRACTION = 0.35;
+/** How long a relic lies where its owner fell. Long enough to be worth crossing for. */
+export const LEGACY_TTL_MS = 180_000;
+
+/**
+ * How much of a thought's real price a devot actually pays in life.
+ *
+ * This DELIBERATELY breaks the "1 HP = 1 µ$" identity, and it is worth being
+ * honest about why. Devots are now always in the loop, thinking every ten
+ * seconds whether or not anything has happened to them. At full price that is a
+ * whole life in six minutes — the world never gets going before everyone in it
+ * is dead.
+ *
+ * So an inference costs a fifth of what it is worth. A devot gets roughly two
+ * hundred thoughts instead of forty, which is half an hour of watching rather
+ * than one commercial break. The REAL spend against the subscription is
+ * unchanged — this only alters what the game charges its creatures.
+ */
+export const THOUGHT_COST_SCALE = 0.2;
+
 // Price per 1M tokens (in / out), see PLAN.md §5.2
 export const PRICE_PER_MTOK = {
   "claude-haiku-4-5": { in: 1, out: 5 },
@@ -38,7 +71,9 @@ export type ModelId = keyof typeof PRICE_PER_MTOK;
 
 // Budget guardrails
 // Estimated floor cost of a thought (HP): below it, the mind does not engage.
-export const THOUGHT_COST_FLOOR_HP = 500;
+// Scaled with the cost of a thought: a floor above the actual price would stop
+// a devot from thinking when it could plainly afford to.
+export const THOUGHT_COST_FLOOR_HP = 150;
 // Maximum number of simultaneous inferences.
 export const MAX_CONCURRENT_INFERENCES = 4;
 // Global token bucket: server spending ceiling (µ$ per minute).

@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { THOUGHT_COST_SCALE } from "@devot/shared";
 import { hpCost } from "../src/hpCost.js";
 
 describe("hpCost — life <-> tokens", () => {
-  it("convertit l'usage Haiku en µ$ de HP", () => {
-    // 1M in at $1 + 1M out at $5 = $6 = 6e6 µ$
+  it("converts Haiku usage into HP, at the scaled price of a thought", () => {
+    // 1M in at $1 + 1M out at $5 = $6 = 6e6 µ$, of which a devot pays a share
     const loss = hpCost(
       {
         inputTokens: 1_000_000,
@@ -13,7 +14,7 @@ describe("hpCost — life <-> tokens", () => {
       },
       "claude-haiku-4-5",
     );
-    expect(loss).toBeCloseTo(6_000_000, 0);
+    expect(loss).toBeCloseTo(6_000_000 * THOUGHT_COST_SCALE, 0);
   });
 
   it("a prophet (Opus) bleeds 5× faster than a frugal one (Haiku) on input", () => {
@@ -41,11 +42,11 @@ describe("hpCost — life <-> tokens", () => {
     expect(cached).toBeCloseTo(raw * 0.1, 6);
   });
 
-  it("a typical Haiku thought (~1200 in / 60 out) costs ~1500 HP", () => {
+  it("a typical Haiku thought (~1200 in / 60 out) costs a few hundred HP", () => {
     const loss = hpCost(
       { inputTokens: 1200, outputTokens: 60, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
       "claude-haiku-4-5",
     );
-    expect(loss).toBeCloseTo(1500, 0);
+    expect(loss).toBeCloseTo(1500 * THOUGHT_COST_SCALE, 0);
   });
 });

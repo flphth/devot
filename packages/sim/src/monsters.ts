@@ -145,7 +145,7 @@ export function monsterSystem(world: World, now: number = Date.now()): MonsterTi
       result.triggers.push({
         kind: "threat",
         devotId: prey.id,
-        eventText: `A monster, ${monster.name} (id "${monster.id}"), has fallen upon you and is tearing your life away. It is at x=${monster.pos.x.toFixed(1)}, z=${monster.pos.z.toFixed(1)}. You can flee, or you can fight it — killing it would give you everything it has taken from others.`,
+        eventText: `A monster, ${monster.name} (id "${monster.id}"), has fallen upon you and is tearing your life away. It is at x=${monster.pos.x.toFixed(1)}, z=${monster.pos.z.toFixed(1)}. It is FASTER than you: running only postpones this. Killing it would give you everything it has taken from others.`,
         createdAt: now,
       });
     }

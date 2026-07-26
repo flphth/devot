@@ -66,17 +66,18 @@ describe("a body under attack reacts on its own", () => {
     expect(victim.currentGoal.kind).toBe("flee");
   });
 
-  it("reacts to a monster exactly as it reacts to a devot", () => {
+  it("turns and fights a monster even when hopelessly outmatched", () => {
+    // A monster moves faster than a devot, so running is a slower death with
+    // the same ending. The body fights whatever the odds — which is also the
+    // only way anyone ever collects a monster's hoard.
     const world = new World();
-    const victim = makeDevot({ hp: 20_000, pos: { x: 0, y: 0, z: 0 } });
+    const victim = makeDevot({ hp: 5_000, pos: { x: 0, y: 0, z: 0 } });
     world.devots.set(victim.id, victim);
-    spawnMonster(world, 0.4, 0);
+    const monster = spawnMonster(world, 0.4, 0);
 
-    // Monsters are driven by their own system, which the room runs alongside
-    // the tick; the reflex must fire for their victims just the same.
     monsterSystem(world);
     tick(world);
-    expect(victim.currentGoal.kind).not.toBe("wander");
+    expect(victim.currentGoal).toEqual({ kind: "attack", targetId: monster.id });
   });
 
   it("obeys a mind that has already chosen", () => {

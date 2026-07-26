@@ -9,6 +9,7 @@ import {
 } from "@devot/agents";
 import { createRepos, openDb, type Repos } from "@devot/db";
 import {
+  Economy,
   FreeStubProvider,
   LifeLedger,
   LocalSettler,
@@ -30,6 +31,10 @@ import {
   MONSTER_THINK_INTERVAL_MS,
   SOUL_MAX_CHARS,
   statMultiplier,
+  DEATH_RESIDUE_FRACTION,
+  DEVOT_DEPOSIT,
+  GOD_ENDOWMENT,
+  LEGACY_TTL_MS,
   FOOD_SPAWN_CHANCE_PER_TICK,
   FOOD_TARGET,
   describeSky,
@@ -86,9 +91,15 @@ import { canRecreateFounder, processReproductions } from "../lifecycle.js";
 
 const GOD_COLORS = ["#e0b34c", "#4ca6e0", "#9c4ce0", "#4ce07a", "#e04c5f"];
 
-/** Max HP for a given vitality. Same formula everywhere (see sim/stats). */
+/**
+ * What the deposit is worth as life, for a given vitality.
+ *
+ * The deposit is the same for everyone; vitality decides how much living it
+ * buys. That keeps the stat meaningful without letting a god buy a bigger
+ * devot by paying more.
+ */
 function hpMaxFor(vitality: number): number {
-  return Math.round(HP_MAX_DEFAULT * statMultiplier(vitality));
+  return Math.round(DEVOT_DEPOSIT * statMultiplier(vitality));
 }
 
 interface WorldRoomOptions {
@@ -149,6 +160,13 @@ export class WorldRoom extends Room<WorldState> {
    * network round-trip inside the tick, so they are netted per devot and go out
    * in batches — the simulation never waits for any of it.
    */
+  /**
+   * Who can afford what. A god's treasury pays for every devot it creates, and
+   * only refills from relics its devots pick up off the ground.
+   */
+  private economy = new Economy();
+  /** Funds riding on relics, so what rots away is burned rather than lost track of. */
+  private rottedFunds = new Map<string, number>();
   private ledger = new LifeLedger(
     new LocalSettler((batch) =>
       this.repos.events.record(
@@ -275,6 +293,7 @@ export class WorldRoom extends Room<WorldState> {
       god.name = godName;
       god.color = GOD_COLORS[this.state.gods.size % GOD_COLORS.length]!;
       this.state.gods.set(godId, god);
+      this.economy.endow(godId, GOD_ENDOWMENT);
       this.repos.events.record("god_joined", [godId], { name: godName });
     }
     god.connected = true;
@@ -336,9 +355,21 @@ export class WorldRoom extends Room<WorldState> {
       signature: signatureOf(appearance, stats, traits, soul),
     };
 
+    // The deposit is the devot's life: a god who cannot pay does not get one.
+    if (!this.economy.canAfford(godId, DEVOT_DEPOSIT)) {
+      return this.reject(
+        client,
+        "createFounder",
+        `Your treasury holds ${Math.round(this.economy.balanceOf(godId))} — a devot costs ${DEVOT_DEPOSIT}. Send your living to gather what the dead left behind.`,
+      );
+    }
+
     const receipt = await this.payments.chargeDevotCreation(godId);
     if (!receipt.ok) {
       return this.reject(client, "createFounder", "Payment refused.");
+    }
+    if (!this.economy.withdraw(godId, DEVOT_DEPOSIT)) {
+      return this.reject(client, "createFounder", "Your treasury is short.");
     }
 
     const devot = this.spawnDevot(godId, {
@@ -425,7 +456,11 @@ export class WorldRoom extends Room<WorldState> {
 
     devot.hp = 0;
     devot.state = "dead";
-    this.repos.devots.kill(devot.id, "foudre divine");
+    // Lightning kills outside deathSystem, so this death never reaches the
+    // tick's list: without this the devot's deposit simply vanished — no relic
+    // on the ground, no burn in the books.
+    this.dropLegacy(devot.id);
+    this.repos.devots.kill(devot.id, "divine lightning");
     this.repos.events.record("smite", [devot.id], { godId });
     console.log(`[world] ⚡ ${devot.name} smitten by their god — context destroyed.`);
     this.broadcast("smite", { devotId: devot.id, x: devot.pos.x, z: devot.pos.z });
@@ -619,6 +654,27 @@ export class WorldRoom extends Room<WorldState> {
     this.state.worldMs = this.world.worldMs;
     const result = tick(this.world);
 
+    for (const { godId, funds, leftBy, devotId, foodId } of result.claimed) {
+      this.economy.credit(godId, funds);
+      // Claimed, so it can no longer rot: drop it from the pending-burn book.
+      this.rottedFunds.delete(foodId);
+      this.repos.events.record("legacy_claimed", [devotId], { funds, leftBy });
+      const finder = this.world.devots.get(devotId);
+      console.log(
+        `[world] ⛏ ${finder?.name ?? devotId} recovers ${funds} left by ${leftBy} — ` +
+          `treasury of ${godId}: ${Math.round(this.economy.balanceOf(godId))}`,
+      );
+    }
+
+    // A relic that rots takes its funds with it: nobody came, nobody gets it.
+    for (const foodId of result.rotted) {
+      const lost = this.rottedFunds.get(foodId);
+      if (lost) {
+        this.economy.burn(lost);
+        this.rottedFunds.delete(foodId);
+      }
+    }
+
     for (const foodId of result.rotted) {
       this.repos.events.record("food_rotted", [], { foodId });
     }
@@ -703,6 +759,7 @@ export class WorldRoom extends Room<WorldState> {
     }
 
     for (const { devotId, cause } of result.deaths) {
+      this.dropLegacy(devotId);
       this.repos.devots.kill(devotId, cause);
       const s = this.state.devots.get(devotId);
       const name = this.world.devots.get(devotId)?.name ?? devotId;
@@ -712,8 +769,14 @@ export class WorldRoom extends Room<WorldState> {
 
     // Food appears at random rather than on a metronome, so the world never
     // settles into a rhythm a devot could learn to wait out.
+    // Count only what a devot can actually EAT. Relics and carcasses live in
+    // the same map, so counting them meant a battlefield strewn with the dead
+    // stopped the world producing food — starving it exactly when it had just
+    // become deadly.
+    let edible = 0;
+    for (const f of this.world.food.values()) if (f.type !== "legacy") edible++;
     if (
-      this.world.food.size < FOOD_TARGET &&
+      edible < FOOD_TARGET &&
       Math.random() < FOOD_SPAWN_CHANCE_PER_TICK * foodSpawnMultiplier(this.world.worldMs)
     ) {
       this.spawnFood("spawn");
@@ -818,6 +881,7 @@ export class WorldRoom extends Room<WorldState> {
       god.generations = line.reduce((n, d) => Math.max(n, d.generation), 0);
       god.eldest = line.reduce((n, d) => Math.max(n, d.age), 0);
       god.lineageAlive = living.length > 0;
+      god.treasury = Math.round(this.economy.balanceOf(godId));
 
       const startedAt = this.lineageStart.get(godId);
       if (startedAt === undefined) continue;
@@ -827,6 +891,36 @@ export class WorldRoom extends Room<WorldState> {
         god.lineageCycles = Math.floor((this.world.worldMs - startedAt) / TICK_MS);
       }
     }
+  }
+
+  /**
+   * What a death leaves on the ground.
+   *
+   * A share of the deposit that bought this devot is released where it fell,
+   * claimable by ANY devot of ANY god. The rest is burned — death destroys most
+   * of what it touches, which is what stops a line from churning devots for
+   * free and what makes a corpse worth crossing the map for.
+   */
+  private dropLegacy(devotId: string): void {
+    const devot = this.world.devots.get(devotId);
+    if (!devot) return;
+    const funds = Math.round(DEVOT_DEPOSIT * DEATH_RESIDUE_FRACTION);
+    this.economy.burn(DEVOT_DEPOSIT - funds);
+
+    const relic: FoodEntity = {
+      id: `legacy-${devot.id}`,
+      pos: placeOnGround(devot.pos.x, devot.pos.z),
+      type: "legacy",
+      hpValue: 0,
+      source: "spawn",
+      spawnedAt: Date.now(),
+      ttlMs: LEGACY_TTL_MS,
+      funds,
+      leftBy: devot.name,
+    };
+    this.world.food.set(relic.id, relic);
+    this.rottedFunds.set(relic.id, funds);
+    this.repos.events.record("legacy_dropped", [devot.id], { funds });
   }
 
   /** The last of a line has died. The run is over, and the world remembers. */
@@ -977,6 +1071,8 @@ export class WorldRoom extends Room<WorldState> {
         s.z = f.pos.z;
         s.spawnedAt = f.spawnedAt;
         s.ttlMs = f.ttlMs;
+        s.funds = f.funds ?? 0;
+        s.leftBy = f.leftBy ?? "";
         this.state.food.set(id, s);
       }
     }

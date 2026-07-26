@@ -25,6 +25,9 @@ const EN: Dict = {
   "app.unreachable":
     "The world is unreachable. Is the server running? (pnpm --filter @devot/server dev)",
 
+  "hud.treasury": "Treasury:",
+  "hud.treasury-devots": "({n} devot(s) affordable)",
+
   "feed.title": "The world thinks",
   "feed.empty": "Nobody has thought anything yet.",
 
@@ -90,6 +93,9 @@ const FR: Dict = {
   "app.connecting": "Ascension vers le monde…",
   "app.unreachable":
     "Le monde est injoignable. Le serveur tourne-t-il ? (pnpm --filter @devot/server dev)",
+
+  "hud.treasury": "Trésor :",
+  "hud.treasury-devots": "({n} devot(s) finançable(s))",
 
   "feed.title": "Le monde pense",
   "feed.empty": "Personne n'a encore pensé quoi que ce soit.",

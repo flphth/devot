@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DevotEntity } from "@devot/shared";
-import { THOUGHT_COST_FLOOR_HP, devotSubject } from "@devot/shared";
+import { THOUGHT_COST_FLOOR_HP, THOUGHT_COST_SCALE, devotSubject } from "@devot/shared";
 import { createRepos, openDb } from "@devot/db";
 import { MockMind } from "../src/mind.js";
 import { PROFILES } from "../src/profiles.js";
@@ -75,8 +75,10 @@ describe("orchestrateur cognitif", () => {
 
     expect(applied).toHaveLength(1);
     expect(applied[0]!.hpLoss).toBeGreaterThan(0);
-    // MockMind: 1200 in / 60 out on Haiku -> 1500 HP.
-    expect(devot.hp).toBeCloseTo(10_000 - 1500, 0);
+    // MockMind: 1200 in / 60 out on Haiku -> 1500 µ$, of which a devot pays
+    // THOUGHT_COST_SCALE. The scale is read rather than hard-coded so this
+    // test measures the pipeline, not a number someone will tune next week.
+    expect(devot.hp).toBeCloseTo(10_000 - 1500 * THOUGHT_COST_SCALE, 0);
     // History: user turn (event) + assistant turn (decision).
     expect(repos.devots.contextSize("d1")).toBe(2);
     expect(devot.thinking).toBe(false);

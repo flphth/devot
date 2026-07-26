@@ -91,6 +91,9 @@ export class FoodState extends Schema {
   /** Sent so the client can wilt the food as its end approaches. */
   declare spawnedAt: number;
   declare ttlMs: number;
+  /** Relics only: the funds a death released, and whose death it was. */
+  declare funds: number;
+  declare leftBy: string;
 
   constructor() {
     super();
@@ -102,6 +105,8 @@ export class FoodState extends Schema {
     this.source = "spawn";
     this.spawnedAt = 0;
     this.ttlMs = 0;
+    this.funds = 0;
+    this.leftBy = "";
   }
 }
 defineTypes(FoodState, {
@@ -113,6 +118,8 @@ defineTypes(FoodState, {
   source: "string",
   spawnedAt: "number",
   ttlMs: "number",
+  funds: "number",
+  leftBy: "string",
 });
 
 export class GodState extends Schema {
@@ -136,6 +143,8 @@ export class GodState extends Schema {
   declare eldest: number;
   /** False once the last of them is dead: the run is over. */
   declare lineageAlive: boolean;
+  /** What this god can still afford. A devot costs DEVOT_DEPOSIT. */
+  declare treasury: number;
 
   constructor() {
     super();
@@ -150,6 +159,7 @@ export class GodState extends Schema {
     this.lost = 0;
     this.eldest = 0;
     this.lineageAlive = false;
+    this.treasury = 0;
   }
 }
 defineTypes(GodState, {
@@ -164,6 +174,7 @@ defineTypes(GodState, {
   lost: "number",
   eldest: "number",
   lineageAlive: "boolean",
+  treasury: "number",
 });
 
 /**

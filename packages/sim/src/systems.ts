@@ -34,6 +34,14 @@ export interface TickResult {
   monsterDeaths: Array<{ monsterId: string; killerId: string; hoard: number; x: number; z: number }>;
   /** Food that rotted away untouched. */
   rotted: string[];
+  /** Relics picked up: funds recovered by a devot, for its god. */
+  claimed: Array<{
+    devotId: string;
+    godId: string;
+    foodId: string;
+    funds: number;
+    leftBy: string;
+  }>;
 }
 
 /**
@@ -60,6 +68,7 @@ export function tick(world: World, now: number = Date.now()): TickResult {
     combats: [],
     monsterDeaths: [],
     rotted: [],
+    claimed: [],
   };
   const dt = TICK_MS / 1000;
 
@@ -105,7 +114,7 @@ function movementSystem(devot: DevotEntity, world: World, dt: number): void {
     }
     case "seek_food": {
       const food = world.food.get(goal.foodId);
-      if (!food) {
+      if (!food || food.type === "legacy") {
         devot.currentGoal = { kind: "wander" };
         break;
       }
@@ -223,6 +232,21 @@ function stepToward(devot: DevotEntity, tx: number, tz: number, step: number): v
 
 function feedingSystem(devot: DevotEntity, world: World, result: TickResult): void {
   for (const food of world.food.values()) {
+    // A relic is not a meal. It holds the funds a death released, and picking
+    // it up enriches the finder's GOD rather than the finder — which is what
+    // makes going for one a real choice instead of a free snack.
+    if (food.type === "legacy") {
+      if (dist2(devot.pos, food.pos) > EAT_RADIUS * EAT_RADIUS) continue;
+      world.food.delete(food.id);
+      result.claimed.push({
+        devotId: devot.id,
+        godId: devot.godId,
+        foodId: food.id,
+        funds: food.funds ?? 0,
+        leftBy: food.leftBy ?? "",
+      });
+      break;
+    }
     if (dist2(devot.pos, food.pos) <= EAT_RADIUS * EAT_RADIUS) {
       devot.hp = Math.min(devot.hpMax, devot.hp + food.hpValue);
       world.food.delete(food.id);
@@ -335,6 +359,9 @@ export function nearestVisibleFood(world: World, from: Vec3, maxDist2: number) {
   let best: FoodEntity | undefined;
   let bestD = maxDist2;
   for (const f of world.food.values()) {
+    // A relic holds funds, not life. Left in, a starving devot would walk the
+    // width of the map to something that cannot feed it, and stand there.
+    if (f.type === "legacy") continue;
     const d = dist2(from, f.pos);
     if (d > bestD) continue;
     if (!hasLineOfSight(from, f.pos)) continue;
@@ -421,6 +448,14 @@ export function describeSurroundings(
     // slowly towards a meal about to rot has wasted the walk.
     const left = f.ttlMs - (now - f.spawnedAt);
     const spoiling = left < 12_000 ? ", ROTTING — it will be gone in seconds" : "";
+    if (f.type === "legacy") {
+      // Worth saying plainly: this is not a meal. It will not feed the devot,
+      // and a mind told "food, 0 HP" would rightly ignore it.
+      lines.push(
+        `- a RELIC left by ${f.leftBy || "the dead"} (id "${f.id}"), holding ${Math.round(f.funds ?? 0)} in funds, ${d.toFixed(1)} away at x=${f.pos.x.toFixed(1)}, z=${f.pos.z.toFixed(1)}${spoiling}. It will NOT feed you — it goes to your god, who needs it to make more of you.`,
+      );
+      continue;
+    }
     lines.push(
       `- food (${f.type}, id "${f.id}"), worth ${Math.round(f.hpValue)} HP, ${d.toFixed(1)} away at x=${f.pos.x.toFixed(1)}, z=${f.pos.z.toFixed(1)}${spoiling}`,
     );
@@ -475,11 +510,16 @@ function reflexSystem(devot: DevotEntity, world: World): void {
   const passive = goal === "idle" || goal === "wander" || goal === "seek_food";
   if (!passive) return;
 
-  // A body's instinct is crude on purpose: strike back at something weaker
-  // than you, run from something stronger. A mind is what weighs the rest.
-  if (devot.hp > attacker.hp) {
+  // Against a MONSTER there is no choice worth making: it moves faster than a
+  // devot does, so running is a slower death with the same ending. The body
+  // turns and fights, however bad the odds — and a monster brought down is the
+  // richest thing in this world.
+  const isMonster = world.monsters.has(attackerId);
+  if (isMonster || devot.hp > attacker.hp) {
     devot.currentGoal = { kind: "attack", targetId: attackerId };
   } else {
+    // Against another devot the instinct stays crude: strike back at something
+    // weaker, run from something stronger. A mind weighs the rest.
     devot.currentGoal = { kind: "flee", from: { ...attacker.pos } };
   }
 }
@@ -585,18 +625,17 @@ export function applyDecision(devot: DevotEntity, decision: Decision, world: Wor
       break;
     case "eat": {
       const foodId = decision.targetId;
-      if (foodId && world.food.has(foodId)) {
-        devot.currentGoal = { kind: "seek_food", foodId };
+      const named = foodId ? world.food.get(foodId) : undefined;
+      // A named relic is refused like any other inedible thing: it holds funds,
+      // and walking to it would neither feed the devot nor claim anything it
+      // was not already going to walk over.
+      if (named && named.type !== "legacy") {
+        devot.currentGoal = { kind: "seek_food", foodId: named.id };
       } else {
         // Fallback bounded by perception: the body does not "know" about food
-        // the devot cannot see.
-        const nearest = world.nearestFood(devot.pos);
-        if (
-          nearest &&
-          dist2(devot.pos, nearest.pos) <= sightOf(devot) ** 2
-        ) {
-          devot.currentGoal = { kind: "seek_food", foodId: nearest.id };
-        }
+        // the devot cannot see — too far, behind a hill, or not food at all.
+        const nearest = nearestVisibleFood(world, devot.pos, sightOf(devot) ** 2);
+        if (nearest) devot.currentGoal = { kind: "seek_food", foodId: nearest.id };
       }
       break;
     }
