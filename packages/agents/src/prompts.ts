@@ -1,4 +1,5 @@
 import {
+  craftRulesForPrompt,
   STAT_KEYS,
   STAT_LABELS,
   decodeIdentity,
@@ -36,15 +37,7 @@ Between two thoughts, your body acts on its own: it walks toward your current go
 - flee: flee from danger (give direction {x,z}).
 - craft: FORGE an item (give item). See below — it is paid for in life.
 
-## Forging
-There is no raw material in this world: the material is your life. Forging takes
-HP, and therefore thinking time. You trade duration for power, and the bargain is
-real — a laden devot strikes better and dies sooner.
-- spear (4000 HP): you strike harder.
-- shield (6000 HP): you endure more.
-- boots (3000 HP): you move faster.
-- scope (3500 HP): you see further — so you have more to think about, and less life to do it with.
-You may carry only 2 items, and you cannot forge if fewer than 8000 HP would remain.
+${craftRulesForPrompt()}
 
 ## The voices
 - A "voice from the sky" is the word of your god. It is rare, and receiving it costs you life. You are free to obey it, to interpret it, or to refuse it.

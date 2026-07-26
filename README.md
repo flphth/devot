@@ -1,84 +1,95 @@
 # Devot — prototype
 
-> Un jeu où vous êtes un dieu, et vos fidèles sont de véritables agents Claude.
-> Penser leur coûte la vie. Voir [`PLAN.md`](./PLAN.md) (game design) et
-> [`ARCHITECTURE.md`](./ARCHITECTURE.md) (technique).
+> A game where you are a god, and your faithful are real Claude agents.
+> Thinking costs them their life. See [`PLAN.md`](./PLAN.md) (game design) and
+> [`ARCHITECTURE.md`](./ARCHITECTURE.md) (technical).
 
-## Démarrage rapide
+## Quick start
 
 ```sh
 pnpm install
-pnpm --filter @devot/server dev # terminal 1 — monde sur ws://localhost:2567
-pnpm --filter @devot/client dev # terminal 2 — http://localhost:5173?god=TonNom
+pnpm --filter @devot/server dev # terminal 1 — world on ws://localhost:2567
+pnpm --filter @devot/client dev # terminal 2 — http://localhost:5173?god=YourName
 ```
 
-Ouvre `http://localhost:5173?god=TonNom`, clique « Façonner ton devot fondateur »,
-sélectionne-le (clic sur son corps) pour lui parler (140 caractères / minute) ou le nourrir.
-Deux navigateurs avec des `?god=` différents = deux dieux dans le même monde.
+Open `http://localhost:5173?god=YourName`, shape your founder devot on the
+creation screen, then select it (click its body) to speak to it (140 characters
+per minute) or feed it. Two browsers with different `?god=` values means two
+gods in the same world.
 
-**Accès Claude — trois backends** (variable `MIND`, cf. `.env.example`) :
+**Claude access — three backends** (`MIND` variable, see `.env.example`):
 
-| `MIND=` | Ce que ça utilise | Coût |
+| `MIND=` | What it uses | Cost |
 | --- | --- | --- |
-| `claude` *(défaut)* | Ton **abonnement Claude Code** (Agent SDK, OAuth de la machine) | quota de l'abonnement, **0 facturation au token** |
-| `api` | Messages API avec `ANTHROPIC_API_KEY` (clé Console) | pay-per-token |
-| `mock` | Esprits simulés, hors-ligne | gratuit |
+| `claude` *(default)* | Your **Claude Code subscription** (Agent SDK, the machine's OAuth) | subscription quota, **no per-token billing** |
+| `api` | Messages API with `ANTHROPIC_API_KEY` (Console key) | pay-per-token |
+| `mock` | Simulated minds, offline | free |
 
-Rien à configurer si Claude Code est installé et connecté sur la machine : le défaut
-`claude` fonctionne directement. Une pensée Haiku prend ~5-15 s (session éphémère) —
-le corps du devot continue de vivre pendant qu'il pense, c'est le design.
+Nothing to configure if Claude Code is installed and signed in on the machine:
+the `claude` default works as-is. A Haiku thought takes ~5-15 s (ephemeral
+session) — the devot's body goes on living while it thinks, and that is the
+design.
 
-## Prérequis
+## Requirements
 
 - Node ≥ 22, pnpm ≥ 9
 
-## Commandes
+## Commands
 
 ```sh
 pnpm install
-pnpm typecheck        # tsc --noEmit sur tous les packages
-pnpm test             # vitest (économie HP, mort/contexte, sim, orchestrateur, social)
-pnpm p0               # démo P0 : un devot headless naît, pense, mange, meurt
-pnpm p0 -- --mock     # force l'esprit factice même avec une clé API
+pnpm typecheck        # tsc --noEmit across every package
+pnpm test             # vitest (HP economy, death/context, sim, orchestrator, social)
+pnpm p0               # P0 demo: one headless devot is born, thinks, eats, dies
+pnpm p0 -- --mock     # force the fake mind even with an API key
 
-# Jouer (P1+) : serveur + client
-pnpm --filter @devot/server dev     # WorldRoom Colyseus sur ws://localhost:2567
-pnpm --filter @devot/client dev     # client 3D sur http://localhost:5173 (?god=TonNom)
+# Playing (P1+): server + client
+pnpm --filter @devot/server dev     # Colyseus WorldRoom on ws://localhost:2567
+pnpm --filter @devot/client dev     # 3D client on http://localhost:5173 (?god=YourName)
 
-# Smoke tests bout-en-bout (room réelle, esprit mock, DB mémoire)
+# End-to-end smoke tests (real room, mock mind, in-memory DB)
 pnpm --filter @devot/server smoke
 ```
 
-Variables utiles côté serveur : `DEVOT_MOCK=1` (esprits simulés), `DEVOT_DB=chemin.sqlite`,
-`DEVOT_MOCK_SCRIPT=idle,reproduce,attack` (décisions cycliques du mock pour démo).
+Useful server-side variables: `DEVOT_MOCK=1` (simulated minds),
+`DEVOT_DB=path.sqlite`, `DEVOT_MOCK_SCRIPT=idle,reproduce,attack` (cyclic mock
+decisions, for demos), `DEVOT_WALLET_SEED` (BIP-39 mnemonic; without it the
+world's wallets are real addresses but ephemeral).
 
-## Structure
+## Layout
 
 ```
-apps/server        # boucle de simulation + (P1) Colyseus WorldRoom
+apps/server        # simulation loop + (P1) Colyseus WorldRoom
 apps/client        # (P1) Vite + React + React Three Fiber
-packages/shared    # types, constantes, DECISION_SCHEMA — source de vérité
-packages/sim       # couche réactive : systèmes déterministes du tick 250 ms
-packages/agents    # esprits : prompts, palier de modèles, coût→HP, orchestrateur
-packages/db        # SQLite (better-sqlite3 + Drizzle) : lignées, contextes, événements
-packages/onchain   # PaymentProvider — FreeStubProvider uniquement (onchain différé)
+packages/shared    # types, constants, terrain, props, clock, DECISION_SCHEMA — source of truth
+packages/sim       # reactive layer: deterministic systems of the 250 ms tick
+packages/agents    # minds: prompts, model tiers, cost→HP, orchestrator
+packages/db        # SQLite (better-sqlite3 + Drizzle): lines, contexts, events, migrations
+packages/onchain   # wallets derived per devot, batched life ledger, PaymentProvider
 ```
 
-## Jalons
+## Milestones
 
-- [x] **P0 — Cœur mortel** : tick 250 ms, inférence structurée, HP ↓ selon `usage`, mort = contexte détruit
-- [x] **P1 — Monde & 3D** : WorldRoom Colyseus + R3F, nourriture, HUD dieu (140c / 60 s)
-- [x] **P2 — Vie sociale** : reproduction (bourgeonnement + sexuée), héritage via chroniqueur, combat
-- [x] **P3 — Multi-dieux** : PvP inter-lignées, recréation du fondateur
-- [x] **P4 — Style & outils divins** : rendu voxel/prairie, interpolation, monologue intérieur +
-  panneau Esprit, traits à la création, foudre divine, brouillard de guerre, mode god (touche 1)
+- [x] **P0 — Mortal core**: 250 ms tick, structured inference, HP ↓ from real `usage`, death = context destroyed
+- [x] **P1 — World & 3D**: Colyseus WorldRoom + R3F, food, god HUD (140 chars / 60 s)
+- [x] **P2 — Social life**: reproduction (budding + sexual), inheritance through the chronicler, combat
+- [x] **P3 — Many gods**: PvP between lines, founder re-creation
+- [x] **P4 — Style & divine tools**: voxel/meadow rendering, interpolation, inner monologue +
+  Mind panel, traits at creation, divine lightning, fog of war, god mode (key 1)
+- [x] **G4 — Monsters**: predators that hunt, hoard what they take, and starve if they stop
+- [x] **Living world**: terrain relief and line of sight, boulders and flowers, food that rots,
+  day/night and seasons, monsters with minds, a fight-or-flight reflex, lineage scoring,
+  a live feed of every thought, and a wallet per devot
 
-## En jeu
+## In play
 
-- **Créer** : choisis 2-3 traits, puis « Façonner ton devot fondateur ».
-- **Sélectionner** : clic sur un devot → panneau Esprit (journal de sa vie, monologue intérieur)
-  et barre d'actions : parler (140c/min), nourrir 🍞, foudroyer ⚡ (double clic de confirmation).
-- **Brouillard de guerre** : tu ne vois le monde qu'autour de tes devots vivants (proto : filtrage
-  visuel côté client ; l'anti-triche StateView Colyseus est une évolution notée).
-- **Touche 1 — mode god** (debug/créatif) : brouillard off, clic au sol = spawn de devot,
-  glisser-déposer la nourriture.
+- **Create**: choose your founder's look, stats, traits and soul on the creation screen.
+- **Select**: click a devot → Mind panel (the journal of its life, its inner monologue)
+  and the action bar: speak (140 chars/min), feed 🍞, strike down ⚡ (double click to confirm).
+- **The world thinks**: the right-hand feed carries every monologue and every word spoken,
+  from every creature at once. Thoughts are italic and private; speech is plain and public.
+- **Fog of war**: you only see the world around your living devots, and hills genuinely
+  hide what lies behind them (prototype: client-side filtering; the Colyseus StateView
+  anti-cheat is a noted evolution).
+- **Key 1 — god mode** (debug/creative): fog off, click the ground to spawn a devot or a
+  monster, drag food around.

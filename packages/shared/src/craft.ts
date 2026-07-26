@@ -30,41 +30,40 @@ export interface Recipe {
 /**
  * Four recipes, one per stat.
  *
- * These costs were calibrated against a 50,000 HP pool, where a shield cut away
- * an eighth of a whole life. The pool having been TRIPLED to 150,000, the same
- * shield now costs only 4%, and two items 6.7% instead of 20%. Forging has
- * therefore become markedly easier — the "power for lifespan" bargain still
- * exists, but it is no longer cruel.
+ * Costs are calibrated as a SHARE OF A WHOLE LIFE, not as absolute numbers: a
+ * shield is meant to cost about a twelfth of a devot's existence, and carrying
+ * two items somewhere under a tenth. That is what makes forging a bargain —
+ * power traded for duration — rather than a free upgrade.
  *
- * This is a call to make, not an oversight: tripling them in turn would restore
- * the original difficulty, leaving them as they are makes items an everyday
- * decision rather than a sacrifice.
+ * They were last rescaled when the pool was cut from 150,000 to 60,000. Left
+ * untouched they would have swallowed a sixth of a life for two items, which a
+ * test caught. If HP_MAX_DEFAULT moves again, these move with it.
  */
 export const RECIPES: Record<ItemKind, Recipe> = {
   spear: {
     kind: "spear",
-    cost: 4_000,
+    cost: 1_600,
     stat: "power",
     bonus: 1,
     description: "a spear: you strike harder, but you paid with your life to carve it",
   },
   shield: {
     kind: "shield",
-    cost: 6_000,
+    cost: 2_400,
     stat: "vitality",
     bonus: 1,
     description: "a shield: you endure more, at the cost of part of your existence",
   },
   boots: {
     kind: "boots",
-    cost: 3_000,
+    cost: 1_200,
     stat: "speed",
     bonus: 1,
     description: "boots: you move faster, and you sold thinking time for it",
   },
   scope: {
     kind: "scope",
-    cost: 3_500,
+    cost: 1_400,
     stat: "sight",
     bonus: 1,
     description: "a scope: you see further, so you have more to think about — and less life to do it",
@@ -83,6 +82,7 @@ export const MAX_CARRIED = 2;
  * would be suicide in disguise, and a model that does not yet grasp this world's
  * economy would do exactly that.
  */
+/** A devot may never forge itself below this: the floor is what it lives on. */
 export const CRAFT_HP_FLOOR = 8_000;
 
 export interface CraftRejection {

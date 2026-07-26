@@ -12,17 +12,19 @@ export const UTTERANCE_MAX_CHARS = 140;
 // Life ↔ token economy.
 // HP expressed in µ$ of inference: 1 HP = 1e-6 $ of thinking.
 //
-// Default hp_max = 150,000 HP = $0.15 of cognitive budget.
+// Default hp_max = 60,000 HP = $0.06 of cognitive budget.
 //
-// Tripled from 50,000. Since a thought's price is computed from REAL token
-// usage, tripling the pool literally triples the number of thoughts in a life:
-// a devot lives three times longer AND thinks three times more.
+// Cut from 150,000. A thought's price is computed from REAL token usage, so
+// the pool IS the number of thoughts in a life: at roughly 1,500 HP for a
+// Haiku thought, a devot now gets about forty of them instead of a hundred.
+// Mortality was the whole premise and a hundred thoughts put death too far
+// away to feel — a devot could deliberate its way through a season.
 //
 // Quantities expressed as a FRACTION of hp_max follow along on their own
-// (hunger, agony, reproduction costs). Those in ABSOLUTE HP mechanically become
-// three times lighter relative to a whole life — noted at each of them, because
-// several lose part of their meaning.
-export const HP_MAX_DEFAULT = 150_000;
+// (hunger, agony, reproduction costs). Those in ABSOLUTE HP mechanically weigh
+// two and a half times MORE against a whole life than they did — noted at each
+// of them, because that is where the balance actually moved.
+export const HP_MAX_DEFAULT = 60_000;
 export const LETHALITY = 1e6; // usd → µ$ (HP)
 
 // Price per 1M tokens (in / out), see PLAN.md §5.2
@@ -52,9 +54,9 @@ export const AGONIZING_THRESHOLD = 0.15;
 // Passive metabolism: living costs a little, even without thinking (µ$/tick),
 // so that total inaction is not an eternally dominant strategy.
 //
-// CAREFUL: with the pool tripled, this cost weighs three times less on a life,
-// so doing nothing has become three times more viable. The argument above has
-// weakened accordingly.
+// It is night and winter that carry this argument now, not the number itself:
+// upkeep is multiplied by the world's clock, so standing still is cheap by day
+// in summer and expensive in the dark and the cold.
 export const METABOLISM_HP_PER_TICK = 1;
 
 // Food: it appears on its own, and it rots. A meal left uneaten is a meal
@@ -76,8 +78,9 @@ export const FOOD_TTL_JITTER = 0.35;
 
 // Combat: vital predation (HP transfer from victim to attacker).
 export const ATTACK_RADIUS = 1.5;
-// HP taken from the victim per tick. Absolute value: with the pool tripled,
-// killing someone now takes three times longer.
+// HP taken from the victim per tick. Absolute value: against a 60,000 pool a
+// sustained mauling empties a devot in roughly a minute and a half, which is
+// long enough to run and short enough to be frightening.
 export const ATTACK_DRAIN_PER_TICK = 150;
 export const ATTACK_EFFICIENCY = 0.7;
 /**
@@ -88,8 +91,9 @@ export const ATTACK_EFFICIENCY = 0.7;
 export const THREAT_REALERT_MS = 6_000; // share actually absorbed by the attacker
 
 // Reproduction: procreating exhausts.
-// Below this, too weak to procreate. Absolute threshold: it now amounts to 5%
-// of a life instead of 16%, so procreating is reachable much earlier.
+// Below this, too weak to procreate. Absolute threshold: with the pool at
+// 60,000 it is 13% of a life again, so a devot has to be genuinely doing well
+// before it can spend itself on a child.
 export const REPRO_MIN_HP = 8_000;
 export const REPRO_SOLO_COST_FRACTION = 0.4; // budding: 40% of current HP
 export const REPRO_PAIR_COST_FRACTION = 0.3; // sexual: 30% each
