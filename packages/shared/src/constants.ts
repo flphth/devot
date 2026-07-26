@@ -43,6 +43,20 @@ export const AGONIZING_THRESHOLD = 0.15;
 // so that total inaction is not an eternally dominant strategy.
 export const METABOLISM_HP_PER_TICK = 1;
 
+// Food: it appears on its own, and it rots. A meal left uneaten is a meal
+// lost — waiting is never free, and the map is never a stable larder.
+export const FOOD_TARGET = 8; // ceiling on natural food lying around
+export const FOOD_SPAWN_CHANCE_PER_TICK = 0.05; // ~1 every 5 s, at random
+/** How long each kind lasts before rotting away, in ms. */
+export const FOOD_TTL_MS: Record<string, number> = {
+  grain: 60_000,
+  fruit: 42_000,
+  manna: 24_000, // divine and precious, therefore fleeting
+  tainted: 90_000,
+};
+/** Random spread applied to a TTL, so food does not vanish in synchronised waves. */
+export const FOOD_TTL_JITTER = 0.35;
+
 // Combat: vital predation (HP transfer from victim → attacker).
 export const ATTACK_RADIUS = 1.5;
 export const ATTACK_DRAIN_PER_TICK = 150; // HP drained from the victim per tick

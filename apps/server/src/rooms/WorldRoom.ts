@@ -6,6 +6,10 @@ import {
   DevotState,
   DIVINE_MSG_COOLDOWN_MS,
   DIVINE_MSG_MAX_CHARS,
+  FOOD_SPAWN_CHANCE_PER_TICK,
+  FOOD_TARGET,
+  FOOD_TTL_JITTER,
+  FOOD_TTL_MS,
   FoodState,
   GodState,
   HP_MAX_DEFAULT,
@@ -14,6 +18,8 @@ import {
   TICK_MS,
   TRAIT_POOL,
   WorldState,
+  resolveRockCollisions,
+  terrainHeight,
   type ActionRejectedMsg,
   type CreateFounderMsg,
   type DebugMoveFoodMsg,
@@ -21,6 +27,7 @@ import {
   type DevotEntity,
   type FeedMsg,
   type FoodEntity,
+  type FoodType,
   type JournalEntry,
   type JournalMsg,
   type JournalRequestMsg,
@@ -31,8 +38,6 @@ import { applyDecision, dist2, perceptionSystem, tick, World } from "@devot/sim"
 import { canRecreateFounder, processReproductions } from "../lifecycle.js";
 
 const GOD_COLORS = ["#e0b34c", "#4ca6e0", "#9c4ce0", "#4ce07a", "#e04c5f"];
-const FOOD_TARGET = 8;
-const FOOD_SPAWN_EVERY_TICKS = 16; // ~4 s
 
 interface WorldRoomOptions {
   godName?: string;
@@ -370,6 +375,10 @@ export class WorldRoom extends Room<WorldState> {
       this.repos.events.record("meal", [devotId], { foodId, hpValue });
     }
 
+    for (const foodId of result.rotted) {
+      this.repos.events.record("food_rotted", [], { foodId });
+    }
+
     for (const t of [...result.triggers, ...perceptionSystem(this.world)]) {
       this.orchestrator.enqueue(t);
     }
@@ -409,7 +418,12 @@ export class WorldRoom extends Room<WorldState> {
       if (s) s.utterance = "";
     }
 
-    if (this.tickCount % FOOD_SPAWN_EVERY_TICKS === 0 && this.world.food.size < FOOD_TARGET) {
+    // Food appears at random rather than on a metronome, so the world never
+    // settles into a rhythm a devot could learn to wait out.
+    if (
+      this.world.food.size < FOOD_TARGET &&
+      Math.random() < FOOD_SPAWN_CHANCE_PER_TICK
+    ) {
       this.spawnFood("spawn");
     }
 
@@ -439,24 +453,37 @@ export class WorldRoom extends Room<WorldState> {
   private spawnFood(
     source: "spawn" | "god",
     at?: { x: number; z: number },
-    kind: FoodEntity["type"] = "grain",
+    kind: FoodType = "grain",
     hpValue?: number,
   ): void {
     const rare = Math.random() < 0.06;
+    const type: FoodType = at
+      ? kind
+      : rare
+        ? "manna"
+        : Math.random() < 0.3
+          ? "fruit"
+          : "grain";
+    const x = at?.x ?? (Math.random() - 0.5) * 2 * this.world.size * 0.9;
+    const z = at?.z ?? (Math.random() - 0.5) * 2 * this.world.size * 0.9;
+    const base = FOOD_TTL_MS[type] ?? 45_000;
     const f: FoodEntity = {
       id: `food-${++this.foodSeq}`,
-      pos: {
-        x: at?.x ?? (Math.random() - 0.5) * 2 * this.world.size * 0.9,
-        y: 0,
-        z: at?.z ?? (Math.random() - 0.5) * 2 * this.world.size * 0.9,
-      },
-      type: at ? kind : rare ? "manna" : Math.random() < 0.3 ? "fruit" : "grain",
+      // Height is not stored: it is the ground's business, and both sides
+      // recompute it from x/z.
+      pos: { x, y: terrainHeight(x, z), z },
+      type,
       hpValue: hpValue ?? 0,
       source,
+      spawnedAt: Date.now(),
+      ttlMs: base * (1 + (Math.random() - 0.5) * 2 * FOOD_TTL_JITTER),
     };
     if (f.hpValue === 0) {
       f.hpValue = f.type === "manna" ? HP_MAX_DEFAULT : f.type === "fruit" ? 6000 : 2000;
     }
+    // A boulder must not swallow a meal no one can reach.
+    resolveRockCollisions(f.pos);
+    f.pos.y = terrainHeight(f.pos.x, f.pos.z);
     this.world.food.set(f.id, f);
   }
 
@@ -493,6 +520,8 @@ export class WorldRoom extends Room<WorldState> {
         s.source = f.source;
         s.x = f.pos.x;
         s.z = f.pos.z;
+        s.spawnedAt = f.spawnedAt;
+        s.ttlMs = f.ttlMs;
         this.state.food.set(id, s);
       }
     }

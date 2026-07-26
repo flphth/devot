@@ -23,6 +23,8 @@ export interface TickResult {
   deaths: Array<{ devotId: string; cause: string }>;
   eaten: Array<{ devotId: string; foodId: string; hpValue: number }>;
   combats: Array<{ attackerId: string; victimId: string; drained: number }>;
+  /** Food that rotted away untouched. */
+  rotted: string[];
 }
 
 /**
@@ -30,8 +32,16 @@ export interface TickResult {
  * Keeps the bodies alive and detects the triggers that will wake the minds.
  */
 export function tick(world: World, now: number = Date.now()): TickResult {
-  const result: TickResult = { triggers: [], deaths: [], eaten: [], combats: [] };
+  const result: TickResult = {
+    triggers: [],
+    deaths: [],
+    eaten: [],
+    combats: [],
+    rotted: [],
+  };
   const dt = TICK_MS / 1000;
+
+  decaySystem(world, result, now);
 
   for (const devot of world.aliveDevots()) {
     devot.age += 1;
@@ -45,6 +55,18 @@ export function tick(world: World, now: number = Date.now()): TickResult {
   }
 
   return result;
+}
+
+/**
+ * Food rots. Runs before the bodies move, so a devot never gets to eat on the
+ * exact tick a meal expires — the race would be invisible and maddening.
+ */
+function decaySystem(world: World, result: TickResult, now: number): void {
+  for (const food of world.food.values()) {
+    if (now - food.spawnedAt < food.ttlMs) continue;
+    world.food.delete(food.id);
+    result.rotted.push(food.id);
+  }
 }
 
 function movementSystem(devot: DevotEntity, world: World, dt: number): void {

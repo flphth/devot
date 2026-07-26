@@ -518,6 +518,15 @@ function VoxelFood({
     const g = ref.current;
     if (!g) return;
     g.position.lerp(target.current, 1 - Math.exp(-dt * 10));
+
+    // Wilting: food shrinks over the last quarter of its life, so a devot's
+    // god can see a meal is about to be lost rather than being surprised by it.
+    if (food.ttlMs > 0) {
+      const life = (Date.now() - food.spawnedAt) / food.ttlMs;
+      const wilt = life < 0.75 ? 1 : Math.max(0.25, 1 - (life - 0.75) * 3);
+      g.scale.setScalar(wilt);
+    }
+
     if (food.kind === "manna") {
       g.rotation.y = clock.elapsedTime * 1.2;
       g.position.y = ground + 0.15 + Math.sin(clock.elapsedTime * 2) * 0.08;

@@ -28,6 +28,8 @@ export interface FoodView {
   z: number;
   kind: string;
   source: string;
+  spawnedAt: number;
+  ttlMs: number;
 }
 
 export interface GodView {
@@ -131,7 +133,15 @@ export function useWorld(godName: string): WorldConnection {
           });
           const food: FoodView[] = [];
           state.food.forEach((f: any) => {
-            food.push({ id: f.id, x: f.x, z: f.z, kind: f.kind, source: f.source });
+            food.push({
+              id: f.id,
+              x: f.x,
+              z: f.z,
+              kind: f.kind,
+              source: f.source,
+              spawnedAt: f.spawnedAt,
+              ttlMs: f.ttlMs,
+            });
           });
           const gods: GodView[] = [];
           state.gods.forEach((g: any) => {
