@@ -3,7 +3,7 @@ import type { ModelId } from "./constants.js";
 
 export type DevotLifeState = "alive" | "starving" | "dying" | "dead";
 
-export type CognitionProfileName = "frugal" | "equilibre" | "prophete";
+export type CognitionProfileName = "frugal" | "balanced" | "prophet";
 
 export interface CognitionProfile {
   name: CognitionProfileName;

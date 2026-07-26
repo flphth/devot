@@ -1,7 +1,7 @@
 import type { CognitionProfile, CognitionProfileName } from "@devot/shared";
 
 /**
- * Model tier = temperament x endurance (ARCHITECTURE.md §7.2).
+* Model tier = temperament × endurance (ARCHITECTURE.md §7.2).
  * A prophet thinks better but bleeds faster.
  */
 export const PROFILES: Record<CognitionProfileName, CognitionProfile> = {
@@ -11,15 +11,15 @@ export const PROFILES: Record<CognitionProfileName, CognitionProfile> = {
     // No thinking: effort/adaptive are not supported on Haiku 4.5.
     maxTokens: 512,
   },
-  equilibre: {
-    name: "equilibre",
+  balanced: {
+    name: "balanced",
     model: "claude-sonnet-4-6",
     thinking: { type: "adaptive" },
     effort: "low",
     maxTokens: 1024,
   },
-  prophete: {
-    name: "prophete",
+  prophet: {
+    name: "prophet",
     model: "claude-opus-4-8",
     thinking: { type: "adaptive" },
     effort: "medium",
