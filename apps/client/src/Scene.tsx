@@ -9,7 +9,13 @@ import {
   terrainHeight,
   worldProps,
 } from "@devot/shared";
-import type { DevotView, FoodView, SmiteFx, WorldSnapshot } from "./useWorld.js";
+import type {
+  DevotView,
+  FoodView,
+  MonsterView,
+  SmiteFx,
+  WorldSnapshot,
+} from "./useWorld.js";
 
 const GROUND_SIZE = 120;
 /** Quads across the ground. The relief is only as sharp as this grid is fine. */
@@ -27,6 +33,7 @@ const FOOD_COLORS: Record<string, string> = {
   fruit: "#e0634c",
   manna: "#9fe8ff",
   tainted: "#9c4ce0",
+  carrion: "#8c4a3f",
 };
 
 type VisionCircle = { x: number; z: number };
@@ -498,6 +505,116 @@ function VoxelDevot({
   );
 }
 
+// ── Voxel monster ───────────────────────────────────────────────────────────
+
+/**
+ * Bigger, darker and lower to the ground than a devot, so the shape reads as a
+ * threat before the player has parsed anything else on screen.
+ */
+function VoxelMonster({ monster }: { monster: MonsterView }) {
+  const group = useRef<THREE.Group>(null);
+  const body = useRef<THREE.Group>(null);
+  const target = useRef(new THREE.Vector3(monster.x, monster.y, monster.z));
+  const heading = useRef(0);
+  const dead = monster.state === "dead";
+
+  target.current.set(monster.x, monster.y, monster.z);
+
+  useFrame(({ clock }, dt) => {
+    const g = group.current;
+    const b = body.current;
+    if (!g || !b) return;
+
+    const before = g.position.clone();
+    g.position.lerp(target.current, 1 - Math.exp(-dt * 7));
+    const delta = g.position.clone().sub(before);
+    const moving = delta.length() / Math.max(dt, 1e-4) > 0.15 && !dead;
+
+    if (moving) {
+      const desired = Math.atan2(delta.x, delta.z);
+      let diff = desired - heading.current;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      heading.current += diff * Math.min(1, dt * 10);
+      g.rotation.y = heading.current;
+    }
+
+    const t = clock.elapsedTime;
+    // A prowling gait: heavier and slower than a devot's bob.
+    b.position.y = moving ? Math.abs(Math.sin(t * 6)) * 0.1 : 0;
+    b.scale.setScalar(monster.thinking ? 1 + Math.sin(t * 4) * 0.04 : 1);
+  });
+
+  if (dead) return null;
+
+  const starving = monster.hp / monster.hpMax < 0.3;
+  const hide = starving ? "#4a3742" : "#3b2f3a";
+  const ratio = monster.hpMax > 0 ? monster.hp / monster.hpMax : 0;
+  const bubble = monster.thinking ? "…" : monster.utterance || "";
+
+  return (
+    <group ref={group} position={[monster.x, monster.y, monster.z]}>
+      <group ref={body}>
+        <mesh position={[0, 0.5, 0]}>
+          <boxGeometry args={[0.8, 0.55, 1.15]} />
+          <meshStandardMaterial color={hide} flatShading />
+        </mesh>
+        <mesh position={[0, 0.62, 0.62]}>
+          <boxGeometry args={[0.55, 0.45, 0.45]} />
+          <meshStandardMaterial color="#2c232c" flatShading />
+        </mesh>
+        {/* eyes: the only thing on it that catches the light */}
+        <mesh position={[-0.14, 0.7, 0.85]}>
+          <boxGeometry args={[0.1, 0.08, 0.03]} />
+          <meshStandardMaterial color="#ff5a3c" emissive="#ff5a3c" emissiveIntensity={1.4} />
+        </mesh>
+        <mesh position={[0.14, 0.7, 0.85]}>
+          <boxGeometry args={[0.1, 0.08, 0.03]} />
+          <meshStandardMaterial color="#ff5a3c" emissive="#ff5a3c" emissiveIntensity={1.4} />
+        </mesh>
+        {/* spines along the back */}
+        {[-0.25, 0, 0.25].map((z) => (
+          <mesh key={z} position={[0, 0.85, z]} rotation={[0, 0, Math.PI / 4]}>
+            <boxGeometry args={[0.14, 0.14, 0.08]} />
+            <meshStandardMaterial color="#20191f" flatShading />
+          </mesh>
+        ))}
+        {[-0.28, 0.28].map((x) => (
+          <mesh key={x} position={[x, 0.14, 0.35]}>
+            <boxGeometry args={[0.2, 0.28, 0.24]} />
+            <meshStandardMaterial color="#2c232c" flatShading />
+          </mesh>
+        ))}
+      </group>
+
+      <Billboard position={[0, 1.35, 0]}>
+        <mesh position={[-(1 - ratio) * 0.45, 0, 0]}>
+          <planeGeometry args={[Math.max(0.02, ratio * 0.9), 0.08]} />
+          <meshBasicMaterial color="#e0634c" />
+        </mesh>
+      </Billboard>
+
+      {bubble && (
+        <Html position={[0, 1.75, 0]} center distanceFactor={18} style={{ pointerEvents: "none" }}>
+          <div
+            style={{
+              background: "rgba(48,22,28,0.9)",
+              color: "#ffd9d0",
+              borderRadius: 10,
+              padding: "4px 10px",
+              maxWidth: 220,
+              font: "12px/1.35 system-ui, sans-serif",
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {bubble}
+          </div>
+        </Html>
+      )}
+    </group>
+  );
+}
+
 // ── Voxel food ──────────────────────────────────────────────────────────────
 
 function VoxelFood({
@@ -654,6 +771,11 @@ export function Scene({
     (d) => d.godId === godId || isVisible(d.x, d.z, vision, godMode),
   );
   const visibleFood = snapshot.food.filter((f) => isVisible(f.x, f.z, vision, godMode));
+  // Monsters obey the fog like everything else: a predator behind a hill is
+  // genuinely unseen, which is what makes one walking into view alarming.
+  const visibleMonsters = snapshot.monsters.filter(
+    (m) => m.state !== "dead" && isVisible(m.x, m.z, vision, godMode),
+  );
 
   const handleGroundClick = (e: ThreeEvent<MouseEvent>) => {
     if (draggingFood) return;
@@ -699,6 +821,9 @@ export function Scene({
           selected={d.id === selectedId}
           onSelect={onSelect}
         />
+      ))}
+      {visibleMonsters.map((m) => (
+        <VoxelMonster key={m.id} monster={m} />
       ))}
       {visibleFood.map((f) => (
         <VoxelFood key={f.id} food={f} godModeRef={godModeRef} onDragStart={setDraggingFood} />

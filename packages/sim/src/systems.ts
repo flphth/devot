@@ -16,6 +16,7 @@ import {
   terrainGrade,
   terrainHeight,
 } from "@devot/shared";
+import { monsterTick, reapMonsters } from "./monsters.js";
 import { clampToWorld, dist2, World } from "./world.js";
 
 export interface TickResult {
@@ -25,6 +26,8 @@ export interface TickResult {
   combats: Array<{ attackerId: string; victimId: string; drained: number }>;
   /** Food that rotted away untouched. */
   rotted: string[];
+  monsterDeaths: Array<{ monsterId: string; cause: string }>;
+  monsterAttacks: Array<{ monsterId: string; devotId: string; drained: number }>;
 }
 
 /**
@@ -38,10 +41,18 @@ export function tick(world: World, now: number = Date.now()): TickResult {
     eaten: [],
     combats: [],
     rotted: [],
+    monsterDeaths: [],
+    monsterAttacks: [],
   };
   const dt = TICK_MS / 1000;
 
   decaySystem(world, result, now);
+
+  // Predators move first: a devot's tick then reacts to where they actually
+  // are, rather than to where they were a quarter of a second ago.
+  const monsters = monsterTick(world, dt, now);
+  result.triggers.push(...monsters.triggers);
+  result.monsterAttacks = monsters.attacks;
 
   for (const devot of world.aliveDevots()) {
     devot.age += 1;
@@ -53,6 +64,12 @@ export function tick(world: World, now: number = Date.now()): TickResult {
     hungerSystem(devot, result, now);
     deathSystem(devot, result);
   }
+
+  // Reaped last, so a monster finished off by a devot falls on this tick and
+  // not the next one.
+  const reaped = reapMonsters(world, now);
+  result.monsterDeaths = reaped.deaths;
+  for (const carrion of reaped.carrion) world.food.set(carrion.id, carrion);
 
   return result;
 }
@@ -105,7 +122,8 @@ function movementSystem(devot: DevotEntity, world: World, dt: number): void {
       break;
     }
     case "attack": {
-      const target = world.devots.get(goal.targetId);
+      // A devot may turn on a monster as readily as on another devot.
+      const target = world.creature(goal.targetId);
       if (!target || target.state === "dead") {
         devot.currentGoal = { kind: "wander" };
         break;
@@ -132,7 +150,7 @@ function combatSystem(
   now: number,
 ): void {
   if (devot.currentGoal.kind !== "attack") return;
-  const victim = world.devots.get(devot.currentGoal.targetId);
+  const victim = world.creature(devot.currentGoal.targetId);
   if (!victim || victim.state === "dead") {
     devot.currentGoal = { kind: "wander" };
     return;
@@ -150,7 +168,7 @@ function combatSystem(
     victim.underAttackBy = devot.id;
     result.triggers.push({
       kind: "threat",
-      devotId: victim.id,
+      creatureId: victim.id,
       eventText: `${devot.name} is attacking you and draining your life! You lose HP for every moment of contact. They are at x=${devot.pos.x.toFixed(1)}, z=${devot.pos.z.toFixed(1)}.`,
       createdAt: now,
     });
@@ -203,7 +221,7 @@ function hungerSystem(devot: DevotEntity, result: TickResult, now: number): void
   if (devot.state !== prev && (devot.state === "starving" || devot.state === "dying")) {
     result.triggers.push({
       kind: "survival",
-      devotId: devot.id,
+      creatureId: devot.id,
       eventText:
         devot.state === "dying"
           ? "Your strength is deserting you. You feel death approaching. Very little life remains."
@@ -271,11 +289,25 @@ export function perceptionSystem(world: World, now: number = Date.now()): Trigge
         const sameGod = other.godId === devot.godId;
         triggers.push({
           kind: "encounter",
-          devotId: devot.id,
+          creatureId: devot.id,
           eventText: `You meet ${other.name} (id "${other.id}"), a devot ${sameGod ? "of your own lineage" : "of a rival lineage, watched over by another god"}. They are at x=${other.pos.x.toFixed(1)}, z=${other.pos.z.toFixed(1)}.`,
           createdAt: now,
         });
       }
+    }
+
+    // A monster in sight is the most important thing in a devot's world.
+    for (const monster of world.aliveMonsters()) {
+      if (devot.metDevots?.includes(monster.id)) continue;
+      if (dist2(devot.pos, monster.pos) > r2) continue;
+      if (!hasLineOfSight(devot.pos, monster.pos)) continue;
+      devot.metDevots = [...(devot.metDevots ?? []), monster.id];
+      triggers.push({
+        kind: "threat",
+        creatureId: devot.id,
+        eventText: `A monster prowls within sight: ${monster.name} (id "${monster.id}"), at x=${monster.pos.x.toFixed(1)}, z=${monster.pos.z.toFixed(1)}. It is faster than you. It drains the life of whatever it catches. You can run, or you can fight it — its carcass would feed you for a long time.`,
+        createdAt: now,
+      });
     }
 
     if (devot.currentGoal.kind === "seek_food" || devot.currentGoal.kind === "move_to")
@@ -284,7 +316,7 @@ export function perceptionSystem(world: World, now: number = Date.now()): Trigge
     if (food) {
       triggers.push({
         kind: "encounter",
-        devotId: devot.id,
+        creatureId: devot.id,
         eventText: `You spot food (${food.type}, id "${food.id}") not far from you, towards x=${food.pos.x.toFixed(1)}, z=${food.pos.z.toFixed(1)}.`,
         createdAt: now,
       });
@@ -344,7 +376,7 @@ export function applyDecision(devot: DevotEntity, decision: Decision, world: Wor
       devot.utterance = decision.utterance ?? "";
       break;
     case "attack": {
-      const target = decision.targetId ? world.devots.get(decision.targetId) : undefined;
+      const target = decision.targetId ? world.creature(decision.targetId) : undefined;
       if (target && target.id !== devot.id && target.state !== "dead") {
         devot.currentGoal = { kind: "attack", targetId: target.id };
       }

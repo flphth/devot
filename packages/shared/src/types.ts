@@ -42,10 +42,35 @@ export type TriggerKind =
 
 export interface Trigger {
   kind: TriggerKind;
-  devotId: string;
+  /** Devot or monster — anything that owns a mind. */
+  creatureId: string;
   /** Description of the event, injected into the user turn. */
   eventText: string;
   createdAt: number;
+}
+
+/** What kind of creature a mind belongs to. They do not read the same rules. */
+export type CreatureKind = "devot" | "monster";
+
+/**
+ * The read-only view of a creature that its mind is given. Built fresh for
+ * every thought — position and HP change between two of them.
+ *
+ * This is what makes the cognition layer polymorphic: devots and monsters are
+ * very different entities in the simulation, but a thought only ever needs
+ * this much.
+ */
+export interface ThoughtSubject {
+  id: string;
+  kind: CreatureKind;
+  name: string;
+  pos: Vec3;
+  hp: number;
+  hpMax: number;
+  state: string;
+  age: number;
+  traits: string[];
+  isFounder: boolean;
 }
 
 export const TRIGGER_PRIORITY: Record<TriggerKind, number> = {
@@ -94,7 +119,37 @@ export interface DevotEntity {
   metDevots?: string[];
 }
 
-export type FoodType = "grain" | "fruit" | "manna" | "tainted";
+export type MonsterLifeState = "alive" | "dead";
+
+/**
+ * A predator. Unlike a devot it has no god, no lineage and no reproduction —
+ * it hunts, it feeds, and it starves if it stops. Its mind runs on a much
+ * slower clock than a devot's, which is what keeps a pack of them affordable.
+ */
+export interface MonsterEntity {
+  id: string;
+  name: string;
+  pos: Vec3;
+  hp: number;
+  hpMax: number;
+  state: MonsterLifeState;
+  age: number;
+  thinking: boolean;
+  /** Growls and threats — monsters do speak, and devots hear them. */
+  utterance: string;
+  currentGoal:
+    | { kind: "prowl" }
+    | { kind: "hunt"; targetId: string }
+    | { kind: "move_to"; target: Vec3 }
+    | { kind: "flee"; from: Vec3 }
+    | { kind: "idle" };
+  /** Id of the last reported attacker (avoids re-triggering every tick). */
+  underAttackBy?: string;
+  /** When its mind last ran. The cadence guard lives on this field. */
+  lastThoughtAt: number;
+}
+
+export type FoodType = "grain" | "fruit" | "manna" | "tainted" | "carrion";
 
 export interface FoodEntity {
   id: string;

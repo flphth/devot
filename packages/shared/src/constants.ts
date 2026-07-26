@@ -62,6 +62,32 @@ export const ATTACK_RADIUS = 1.5;
 export const ATTACK_DRAIN_PER_TICK = 150; // HP drained from the victim per tick
 export const ATTACK_EFFICIENCY = 0.7; // share actually absorbed by the attacker
 
+// Monsters. Predators with a mind, which is exactly why their numbers and
+// their thinking cadence are capped: every monster that thinks spends from the
+// same inference budget the devots draw on.
+export const MONSTER_MAX_POPULATION = 4;
+export const MONSTER_SPAWN_CHANCE_PER_TICK = 0.004; // ~1 per minute, at most
+/**
+ * A monster's mind runs at most this often. The real cost guard — and it has
+ * to be enforced at every point that can wake one, not just the obvious one.
+ */
+export const MONSTER_THINK_INTERVAL_MS = 15_000;
+export const MONSTER_HP_START = 40_000;
+export const MONSTER_HP_MAX = 60_000;
+/**
+ * Monsters burn life far faster than devots: stop hunting and you die. Tuned
+ * against the cost of thinking, not in isolation — a thought runs a monster
+ * ~1500 HP, so at this cadence thinking already costs it more than living
+ * does. Roughly five minutes of prowling before starvation.
+ */
+export const MONSTER_METABOLISM_HP_PER_TICK = 8;
+export const MONSTER_SPEED = 2.6; // faster than a devot — that is the threat
+export const MONSTER_PERCEPTION_RADIUS = 14; // and it sees further
+export const MONSTER_ATTACK_DRAIN_PER_TICK = 220;
+export const MONSTER_ATTACK_EFFICIENCY = 0.8;
+/** Share of a dead monster's peak life that its carcass is worth as food. */
+export const CARRION_HP_FRACTION = 0.45;
+
 // Reproduction: procreating is exhausting.
 export const REPRO_MIN_HP = 8_000; // below this, too weak to procreate
 export const REPRO_SOLO_COST_FRACTION = 0.4; // budding: 40% of current HP

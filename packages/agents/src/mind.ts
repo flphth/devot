@@ -1,8 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { CognitionProfile, Decision, DevotEntity, InferenceUsage } from "@devot/shared";
+import type { CognitionProfile, Decision, InferenceUsage, ThoughtSubject } from "@devot/shared";
 import { DECISION_SCHEMA, parseDecision } from "@devot/shared";
 import type { StoredMessage } from "@devot/db";
-import { buildEventBlock, buildPersona, WORLD_RULES } from "./prompts.js";
+import { buildEventBlock, buildPersona, rulesFor } from "./prompts.js";
 
 export interface ThoughtResult {
   decision: Decision;
@@ -14,13 +14,17 @@ export interface ThoughtResult {
 }
 
 /**
- * A devot's mind: produces a structured decision from its history and an event.
+ * A creature's mind: produces a structured decision from its history and an
+ * event. Takes a ThoughtSubject rather than an entity, which is what lets the
+ * same implementation drive both a devot and a monster — they read different
+ * rules, but they think through the same door.
+ *
  * Injectable interface — real implementation (Claude) or fake one (tests /
  * demo without a key).
  */
 export interface MindProvider {
   think(
-    devot: DevotEntity,
+    subject: ThoughtSubject,
     profile: CognitionProfile,
     history: StoredMessage[],
     eventText: string,
@@ -35,12 +39,12 @@ export class AnthropicMind implements MindProvider {
   }
 
   async think(
-    devot: DevotEntity,
+    subject: ThoughtSubject,
     profile: CognitionProfile,
     history: StoredMessage[],
     eventText: string,
   ): Promise<ThoughtResult> {
-    const userTurn = buildEventBlock(devot, eventText);
+    const userTurn = buildEventBlock(subject, eventText);
 
     const messages = [
       ...history.map((m) => ({
@@ -57,10 +61,10 @@ export class AnthropicMind implements MindProvider {
       system: [
         {
           type: "text",
-          text: WORLD_RULES,
+          text: rulesFor(subject),
           cache_control: { type: "ephemeral" },
         },
-        { type: "text", text: buildPersona(devot) },
+        { type: "text", text: buildPersona(subject) },
       ],
       messages,
       output_config: {
@@ -101,7 +105,7 @@ export class MockMind implements MindProvider {
   private callCount = 0;
 
   async think(
-    devot: DevotEntity,
+    subject: ThoughtSubject,
     _profile: CognitionProfile,
     _history: StoredMessage[],
     eventText: string,
@@ -142,7 +146,7 @@ export class MockMind implements MindProvider {
       decision,
       usage,
       rawAssistantContent: [{ type: "text", text: JSON.stringify(decision) }],
-      userTurn: buildEventBlock(devot, eventText),
+      userTurn: buildEventBlock(subject, eventText),
     };
   }
 }

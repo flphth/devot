@@ -32,6 +32,21 @@ export interface FoodView {
   ttlMs: number;
 }
 
+export interface MonsterView {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  z: number;
+  hp: number;
+  hpMax: number;
+  state: string;
+  thinking: boolean;
+  utterance: string;
+  thought: string;
+  age: number;
+}
+
 export interface GodView {
   id: string;
   name: string;
@@ -42,6 +57,7 @@ export interface GodView {
 
 export interface WorldSnapshot {
   devots: DevotView[];
+  monsters: MonsterView[];
   food: FoodView[];
   gods: GodView[];
 }
@@ -73,7 +89,7 @@ export interface WorldConnection {
   actions: WorldActions;
 }
 
-const EMPTY: WorldSnapshot = { devots: [], food: [], gods: [] };
+const EMPTY: WorldSnapshot = { devots: [], monsters: [], food: [], gods: [] };
 
 export function useWorld(godName: string): WorldConnection {
   const [snapshot, setSnapshot] = useState<WorldSnapshot>(EMPTY);
@@ -131,6 +147,23 @@ export function useWorld(godName: string): WorldConnection {
               age: d.age,
             });
           });
+          const monsters: MonsterView[] = [];
+          state.monsters.forEach((m: any) => {
+            monsters.push({
+              id: m.id,
+              name: m.name,
+              x: m.x,
+              y: m.y,
+              z: m.z,
+              hp: m.hp,
+              hpMax: m.hpMax,
+              state: m.state,
+              thinking: m.thinking,
+              utterance: m.utterance,
+              thought: m.thought,
+              age: m.age,
+            });
+          });
           const food: FoodView[] = [];
           state.food.forEach((f: any) => {
             food.push({
@@ -153,7 +186,7 @@ export function useWorld(godName: string): WorldConnection {
               connected: g.connected,
             });
           });
-          setSnapshot({ devots, food, gods });
+          setSnapshot({ devots, monsters, food, gods });
         });
       })
       .catch((err) => {

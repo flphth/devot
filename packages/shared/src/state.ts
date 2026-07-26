@@ -99,6 +99,51 @@ defineTypes(FoodState, {
   ttlMs: "number",
 });
 
+export class MonsterState extends Schema {
+  declare id: string;
+  declare name: string;
+  declare x: number;
+  declare y: number;
+  declare z: number;
+  declare hp: number;
+  declare hpMax: number;
+  declare state: string;
+  declare thinking: boolean;
+  declare utterance: string;
+  declare thought: string;
+  declare age: number;
+
+  constructor() {
+    super();
+    this.id = "";
+    this.name = "";
+    this.x = 0;
+    this.y = 0;
+    this.z = 0;
+    this.hp = 0;
+    this.hpMax = 0;
+    this.state = "alive";
+    this.thinking = false;
+    this.utterance = "";
+    this.thought = "";
+    this.age = 0;
+  }
+}
+defineTypes(MonsterState, {
+  id: "string",
+  name: "string",
+  x: "number",
+  y: "number",
+  z: "number",
+  hp: "number",
+  hpMax: "number",
+  state: "string",
+  thinking: "boolean",
+  utterance: "string",
+  thought: "string",
+  age: "number",
+});
+
 export class GodState extends Schema {
   declare id: string;
   declare name: string;
@@ -126,18 +171,21 @@ defineTypes(GodState, {
 
 export class WorldState extends Schema {
   declare devots: MapSchema<DevotState>;
+  declare monsters: MapSchema<MonsterState>;
   declare food: MapSchema<FoodState>;
   declare gods: MapSchema<GodState>;
 
   constructor() {
     super();
     this.devots = new MapSchema<DevotState>();
+    this.monsters = new MapSchema<MonsterState>();
     this.food = new MapSchema<FoodState>();
     this.gods = new MapSchema<GodState>();
   }
 }
 defineTypes(WorldState, {
   devots: { map: DevotState },
+  monsters: { map: MonsterState },
   food: { map: FoodState },
   gods: { map: GodState },
 });
@@ -176,6 +224,11 @@ export interface JournalMsg {
 // ── God mode (debug/creative, outside the rules of the game) ────────────────
 
 export interface DebugSpawnDevotMsg {
+  x: number;
+  z: number;
+}
+
+export interface DebugSpawnMonsterMsg {
   x: number;
   z: number;
 }

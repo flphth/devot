@@ -1,5 +1,12 @@
 import { Client, Room } from "@colyseus/core";
-import { CognitionOrchestrator, createMind, type Chronicler } from "@devot/agents";
+import {
+  CognitionOrchestrator,
+  EphemeralMemory,
+  PROFILES,
+  createMind,
+  type Chronicler,
+  type Thinker,
+} from "@devot/agents";
 import { createRepos, openDb, type Repos } from "@devot/db";
 import { FreeStubProvider, type PaymentProvider } from "@devot/onchain";
 import {
@@ -7,6 +14,10 @@ import {
   DIVINE_MSG_COOLDOWN_MS,
   DIVINE_MSG_MAX_CHARS,
   FOOD_SPAWN_CHANCE_PER_TICK,
+  MONSTER_MAX_POPULATION,
+  MONSTER_SPAWN_CHANCE_PER_TICK,
+  MONSTER_THINK_INTERVAL_MS,
+  MonsterState,
   FOOD_TARGET,
   FOOD_TTL_JITTER,
   FOOD_TTL_MS,
@@ -18,13 +29,17 @@ import {
   TICK_MS,
   TRAIT_POOL,
   WorldState,
+  devotSubject,
+  monsterSubject,
   resolveRockCollisions,
   terrainHeight,
   type ActionRejectedMsg,
   type CreateFounderMsg,
   type DebugMoveFoodMsg,
   type DebugSpawnDevotMsg,
+  type DebugSpawnMonsterMsg,
   type DevotEntity,
+  type MonsterEntity,
   type FeedMsg,
   type FoodEntity,
   type FoodType,
@@ -34,7 +49,16 @@ import {
   type SmiteMsg,
   type SpeakMsg,
 } from "@devot/shared";
-import { applyDecision, dist2, perceptionSystem, tick, World } from "@devot/sim";
+import {
+  applyDecision,
+  applyMonsterDecision,
+  dist2,
+  monsterPerception,
+  perceptionSystem,
+  spawnMonster,
+  tick,
+  World,
+} from "@devot/sim";
 import { canRecreateFounder, processReproductions } from "../lifecycle.js";
 
 const GOD_COLORS = ["#e0b34c", "#4ca6e0", "#9c4ce0", "#4ce07a", "#e04c5f"];
@@ -53,8 +77,40 @@ export class WorldRoom extends Room<WorldState> {
   private tickCount = 0;
   private foodSeq = 0;
   private devotSeq = 0;
-  /** sessionId → godId (un dieu peut se reconnecter). */
+  /** sessionId → godId (a god may reconnect). */
   private sessions = new Map<string, string>();
+  /**
+   * Monster histories live here, not in SQLite: a monster leaves no gravestone,
+   * and the messages table only accepts rows belonging to a devot.
+   */
+  private monsterMemory = new EphemeralMemory();
+
+  /**
+   * Hands the orchestrator whatever thinks under this id, devot or monster.
+   * Monsters run on the frugal tier: they are numerous enough to matter and
+   * their decisions are simple enough not to need a better model.
+   */
+  private thinkerOf(id: string): Thinker | undefined {
+    const devot = this.world.devots.get(id);
+    if (devot) {
+      return {
+        entity: devot,
+        subject: devotSubject(devot),
+        profile: PROFILES[devot.profile],
+        memory: this.repos.messages,
+      };
+    }
+    const monster = this.world.monsters.get(id);
+    if (monster) {
+      return {
+        entity: monster,
+        subject: monsterSubject(monster),
+        profile: PROFILES.frugal,
+        memory: this.monsterMemory,
+      };
+    }
+    return undefined;
+  }
 
   onCreate(): void {
     this.setState(new WorldState());
@@ -77,19 +133,29 @@ export class WorldRoom extends Room<WorldState> {
 
     this.orchestrator = new CognitionOrchestrator(
       mind,
-      this.repos,
-      (id) => this.world.devots.get(id),
-      ({ devotId, decision }) => {
-        const devot = this.world.devots.get(devotId);
-        if (!devot) return;
-        applyDecision(devot, decision, this.world);
-        const s = this.state.devots.get(devotId);
-        if (s) {
-          if (decision.emotion) s.emotion = decision.emotion;
-          if (decision.thought) s.thought = decision.thought;
+      (id) => this.thinkerOf(id),
+      ({ creatureId, decision }) => {
+        const devot = this.world.devots.get(creatureId);
+        if (devot) {
+          applyDecision(devot, decision, this.world);
+          const s = this.state.devots.get(creatureId);
+          if (s) {
+            if (decision.emotion) s.emotion = decision.emotion;
+            if (decision.thought) s.thought = decision.thought;
+          }
+          if (decision.action === "speak" && decision.utterance) {
+            this.onDevotSpoke(devot, decision.utterance);
+          }
+          return;
         }
+
+        const monster = this.world.monsters.get(creatureId);
+        if (!monster) return;
+        applyMonsterDecision(monster, decision, this.world);
+        const ms = this.state.monsters.get(creatureId);
+        if (ms && decision.thought) ms.thought = decision.thought;
         if (decision.action === "speak" && decision.utterance) {
-          this.onDevotSpoke(devot, decision.utterance);
+          this.onMonsterSpoke(monster, decision.utterance);
         }
       },
       undefined,
@@ -116,6 +182,11 @@ export class WorldRoom extends Room<WorldState> {
     this.onMessage("debugMoveFood", (_client, msg: DebugMoveFoodMsg) =>
       this.handleDebugMoveFood(msg),
     );
+    this.onMessage("debugSpawnMonster", (_client, msg: DebugSpawnMonsterMsg) => {
+      if (typeof msg?.x !== "number" || typeof msg?.z !== "number") return;
+      const monster = spawnMonster(this.world, msg.x, msg.z);
+      this.repos.events.record("monster_spawn", [], { monsterId: monster.id, debug: true });
+    });
 
     this.setSimulationInterval(() => this.simulate(), TICK_MS);
   }
@@ -189,7 +260,7 @@ export class WorldRoom extends Room<WorldState> {
 
     this.orchestrator.enqueue({
       kind: "idle_reflection",
-      devotId: devot.id,
+      creatureId: devot.id,
       eventText:
         "You have just been born. You open your eyes on the world for the first time. You already know that thinking costs you your life.",
       createdAt: Date.now(),
@@ -337,7 +408,7 @@ export class WorldRoom extends Room<WorldState> {
     // Untrusted content: framed, injected into the user turn only.
     this.orchestrator.enqueue({
       kind: "divine_message",
-      devotId: devot.id,
+      creatureId: devot.id,
       eventText: `A voice from the sky says to you: "${msg.text}"`,
       createdAt: now,
     });
@@ -379,7 +450,27 @@ export class WorldRoom extends Room<WorldState> {
       this.repos.events.record("food_rotted", [], { foodId });
     }
 
-    for (const t of [...result.triggers, ...perceptionSystem(this.world)]) {
+    for (const { monsterId, devotId, drained } of result.monsterAttacks) {
+      if (this.tickCount % 8 === 0) {
+        this.repos.events.record("monster_attack", [devotId], { monsterId, drained });
+      }
+    }
+
+    for (const { monsterId, cause } of result.monsterDeaths) {
+      const name = this.world.monsters.get(monsterId)?.name ?? monsterId;
+      console.log(`[world] 🩸 monster ${name} is dead (${cause}) — it leaves carrion.`);
+      this.repos.events.record("monster_death", [], { monsterId, cause });
+      this.monsterMemory.forget(monsterId);
+    }
+
+    this.spawnMonsters();
+    this.wakeMonsters();
+
+    for (const t of [
+      ...result.triggers,
+      ...perceptionSystem(this.world),
+      ...monsterPerception(this.world),
+    ]) {
       this.orchestrator.enqueue(t);
     }
 
@@ -398,7 +489,7 @@ export class WorldRoom extends Room<WorldState> {
         );
         this.orchestrator.enqueue({
           kind: "idle_reflection",
-          devotId: birth.child.id,
+          creatureId: birth.child.id,
           eventText:
             birth.parents.length > 1
               ? "You have just been born of the union of two devots. You carry within you memories of a life you did not live."
@@ -434,6 +525,74 @@ export class WorldRoom extends Room<WorldState> {
     this.syncState();
   }
 
+  /**
+   * Monsters arrive on their own, rarely, and never more than a handful at a
+   * time. The cap is a cost guard as much as a design one: each of them thinks.
+   */
+  private spawnMonsters(): void {
+    if (this.world.aliveMonsters().length >= MONSTER_MAX_POPULATION) return;
+    if (Math.random() >= MONSTER_SPAWN_CHANCE_PER_TICK) return;
+
+    // They come from the edges of the world, never on top of a devot.
+    const edge = this.world.size * 0.92;
+    const angle = Math.random() * Math.PI * 2;
+    const monster = spawnMonster(
+      this.world,
+      Math.cos(angle) * edge,
+      Math.sin(angle) * edge,
+    );
+    this.repos.events.record("monster_spawn", [], { monsterId: monster.id });
+    console.log(`[world] 🐺 ${monster.name} enters the world.`);
+
+    this.orchestrator.enqueue({
+      kind: "idle_reflection",
+      creatureId: monster.id,
+      eventText:
+        "You wake at the edge of the world, already hungry. Something out there is made of life, and you are made to take it.",
+      createdAt: Date.now(),
+    });
+  }
+
+  /**
+   * A monster's mind on a leash: it may think at most once every
+   * MONSTER_THINK_INTERVAL_MS. Predators are always in a situation worth
+   * thinking about, so without this they would think every single tick and
+   * spend the whole inference budget between them.
+   */
+  private wakeMonsters(): void {
+    const now = Date.now();
+    for (const monster of this.world.aliveMonsters()) {
+      if (monster.thinking) continue;
+      if (now - monster.lastThoughtAt < MONSTER_THINK_INTERVAL_MS) continue;
+      monster.lastThoughtAt = now;
+
+      const prowling = monster.currentGoal.kind === "prowl";
+      this.orchestrator.enqueue({
+        kind: prowling ? "idle_reflection" : "survival",
+        creatureId: monster.id,
+        eventText: prowling
+          ? "You have found nothing to kill. Your own life is draining while you prowl."
+          : "You are on the hunt. Decide whether to press it, break off, or take something else.",
+        createdAt: now,
+      });
+    }
+  }
+
+  private onMonsterSpoke(monster: MonsterEntity, utterance: string): void {
+    monster.utterance = utterance;
+    const now = Date.now();
+    for (const devot of this.world.aliveDevots()) {
+      if (dist2(devot.pos, monster.pos) <= PERCEPTION_RADIUS * PERCEPTION_RADIUS) {
+        this.orchestrator.enqueue({
+          kind: "utterance_heard",
+          creatureId: devot.id,
+          eventText: `The monster ${monster.name} makes a sound you understand: "${utterance}"`,
+          createdAt: now,
+        });
+      }
+    }
+  }
+
   private onDevotSpoke(speaker: DevotEntity, utterance: string): void {
     speaker.utterance = utterance;
     const now = Date.now();
@@ -442,7 +601,7 @@ export class WorldRoom extends Room<WorldState> {
       if (dist2(other.pos, speaker.pos) <= PERCEPTION_RADIUS * PERCEPTION_RADIUS) {
         this.orchestrator.enqueue({
           kind: "utterance_heard",
-          devotId: other.id,
+          creatureId: other.id,
           eventText: `${speaker.name}, a devot near you, says: "${utterance}"`,
           createdAt: now,
         });
@@ -510,6 +669,30 @@ export class WorldRoom extends Room<WorldState> {
       s.utterance = d.utterance;
       s.age = d.age;
     }
+    for (const m of this.world.monsters.values()) {
+      let s = this.state.monsters.get(m.id);
+      if (!s) {
+        s = new MonsterState();
+        s.id = m.id;
+        s.name = m.name;
+        s.hpMax = m.hpMax;
+        this.state.monsters.set(m.id, s);
+      }
+      s.x = m.pos.x;
+      s.y = m.pos.y;
+      s.z = m.pos.z;
+      s.hp = Math.max(0, m.hp);
+      s.state = m.state;
+      s.thinking = m.thinking;
+      s.utterance = m.utterance;
+      s.age = m.age;
+    }
+    // Carcasses are cleared from the wire once they have rotted into carrion.
+    for (const id of this.state.monsters.keys()) {
+      const m = this.world.monsters.get(id);
+      if (!m) this.state.monsters.delete(id);
+    }
+
     for (const [id, f] of this.world.food) {
       let s = this.state.food.get(id);
       if (!s) {

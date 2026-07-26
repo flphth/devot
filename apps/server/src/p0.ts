@@ -7,11 +7,11 @@
  * Mind backend (cf. .env.example): Claude Code subscription (default),
  * Messages API (MIND=api + key), or simulated (MIND=mock / --mock).
  */
-import { CognitionOrchestrator, createMind } from "@devot/agents";
+import { CognitionOrchestrator, PROFILES, createMind } from "@devot/agents";
 import { createRepos, openDb } from "@devot/db";
 import { FreeStubProvider } from "@devot/onchain";
 import type { DevotEntity, FoodEntity } from "@devot/shared";
-import { FOOD_TTL_MS, TICK_MS } from "@devot/shared";
+import { FOOD_TTL_MS, TICK_MS, devotSubject } from "@devot/shared";
 import { applyDecision, perceptionSystem, tick, World } from "@devot/sim";
 
 if (process.argv.includes("--mock")) process.env.MIND = "mock";
@@ -71,10 +71,18 @@ async function main(): Promise<void> {
 
   const orchestrator = new CognitionOrchestrator(
     mind,
-    repos,
-    (id) => world.devots.get(id),
-    ({ devotId, decision, hpLoss }) => {
-      const d = world.devots.get(devotId);
+    (id) => {
+      const devot = world.devots.get(id);
+      if (!devot) return undefined;
+      return {
+        entity: devot,
+        subject: devotSubject(devot),
+        profile: PROFILES[devot.profile],
+        memory: repos.messages,
+      };
+    },
+    ({ creatureId, decision, hpLoss }) => {
+      const d = world.devots.get(creatureId);
       if (!d) return;
       applyDecision(d, decision, world);
       log(
@@ -130,7 +138,7 @@ async function main(): Promise<void> {
         for (const d of world.aliveDevots()) {
           orchestrator.enqueue({
             kind: "idle_reflection",
-            devotId: d.id,
+            creatureId: d.id,
             eventText:
               "Nothing notable is happening. You may meditate on your condition, act, or save your life.",
             createdAt: Date.now(),

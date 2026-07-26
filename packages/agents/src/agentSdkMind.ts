@@ -1,10 +1,10 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import type { CognitionProfile, DevotEntity, InferenceUsage } from "@devot/shared";
+import type { CognitionProfile, InferenceUsage, ThoughtSubject } from "@devot/shared";
 import { DECISION_SCHEMA, parseDecision } from "@devot/shared";
 import type { StoredMessage } from "@devot/db";
 import type { Chronicler, ChronicleResult } from "./chronicler.js";
 import type { MindProvider, ThoughtResult } from "./mind.js";
-import { buildEventBlock, buildPersona, WORLD_RULES } from "./prompts.js";
+import { buildEventBlock, buildPersona, rulesFor } from "./prompts.js";
 
 /**
  * Minds powered by the Claude Code subscription (Agent SDK): no pay-per-token
@@ -32,12 +32,12 @@ export class AgentSdkMind implements MindProvider {
   constructor(private modelOverride?: string) {}
 
   async think(
-    devot: DevotEntity,
+    subject: ThoughtSubject,
     profile: CognitionProfile,
     history: StoredMessage[],
     eventText: string,
   ): Promise<ThoughtResult> {
-    const userTurn = buildEventBlock(devot, eventText);
+    const userTurn = buildEventBlock(subject, eventText);
     const transcript = renderTranscript(history);
     const prompt = transcript
       ? `## Your memory (lived so far)\n${transcript}\n\n## Now\n${userTurn}`
@@ -46,7 +46,7 @@ export class AgentSdkMind implements MindProvider {
     const q = query({
       prompt,
       options: {
-        systemPrompt: `${WORLD_RULES}\n\n${buildPersona(devot)}`,
+        systemPrompt: `${rulesFor(subject)}\n\n${buildPersona(subject)}`,
         model: this.modelOverride ?? profile.model,
         maxTurns: 1,
         allowedTools: [],

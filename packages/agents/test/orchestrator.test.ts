@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { DevotEntity } from "@devot/shared";
-import { THOUGHT_COST_FLOOR_HP } from "@devot/shared";
+import { THOUGHT_COST_FLOOR_HP, devotSubject } from "@devot/shared";
 import { createRepos, openDb } from "@devot/db";
 import { MockMind } from "../src/mind.js";
 import { CognitionOrchestrator, type AppliedThought } from "../src/orchestrator.js";
+import { PROFILES } from "../src/profiles.js";
 
 function makeDevot(id: string, hp = 10_000): DevotEntity {
   return {
@@ -32,8 +33,17 @@ function setup(devots: DevotEntity[], mind = new MockMind()) {
   const applied: AppliedThought[] = [];
   const orchestrator = new CognitionOrchestrator(
     mind,
-    repos,
-    (id) => map.get(id),
+    (id) => {
+      const d = map.get(id);
+      return d
+        ? {
+            entity: d,
+            subject: devotSubject(d),
+            profile: PROFILES[d.profile],
+            memory: repos.messages,
+          }
+        : undefined;
+    },
     (a) => applied.push(a),
     () => {},
   );
@@ -53,8 +63,8 @@ describe("cognition orchestrator", () => {
 
     orchestrator.enqueue({
       kind: "idle_reflection",
-      devotId: "d1",
-      eventText: "Rien ne se passe.",
+      creatureId: "d1",
+      eventText: "Nothing is happening.",
       createdAt: Date.now(),
     });
     await settle(orchestrator);
@@ -75,7 +85,7 @@ describe("cognition orchestrator", () => {
     for (let i = 0; i < 5; i++) {
       orchestrator.enqueue({
         kind: "idle_reflection",
-        devotId: "d1",
+        creatureId: "d1",
         eventText: `tick ${i}`,
         createdAt: Date.now(),
       });
@@ -90,7 +100,7 @@ describe("cognition orchestrator", () => {
 
     orchestrator.enqueue({
       kind: "survival",
-      devotId: "d1",
+      creatureId: "d1",
       eventText: "Tu meurs de faim.",
       createdAt: Date.now(),
     });
@@ -107,7 +117,7 @@ describe("cognition orchestrator", () => {
 
     orchestrator.enqueue({
       kind: "divine_message",
-      devotId: "d1",
+      creatureId: "d1",
       eventText: "Une voix venue du ciel te dit : reviens.",
       createdAt: Date.now(),
     });
@@ -130,13 +140,13 @@ describe("cognition orchestrator", () => {
 
     orchestrator.enqueue({
       kind: "idle_reflection",
-      devotId: "a",
+      creatureId: "a",
       eventText: "rien",
       createdAt: Date.now(),
     });
     orchestrator.enqueue({
       kind: "divine_message",
-      devotId: "b",
+      creatureId: "b",
       eventText: "Une voix venue du ciel te dit : lève-toi.",
       createdAt: Date.now(),
     });

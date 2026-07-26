@@ -1,5 +1,11 @@
 import pLimit from "p-limit";
-import type { Decision, DevotEntity, Trigger } from "@devot/shared";
+import type {
+  CognitionProfile,
+  Decision,
+  InferenceUsage,
+  ThoughtSubject,
+  Trigger,
+} from "@devot/shared";
 import {
   CONTEXT_COMPACT_THRESHOLD_MSGS,
   GLOBAL_BUDGET_UHP_PER_MIN,
@@ -7,16 +13,43 @@ import {
   THOUGHT_COST_FLOOR_HP,
   TRIGGER_PRIORITY,
 } from "@devot/shared";
-import type { Repos } from "@devot/db";
+import type { StoredMessage } from "@devot/db";
 import type { Chronicler } from "./chronicler.js";
 import { hpCost } from "./hpCost.js";
 import type { MindProvider } from "./mind.js";
-import { PROFILES } from "./profiles.js";
 
 export interface AppliedThought {
-  devotId: string;
+  creatureId: string;
   decision: Decision;
   hpLoss: number;
+}
+
+/**
+ * Where a creature's past is kept. Devots use the SQLite-backed repo, so their
+ * memory survives a restart and dies with them; monsters use an in-memory store,
+ * since they are ephemeral and their history has no owner to outlive.
+ */
+export interface MemoryStore {
+  history(id: string): StoredMessage[];
+  append(
+    id: string,
+    role: "user" | "assistant",
+    content: unknown,
+    usage?: InferenceUsage,
+  ): void;
+  replaceWithSummary(id: string, summary: string): void;
+}
+
+/**
+ * Everything the orchestrator needs in order to run one creature's mind,
+ * whatever kind of creature it is.
+ */
+export interface Thinker {
+  /** The live entity: hp is read before thinking and written back after. */
+  entity: { id: string; hp: number; state: string; thinking: boolean };
+  subject: ThoughtSubject;
+  profile: CognitionProfile;
+  memory: MemoryStore;
 }
 
 /** Token bucket: caps global inference spending (µ$/min). */
@@ -46,9 +79,13 @@ class BudgetBucket {
 /**
  * Priority inference queue, decoupled from the tick:
  * - bounded concurrency (p-limit)
- * - a single thought in flight per devot
+ * - a single thought in flight per creature
  * - priority: divine > threat > survival > encounter > idle
  * - pre-check hp > floor cost + global token bucket
+ *
+ * Devots and monsters share this one queue on purpose: the budget ceiling is
+ * global, so a pack of monsters cannot starve the devots of thought, nor run
+ * up a bill of its own behind their back.
  */
 export class CognitionOrchestrator {
   private queue: Trigger[] = [];
@@ -58,10 +95,9 @@ export class CognitionOrchestrator {
 
   constructor(
     private mind: MindProvider,
-    private repos: Repos,
-    private getDevot: (id: string) => DevotEntity | undefined,
+    private getThinker: (id: string) => Thinker | undefined,
     private onDecision: (applied: AppliedThought) => void,
-    private onError: (devotId: string, err: unknown) => void = (id, err) =>
+    private onError: (creatureId: string, err: unknown) => void = (id, err) =>
       console.error(`[orchestrator] thought failed for ${id}:`, err),
     /** Optional: enables ageing (history compaction). */
     private chronicler?: Chronicler,
@@ -69,11 +105,11 @@ export class CognitionOrchestrator {
 
   /** Files a trigger; the mind will be woken in the background. */
   enqueue(trigger: Trigger): void {
-    const devot = this.getDevot(trigger.devotId);
-    if (!devot || devot.state === "dead") return;
-    // A devot already thinking, or already queued, is not woken again.
-    if (this.inFlight.has(trigger.devotId)) return;
-    if (this.queue.some((t) => t.devotId === trigger.devotId)) return;
+    const thinker = this.getThinker(trigger.creatureId);
+    if (!thinker || thinker.entity.state === "dead") return;
+    // A creature already thinking, or already queued, is not woken again.
+    if (this.inFlight.has(trigger.creatureId)) return;
+    if (this.queue.some((t) => t.creatureId === trigger.creatureId)) return;
     this.queue.push(trigger);
     this.queue.sort((a, b) => TRIGGER_PRIORITY[a.kind] - TRIGGER_PRIORITY[b.kind]);
     this.pump();
@@ -84,13 +120,16 @@ export class CognitionOrchestrator {
   }
 
   private pump(): void {
-    while (this.queue.length > 0 && this.limit.activeCount + this.limit.pendingCount < MAX_CONCURRENT_INFERENCES) {
+    while (
+      this.queue.length > 0 &&
+      this.limit.activeCount + this.limit.pendingCount < MAX_CONCURRENT_INFERENCES
+    ) {
       const trigger = this.queue.shift()!;
-      const devot = this.getDevot(trigger.devotId);
-      if (!devot || devot.state === "dead") continue;
+      const thinker = this.getThinker(trigger.creatureId);
+      if (!thinker || thinker.entity.state === "dead") continue;
 
-      // Budget pre-check: a devot too poor to think abstains.
-      if (devot.hp <= THOUGHT_COST_FLOOR_HP) continue;
+      // Budget pre-check: a creature too poor to think abstains.
+      if (thinker.entity.hp <= THOUGHT_COST_FLOOR_HP) continue;
       if (!this.bucket.tryConsume(THOUGHT_COST_FLOOR_HP)) {
         // Under budget pressure the non-urgent go to sleep. The body carries
         // on; the mind waits for the next window.
@@ -98,56 +137,83 @@ export class CognitionOrchestrator {
         return;
       }
 
-      this.inFlight.add(devot.id);
-      devot.thinking = true;
+      const id = thinker.entity.id;
+      this.inFlight.add(id);
+      thinker.entity.thinking = true;
 
-      void this.limit(() => this.runThought(trigger, devot)).finally(() => {
-        this.inFlight.delete(devot.id);
-        const d = this.getDevot(devot.id);
-        if (d) d.thinking = false;
+      void this.limit(() => this.runThought(trigger, thinker)).finally(() => {
+        this.inFlight.delete(id);
+        const t = this.getThinker(id);
+        if (t) t.entity.thinking = false;
         this.pump();
       });
     }
   }
 
-  private async runThought(trigger: Trigger, devot: DevotEntity): Promise<void> {
-    const profile = PROFILES[devot.profile];
+  private async runThought(trigger: Trigger, thinker: Thinker): Promise<void> {
+    const { entity, subject, profile, memory } = thinker;
     try {
-      let history = this.repos.messages.history(devot.id);
+      let history = memory.history(entity.id);
 
       // To age is to forget: a history grown too long → the chronicler
       // condenses it into a single memory. That memory work costs HP.
       if (this.chronicler && history.length > CONTEXT_COMPACT_THRESHOLD_MSGS) {
         const { summary, usage } = await this.chronicler.chronicle(
-          [{ name: devot.name, history }],
+          [{ name: subject.name, history }],
           "aging",
         );
-        this.repos.messages.replaceWithSummary(devot.id, summary);
-        devot.hp -= hpCost(usage, "claude-haiku-4-5");
-        history = this.repos.messages.history(devot.id);
+        memory.replaceWithSummary(entity.id, summary);
+        entity.hp -= hpCost(usage, "claude-haiku-4-5");
+        history = memory.history(entity.id);
       }
-      const result = await this.mind.think(devot, profile, history, trigger.eventText);
+      const result = await this.mind.think(subject, profile, history, trigger.eventText);
 
       const loss = hpCost(result.usage, profile.model);
       this.bucket.settle(THOUGHT_COST_FLOOR_HP, loss);
 
-      // The devot may have died while the mind was thinking.
-      const current = this.getDevot(devot.id);
-      if (!current || current.state === "dead") return;
+      // The creature may have died while its mind was thinking.
+      const current = this.getThinker(entity.id);
+      if (!current || current.entity.state === "dead") return;
 
-      // Persists the exchange in the devot's history.
-      this.repos.messages.append(devot.id, "user", result.userTurn);
-      this.repos.messages.append(
-        devot.id,
-        "assistant",
-        result.rawAssistantContent,
-        result.usage,
-      );
+      // Persists the exchange in the creature's history.
+      memory.append(entity.id, "user", result.userTurn);
+      memory.append(entity.id, "assistant", result.rawAssistantContent, result.usage);
 
-      current.hp -= loss;
-      this.onDecision({ devotId: devot.id, decision: result.decision, hpLoss: loss });
+      current.entity.hp -= loss;
+      this.onDecision({ creatureId: entity.id, decision: result.decision, hpLoss: loss });
     } catch (err) {
-      this.onError(devot.id, err);
+      this.onError(entity.id, err);
     }
+  }
+}
+
+/**
+ * A memory that lives and dies with the process. Monsters use it: they leave
+ * no gravestone, so there is nothing to persist, and it keeps their histories
+ * out of a `messages` table whose rows must belong to a devot.
+ */
+export class EphemeralMemory implements MemoryStore {
+  private byId = new Map<string, StoredMessage[]>();
+
+  constructor(private maxMessages = 24) {}
+
+  history(id: string): StoredMessage[] {
+    return this.byId.get(id) ?? [];
+  }
+
+  append(id: string, role: "user" | "assistant", content: unknown): void {
+    const list = this.byId.get(id) ?? [];
+    list.push({ role, content });
+    // Trimmed rather than chronicled: a monster's past is not worth an
+    // inference, and an unbounded list would leak for the life of the server.
+    this.byId.set(id, list.slice(-this.maxMessages));
+  }
+
+  replaceWithSummary(id: string, summary: string): void {
+    this.byId.set(id, [{ role: "user", content: summary }]);
+  }
+
+  forget(id: string): void {
+    this.byId.delete(id);
   }
 }

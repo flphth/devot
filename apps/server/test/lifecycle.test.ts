@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { MockChronicler, MockMind, CognitionOrchestrator } from "@devot/agents";
+import { MockChronicler, MockMind, CognitionOrchestrator, PROFILES } from "@devot/agents";
 import { createRepos, openDb } from "@devot/db";
 import type { DevotEntity } from "@devot/shared";
-import { CONTEXT_COMPACT_THRESHOLD_MSGS } from "@devot/shared";
+import { CONTEXT_COMPACT_THRESHOLD_MSGS, devotSubject } from "@devot/shared";
 import { World } from "@devot/sim";
 import { canRecreateFounder, processReproductions } from "../src/lifecycle.js";
 
@@ -102,8 +102,17 @@ describe("to age is to forget (compaction)", () => {
     let applied = 0;
     const orchestrator = new CognitionOrchestrator(
       new MockMind(),
-      repos,
-      (id) => map.get(id),
+      (id) => {
+        const d = map.get(id);
+        return d
+          ? {
+              entity: d,
+              subject: devotSubject(d),
+              profile: PROFILES[d.profile],
+              memory: repos.messages,
+            }
+          : undefined;
+      },
       () => applied++,
       () => {},
       new MockChronicler(),
@@ -111,8 +120,8 @@ describe("to age is to forget (compaction)", () => {
 
     orchestrator.enqueue({
       kind: "idle_reflection",
-      devotId: devot.id,
-      eventText: "rien",
+      creatureId: devot.id,
+      eventText: "nothing",
       createdAt: Date.now(),
     });
     while (orchestrator.pendingCount > 0) await new Promise((r) => setTimeout(r, 10));
