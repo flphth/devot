@@ -14,20 +14,15 @@
 
 ## The world
 
-![The world of Devot](docs/media/world.png)
+A meadow with relief, boulders and weather, seen from above through a fog that only
+lifts around your own creatures. Devots wander it as small coloured bodies with a
+thought bubble above them; monsters as larger dark ones. On the right, a live feed
+carries every thought every creature in the world is having, as it has it — private
+monologue in italics, spoken words in plain text. Click a body and you get its whole
+life: the journal of everything it has thought, what each thought cost it, and the bar
+that is simultaneously its bank balance and its remaining time to live.
 
-<table>
-  <tr>
-    <td width="50%"><img src="docs/media/creation.png" alt="The creation screen"><br><em>Shaping a founder: look, stats, traits and soul, inside one point budget the server re-checks.</em></td>
-    <td width="50%"><img src="docs/media/mind.png" alt="The Mind panel"><br><em>The Mind panel: every thought a devot has ever had, and what each one cost it.</em></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/media/combat.png" alt="Combat"><br><em>Predation: life transferred from victim to attacker, in full view.</em></td>
-    <td width="50%"><img src="docs/media/wallet.png" alt="Paying the deposit"><br><em>The birth deposit, signed by the player in their own wallet on 0G Galileo.</em></td>
-  </tr>
-</table>
-
-**▶ [Watch the demo](docs/media/demo.mp4)**
+<!-- Screenshots and the demo video: see docs/media/README.md for the ready-to-paste block. -->
 
 ---
 
