@@ -20,10 +20,12 @@ export const devots = sqliteTable("devots", {
   x: real("x").notNull().default(0),
   y: real("y").notNull().default(0),
   z: real("z").notNull().default(0),
-  state: text("state").notNull().default("vivant"),
+  state: text("state").notNull().default("alive"),
   currentGoal: text("current_goal_json"),
   age: integer("age").notNull().default(0),
   traitsJson: text("traits_json").notNull().default("[]"),
+  /** Appearance, stats and signature chosen at creation. Frozen at birth. */
+  identityJson: text("identity_json").notNull().default(""),
   parentA: text("parent_a"),
   parentB: text("parent_b"),
   bornAt: integer("born_at").notNull(),
@@ -31,7 +33,7 @@ export const devots = sqliteTable("devots", {
   lastActionAt: integer("last_action_at").notNull().default(0),
 });
 
-// L'historique LLM du devot. Mort = DELETE CASCADE de ces lignes.
+// The devot's LLM history. Death = DELETE CASCADE on these rows.
 export const messages = sqliteTable("messages", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   devotId: text("devot_id")
@@ -44,7 +46,7 @@ export const messages = sqliteTable("messages", {
   createdAt: integer("created_at").notNull(),
 });
 
-// Mémoire du monde : ce qui survit aux morts (pierres tombales incluses).
+// The world's memory: what outlives the dead (gravestones included).
 export const worldEvents = sqliteTable("world_events", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   type: text("type").notNull(),
